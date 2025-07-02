@@ -201,27 +201,27 @@ def json_ready(obj):
 
 # this script should be called from the root directory of the bank
 # so loads in the generator file work as intended
-def cli(generator_path, build_path, slug, amount=1000, random=True, gen_images=False):
-    seeds_path = os.path.join(build_path, slug, "generated", "seeds.json")
+def cli(_generator_path, _build_path, _slug, _amount=1000, _random=True, _gen_images=False):
+    seeds_path = os.path.join(_build_path, _slug, "generated", "seeds.json")
 
-    load(generator_path) # must provide Generator class extending BaseGenerator
+    load(_generator_path) # must provide Generator class extending BaseGenerator
     generator = Generator()
 
     # Get hash of generator file
-    with open(generator_path, 'rb') as f:
+    with open(_generator_path, 'rb') as f:
         generator_bytes = f.read()
     generator_hash = hashlib.sha256(generator_bytes).hexdigest()
-    cache_dir = os.path.join(build_path, ".cache", f"{generator_hash}")
+    cache_dir = os.path.join(_build_path, ".cache", f"{generator_hash}")
     cache_exists = os.path.exists(cache_dir)
     if cache_exists:
         shutil.copytree(cache_dir,os.path.dirname(seeds_path), dirs_exist_ok=True)
 
     # preview/build to specified JSON file
     seeds = []
-    for i in range(amount):
+    for i in range(_amount):
         if i > 0 and (i % 50) == 0:
             print(f"Generating seed {i}")
-        if random:
+        if _random:
             set_random_seed()
             seed_int = int(randrange(1_000))
         else:
@@ -232,7 +232,7 @@ def cli(generator_path, build_path, slug, amount=1000, random=True, gen_images=F
             "hash":generator_hash,
             "data":json_ready(generator.get_data())
         }
-        if gen_images and not cache_exists:
+        if _gen_images and not cache_exists:
             graphics = generator.graphics()
             if graphics is not None:
                 directory = os.path.join(os.path.dirname(seeds_path))
@@ -251,7 +251,7 @@ def cli(generator_path, build_path, slug, amount=1000, random=True, gen_images=F
     os.makedirs(os.path.dirname(seeds_path), exist_ok=True)
     with open(os.path.join(seeds_path), 'w') as f:
         json.dump(data, f)
-    if amount==1000:
+    if _amount==1000:
         shutil.copytree(os.path.dirname(seeds_path),cache_dir, dirs_exist_ok=True)
 
 
