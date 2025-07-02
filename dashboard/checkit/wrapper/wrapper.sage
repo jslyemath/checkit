@@ -271,7 +271,7 @@ if __name__ == "__main__":
         args.generator_path, 
         args.build_path, 
         args.slug,
-        amount=args.amount, 
-        random=args.random, 
-        gen_images=args.gen_images
+        _amount=args.amount, 
+        _random=args.random, 
+        _gen_images=args.gen_images
     )
