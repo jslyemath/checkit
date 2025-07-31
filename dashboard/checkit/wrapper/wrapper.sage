@@ -165,6 +165,10 @@ class BaseGenerator:
     def data(self):
         return {}
 
+    @property
+    def seed(self):
+        return self.__seed
+
     @provide_data
     def graphics(data):
         return None
