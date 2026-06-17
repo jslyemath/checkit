@@ -145,6 +145,20 @@
         </img>
     </xsl:template>
 
+    <xsl:template match="stx:tikz-image">
+        <img>
+            <xsl:attribute name="src">
+                <xsl:value-of select="@remote"/>
+                <xsl:text>/</xsl:text>
+                <xsl:value-of select="@source"/>
+                <xsl:text>.png</xsl:text>
+            </xsl:attribute>
+            <xsl:attribute name="alt">
+                <xsl:value-of select="@description"/>
+            </xsl:attribute>
+        </img>
+    </xsl:template>
+
     <xsl:template match="stx:url[@href]">
         <xsl:choose>
             <xsl:when test=". != ''">

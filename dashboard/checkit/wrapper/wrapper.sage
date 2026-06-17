@@ -168,7 +168,11 @@ class BaseGenerator:
     @provide_data
     def graphics(data):
         return None
-    
+
+    @provide_data
+    def tikz_graphics(data):
+        return None
+
     def roll_data(self,seed=None):
         if seed is None:
             set_random_seed()
@@ -203,6 +207,7 @@ if len(sys.argv) >= 4:
     amount = int(sys.argv[3])
     random = (len(sys.argv) >= 5 and sys.argv[4].lower() == "random")
     gen_images = (len(sys.argv) >= 6 and sys.argv[5].lower()=="images")
+    image_amount = int(sys.argv[6]) if (gen_images and len(sys.argv) >= 7) else amount
 
     load(generator_path) # must provide Generator class extending BaseGenerator
     generator = Generator()
@@ -219,17 +224,20 @@ if len(sys.argv) >= 4:
             seed_int = int(i)
         generator.roll_data(seed=seed_int)
         seed  = {"seed":seed_int,"data":json_ready(generator.get_data())}
-        if gen_images:
+        if gen_images and i < image_amount:
+            directory = os.path.dirname(seeds_path)
+            seed_path = os.path.join(directory, f"{seed_int:04}")
             graphics = generator.graphics()
             if graphics is not None:
-                directory = os.path.join(os.path.dirname(seeds_path))
-                if not os.path.exists(directory):
-                    os.makedirs(directory)
+                os.makedirs(seed_path, exist_ok=True)
                 for filename in graphics:
-                    seed_path = os.path.join(directory,f"{seed_int:04}")
-                    if not os.path.exists(seed_path):
-                        os.makedirs(seed_path)
-                    graphics[filename].save(os.path.join(seed_path,f"{filename}.png"))
+                    graphics[filename].save(os.path.join(seed_path, f"{filename}.png"))
+            tikz = generator.tikz_graphics()
+            if tikz is not None:
+                os.makedirs(seed_path, exist_ok=True)
+                for name, source in tikz.items():
+                    with open(os.path.join(seed_path, f"{name}.tikz"), "w") as f:
+                        f.write(source)
         seeds.append(seed)
     data = {
         "seeds": seeds,

@@ -152,6 +152,18 @@
         </image>
     </xsl:template>
 
+    <xsl:template match="stx:tikz-image">
+        <image>
+            <xsl:attribute name="source">
+                <xsl:value-of select="@source"/>
+                <xsl:text>.png</xsl:text>
+            </xsl:attribute>
+            <xsl:attribute name="description">
+                <xsl:value-of select="@description"/>
+            </xsl:attribute>
+        </image>
+    </xsl:template>
+
     <xsl:template match="stx:url[@href]">
         <url>
             <xsl:attribute name="href">

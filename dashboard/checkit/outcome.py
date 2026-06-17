@@ -2,6 +2,7 @@ from .exercise import Exercise
 import os, json, random
 from html import escape as escape_html
 from .wrapper import sage
+from .wrapper.tikz import compile_tikz_for_outcome
 
 class Outcome():
     def __init__(self, title=None, slug=None, path=None, description=None, bank=None):
@@ -51,6 +52,7 @@ class Outcome():
     def preview_exercises(self):
         preview_json = os.path.join(self.build_path(),"preview.json")
         sage(self,preview_json,preview=True,images=True)
+        compile_tikz_for_outcome(self)
         with open(os.path.join(preview_json)) as f:
             data = json.load(f)['seeds']
         return [Exercise(d["data"],d["seed"],self) for d in data]
@@ -96,14 +98,16 @@ class Outcome():
     def seeds_json_path(self):
         return os.path.join(self.build_path(),"seeds.json")
 
-    def generate_exercises(self,regenerate=False,images=False,amount=1_000):
+    def generate_exercises(self,regenerate=False,images=False,amount=1_000,image_seeds=None):
         if not regenerate:
             try:
                 self.load_exercises()
                 return
             except RuntimeError:
                 pass # generation is necessary
-        sage(self,self.seeds_json_path(),preview=False,images=images,amount=amount)
+        sage(self,self.seeds_json_path(),preview=False,images=images,amount=amount,image_seeds=image_seeds)
+        if images:
+            compile_tikz_for_outcome(self)
         self.load_exercises(reload=True)
 
 

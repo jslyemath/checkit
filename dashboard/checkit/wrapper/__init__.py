@@ -2,7 +2,7 @@ import importlib.resources
 import subprocess, os, tempfile, shutil
 from ..utils import working_directory
 
-def sage(outcome,output_path,preview=True,images=False,amount=1_000,random=False):
+def sage(outcome,output_path,preview=True,images=False,amount=1_000,random=False,image_seeds=None):
     """
     Wraps generator and builds to a seeds.json file at output_path
     """
@@ -31,4 +31,6 @@ def sage(outcome,output_path,preview=True,images=False,amount=1_000,random=False
                 ]
                 if images:
                     cmds += ["images"]
+                    if image_seeds is not None:
+                        cmds += [str(image_seeds)]
                 subprocess.run(cmds,check=True)

@@ -146,6 +146,12 @@
         <xsl:text>}</xsl:text>
     </xsl:template>
 
+    <xsl:template match="stx:tikz-image">
+        <xsl:text>\input{</xsl:text>
+        <xsl:value-of select="@source"/>
+        <xsl:text>.tikz}</xsl:text>
+    </xsl:template>
+
     <xsl:template match="stx:url[@href]">
         <xsl:choose>
             <xsl:when test=". != ''">
