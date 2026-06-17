@@ -41,17 +41,34 @@ def _compile_one(tikz_path, png_path, name, preamble):
             f.write("\n\\begin{document}\n")
             f.write(f"\\input{{{name}.tikz}}\n")
             f.write("\\end{document}\n")
-        subprocess.run(
+        # pdflatex can exit non-zero on RECOVERABLE errors while still
+        # producing a valid PDF, so we don't use check=True here. Instead we
+        # judge success by whether figure.pdf was actually written.
+        result = subprocess.run(
             ["pdflatex", "-interaction=nonstopmode", "-output-directory", tmp, "figure.tex"],
             cwd=tmp,
-            check=True,
             capture_output=True,
+            text=True,
         )
         pdf_path = os.path.join(tmp, "figure.pdf")
-        subprocess.run(
+        if not os.path.isfile(pdf_path):
+            raise RuntimeError(
+                f"pdflatex failed to produce a PDF for {name} "
+                f"(from {tikz_path}).\n"
+                f"--- pdflatex output ---\n{result.stdout}\n{result.stderr}"
+            )
+        # PDF -> PNG. This step has no recoverable-error quirk, so a non-zero
+        # exit is a genuine failure; surface the output if it happens.
+        result = subprocess.run(
             ["pdftoppm", "-r", "150", "-png", "-singlefile", pdf_path, os.path.join(tmp, name)],
-            check=True,
             capture_output=True,
+            text=True,
         )
+        out_png = os.path.join(tmp, f"{name}.png")
+        if not os.path.isfile(out_png):
+            raise RuntimeError(
+                f"pdftoppm failed to produce a PNG for {name}.\n"
+                f"--- pdftoppm output ---\n{result.stdout}\n{result.stderr}"
+            )
         # PDF is discarded with the temp directory; only the PNG is kept.
-        shutil.move(os.path.join(tmp, f"{name}.png"), png_path)
+        shutil.move(out_png, png_path)
