@@ -19,3 +19,4 @@ checkit.code-workspace
 
 #.venv
 .venv
+.vscode/settings.json
