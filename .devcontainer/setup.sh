@@ -23,6 +23,10 @@ sudo "$TL_BIN/tlmgr" install \
 sudo "$TL_BIN/tlmgr" path add
 cd /workspaces/checkit
 
+## Poppler (pdftoppm) for PDF -> PNG conversion of compiled TikZ
+sudo DEBIAN_FRONTEND=noninteractive apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y poppler-utils
+
 ## sage stuff
 
 # Conda should already be installed in the codespace.  We need to add the conda-forge channel
