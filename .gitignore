@@ -16,3 +16,6 @@ demo-bank/docs
 # default new bank
 new-checkit-bank
 checkit.code-workspace
+
+#.venv
+.venv
