@@ -60,5 +60,13 @@ Example of generating graphics.
 Example of using manually-provided images.
             </description>
         </outcome>
+        <outcome>
+            <title>TikZ Test</title>
+            <slug>TIKZ</slug>
+            <path>outcomes/TIKZ</path>
+            <description>
+Test outcome for TikZ image generation.
+            </description>
+        </outcome>
     </outcomes>
 </bank>
