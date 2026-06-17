@@ -72,16 +72,25 @@ def new(directory):
     help="Generate images.",
 )
 @click.option(
+    "--image-seeds",
+    default=None,
+    type=int,
+    help="Render images for only the first N seeds (default: all). "
+         "The HTML viewer shows ~20 seeds and LMS export uses seeds 100-999, "
+         "so a low value produces broken images for those endusers. "
+         "Intended for quick local previews.",
+)
+@click.option(
     "-o",
     "--outcome",
     default="ALL",
     help="Outcome to generate. \"ALL\" generates all outcomes",
 )
-def generate(amount,regenerate,images,outcome):
+def generate(amount,regenerate,images,image_seeds,outcome):
     b = bank.Bank()
     if outcome != "ALL":
         b._outcomes = [o for o in b._outcomes if o.slug.lower() == outcome.lower()]
-    b.generate_exercises(regenerate=regenerate,images=images,amount=amount)
+    b.generate_exercises(regenerate=regenerate,images=images,amount=amount,image_seeds=image_seeds)
     b.write_json()
 
 # checkit viewer
