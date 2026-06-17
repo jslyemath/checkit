@@ -6,6 +6,11 @@ PREAMBLE = r"""\documentclass[tikz,border=4pt]{standalone}
 """
 # To use a custom preamble, place a tikz_preamble.tex file in the bank root directory.
 
+# Max seconds any single figure may take to compile or convert. A normal figure
+# takes 1-2s; this only trips on a genuinely stuck process (e.g. pdflatex caught
+# at an interactive prompt despite nonstopmode, or a runaway computation).
+COMPILE_TIMEOUT = 60
+
 def compile_tikz_for_outcome(outcome):
     """Compile any .tikz files in the outcome's generated/ directory to PNG."""
     generated = outcome.build_path()  # assets/<slug>/generated/
@@ -44,12 +49,26 @@ def _compile_one(tikz_path, png_path, name, preamble):
         # pdflatex can exit non-zero on RECOVERABLE errors while still
         # producing a valid PDF, so we don't use check=True here. Instead we
         # judge success by whether figure.pdf was actually written.
-        result = subprocess.run(
-            ["pdflatex", "-interaction=nonstopmode", "-output-directory", tmp, "figure.tex"],
-            cwd=tmp,
-            capture_output=True,
-            text=True,
-        )
+        # stdin=DEVNULL: some errors drop pdflatex to an interactive prompt even
+        # under nonstopmode; feeding it empty input makes it exit instead of
+        # hanging forever. Unfortunately this still doesn't work correctly.
+        # timeout: hard backstop against any runaway process.
+        try:
+            result = subprocess.run(
+                ["pdflatex", "-interaction=nonstopmode", "-output-directory", tmp, "figure.tex"],
+                cwd=tmp,
+                capture_output=True,
+                text=True,
+                stdin=subprocess.DEVNULL,
+                timeout=COMPILE_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired as e:
+            raise RuntimeError(
+                f"pdflatex timed out (>{COMPILE_TIMEOUT}s) compiling {name} "
+                f"(from {tikz_path}). The figure may contain an error that put "
+                f"pdflatex into an interactive prompt, or an expensive/looping "
+                f"computation.\n--- partial output ---\n{e.stdout}\n{e.stderr}"
+            ) from e
         pdf_path = os.path.join(tmp, "figure.pdf")
         if not os.path.isfile(pdf_path):
             raise RuntimeError(
@@ -59,11 +78,19 @@ def _compile_one(tikz_path, png_path, name, preamble):
             )
         # PDF -> PNG. This step has no recoverable-error quirk, so a non-zero
         # exit is a genuine failure; surface the output if it happens.
-        result = subprocess.run(
-            ["pdftoppm", "-r", "150", "-png", "-singlefile", pdf_path, os.path.join(tmp, name)],
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                ["pdftoppm", "-r", "150", "-png", "-singlefile", pdf_path, os.path.join(tmp, name)],
+                capture_output=True,
+                text=True,
+                stdin=subprocess.DEVNULL,
+                timeout=COMPILE_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired as e:
+            raise RuntimeError(
+                f"pdftoppm timed out (>{COMPILE_TIMEOUT}s) converting {name}.\n"
+                f"--- partial output ---\n{e.stdout}\n{e.stderr}"
+            ) from e
         out_png = os.path.join(tmp, f"{name}.png")
         if not os.path.isfile(out_png):
             raise RuntimeError(
