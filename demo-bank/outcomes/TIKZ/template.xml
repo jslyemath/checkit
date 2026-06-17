@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<knowl mode="exercise" xmlns="https://spatext.clontz.org" version="0.2">
+    <content>
+        <p>What is the area of this rectangle?</p>
+        <p>
+            <tikz-image
+                source="assets/TIKZ/generated/{{__seed__}}/rect"
+                description="A {{a}} by {{b}} rectangle."/>
+        </p>
+    </content>
+    <outtro>
+        <p>The area is <m>{{a}} \times {{b}}</m>.</p>
+    </outtro>
+</knowl>
