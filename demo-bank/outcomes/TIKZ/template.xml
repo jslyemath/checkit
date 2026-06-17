@@ -1,14 +1,14 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <knowl mode="exercise" xmlns="https://spatext.clontz.org" version="0.2">
     <content>
-        <p>What is the area of this rectangle?</p>
+        <p>Identify the circumcenter of the triangle shown.</p>
         <p>
             <tikz-image
-                source="assets/TIKZ/generated/{{__seed__}}/rect"
-                description="A {{a}} by {{b}} rectangle."/>
+                source="assets/TIKZ/generated/{{__seed__}}/triangle"
+                description="A triangle with its circumscribed circle."/>
         </p>
     </content>
     <outtro>
-        <p>The area is <m>{{a}} \times {{b}}</m>.</p>
+        <p>The circumcenter is equidistant from all three vertices.</p>
     </outtro>
 </knowl>
