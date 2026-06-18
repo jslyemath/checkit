@@ -1,6 +1,6 @@
 # CheckIt Codebase Notes
 
-This document is as close to a complete, self-contained reference for the CheckIt codebase as possible. Every class, function, file, and design decision is explained here in enough detail that someone with no access to the source files can answer any question about how the system works. It started by looking at the original CheckIt by StevenClontz. Now, it also details changes made to this fork, maintained by jslyemath. Note that it is maintained alongside the code but may lag; when in doubt, the actual source code is authoritative.
+This document is as close to a complete, self-contained reference for the CheckIt codebase as possible. Every class, function, file, and design decision is explained here in enough detail that someone with no access to the source files can answer any question about how the system works. It started by looking at the original CheckIt by StevenClontz. Now, it also details changes made to this fork, maintained by jslyemath. Note that it is maintained alongside the code but may lag; when in doubt, the actual source code is authoritative. Please update this document appropriately whenever making changes to the codebase.
 
 ---
 
@@ -179,7 +179,7 @@ checkit/                             (repo root)
         │   │   └── List.svelte      <list>/<item> -> <ul>/<li> with ContentNodes
         │   ├── NodeList/
         │   │   ├── ContentNodes.svelte  dispatches block-level nodes (p, list, knowl)
-        │   │   ├── ParagraphNodes.svelte  dispatches inline nodes (m, me, em, c, q, url, image)
+        │   │   ├── ParagraphNodes.svelte  dispatches inline nodes (m, me, em, c, q, url, image, tikz-image)
         │   │   └── TitleNodes.svelte  inline nodes allowed inside a title (m, c, em, q)
         │   └── xsl/
         │       ├── html.xsl         SpaTeXt -> HTML (browser-side, identical to static copy)
@@ -1005,7 +1005,12 @@ Children of `<knowl>`:
 
 **`<tikz-image source="..." description="...">`** — A TikZ-generated image (fork addition; see §12 "Image generation backends"). `source` is the relative path to the compiled figure **without** the `.png` extension (e.g., `assets/TIKZ/generated/{{__seed__}}/triangle`); the XSLT appends the appropriate suffix per output format. The three stylesheets render it differently: HTML/PreTeXt point at the compiled `<source>.png`, while LaTeX `\input{<source>.tikz}`s the original TikZ source so print/PDF needs no PNG at all. The HTML rule prefixes `src` with the element's `@remote` attribute when present.
 
-> **Known viewer gap:** unlike `<image>`, `<tikz-image>` is *not* wired into the interactive Svelte rendering path. `outcomeToStx` (in `utils/index.ts`) only sets `@remote` on `image` tags, and `ParagraphNodes.svelte` only dispatches `m/me/c/em/q/image/url` — `tikz-image` falls through and is dropped. So a `<tikz-image>` renders in the **html / latex / pretext export tabs** (which run the XSLT via `XSLTProcessor`) but shows nothing in the default interactive **display** mode. Wiring it up would mean adding a `tikz-image` case to `ParagraphNodes.svelte` and extending the `querySelectorAll("image")` remote-stamping in `outcomeToStx` to cover `tikz-image`.
+`<tikz-image>` is wired into every rendering path the same way `<image>` is — but getting there required fixing two bugs that left it half-implemented:
+
+1. **Dead XSLT rules (all three stylesheets, both copies):** the `stx:tikz-image` template existed, but the `parseDisplay` template — which lists exactly which inline children of a `<p>` to process — only selected `…|stx:url|stx:image`, *not* `stx:tikz-image`. In XSLT, `apply-templates` with an explicit `select` processes only the listed nodes, so a `<tikz-image>` inside a paragraph was silently skipped and its rule never fired. The element therefore rendered as nothing in **every** output (HTML, LaTeX, PreTeXt — server-side and in the viewer's export tabs). Fixed by adding `|stx:tikz-image` to the `parseDisplay` select in all six files.
+2. **Interactive Svelte path:** `outcomeToStx` (in `utils/index.ts`) stamped `@remote` only on `image` tags, and `ParagraphNodes.svelte` dispatched only `m/me/c/em/q/image/url`, so `<tikz-image>` was dropped in the default interactive **display** mode. Fixed by extending the remote-stamping query to `"image, tikz-image"` and adding a `tikz-image` case to `ParagraphNodes.svelte` (its `src` reuses the image helper and appends `.png`).
+
+Because `viewer.zip` is a gitignored build artifact, the viewer-side fixes only reach end users after `update_viewer.py` (or `build_docs.py`) regenerates it.
 
 **`<list>`** — An unordered list.
 
@@ -1049,7 +1054,7 @@ This distinction prevents double-nesting of knowls.
 
 **`match="stx:p"`:** `<p>` element, calling the named `parseDisplay` template for inline content.
 
-**`parseDisplay` template:** Applies templates to all inline children: text nodes, `<m>`, `<me>`, `<q>`, `<c>`, `<em>`, `<url>`, `<image>`.
+**`parseDisplay` template:** Applies templates to all inline children: text nodes, `<m>`, `<me>`, `<q>`, `<c>`, `<em>`, `<url>`, `<image>`, `<tikz-image>`. This explicit `select` list is the gatekeeper for inline rendering — an inline element rule only fires if the element is named here (see the `<tikz-image>` note in the SpaTeXt vocabulary above).
 
 **`match="stx:m"`:**
 ```html
@@ -1301,7 +1306,7 @@ Converts an outcome + seed index to a SpaTeXt DOM element.
 2. If Mustache fails, returns a knowl with an error message
 3. Parses the resulting XML string via `DOMParser`
 4. If XML parsing fails (e.g., malformed XML from bad generator output), returns an error knowl
-5. Finds all `<image>` elements and sets their `remote` attribute to the current page's origin + pathname (so relative image paths work correctly when the viewer is served from a subdirectory)
+5. Finds all `<image>` and `<tikz-image>` elements (`querySelectorAll("image, tikz-image")`) and sets their `remote` attribute to the current page's origin + pathname (so relative image paths work correctly when the viewer is served from a subdirectory)
 6. Returns the root DOM element
 
 **`outcomeToHtml(outcome, seed, mathMode, solutions)`**
@@ -1416,6 +1421,7 @@ Renders:
 - `<em>` → `<em>` containing recursive `<svelte:self>`
 - `<q>` → `"` + recursive `<svelte:self>` + `"`
 - `<image>` → `<img style="max-width:100%" src={...} alt={...}>`. The `src` is computed as `remote + "/" + source` if a `remote` attribute exists, otherwise just `source`.
+- `<tikz-image>` → same as `<image>`, but the `src` helper appends `.png` (the template stores the figure path without an extension). Mirrors the `stx:tikz-image` HTML XSLT rule so the interactive display and the html export tab agree.
 - `<url>` → `<a href={...}>`. If text content is empty, shows the href; otherwise shows `<svelte:self nodes={child nodes}>`.
 - Other elements: ignored
 
@@ -2244,7 +2250,16 @@ upstream merge doesn't silently revert them:
 - **TikZ image backend** — new wrapper/tikz.py; tikz_graphics() added to
   BaseGenerator in wrapper.sage; <tikz-image> rule added to all three XSLTs
   (both the dashboard/checkit/static/ and viewer/src/spatext/xsl/ copies);
-  image_amount cap in wrapper.sage.
+  image_amount cap in wrapper.sage. NOTE: the rule alone is not enough — the
+  `parseDisplay` template in each stylesheet must also list `stx:tikz-image` in
+  its `apply-templates select`, or the rule is dead code and the element renders
+  as nothing. (This was initially missed; watch that an upstream merge of the
+  XSLTs keeps `|stx:tikz-image` in all six `parseDisplay` selects.)
+- **TikZ in the interactive viewer** — `<tikz-image>` is wired into the Svelte
+  display path: `ParagraphNodes.svelte` has a `tikz-image` case, and
+  `outcomeToStx` (utils/index.ts) stamps `@remote` on `image, tikz-image`.
+  Without these, TikZ figures render only in the html/latex/pretext export tabs,
+  not in the default display mode.
 - **image_seeds option** — added to the CLI generate command and threaded
   through Bank/Outcome.generate_exercises and sage().
 - **tikz.py robustness** — judges pdflatex success by PDF existence (not exit
