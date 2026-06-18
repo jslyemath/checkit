@@ -645,7 +645,7 @@ The method, when called as `generator.graphics()`, automatically receives the cu
 Every generator must define a `Generator` class that extends `BaseGenerator`. This base class handles seed management so authors don't have to.
 
 **`__init__(self)`**
-Sets `self.__data = None` and `self.__seed = None` (double-underscored = name-mangled, truly private).
+Sets `self.__data = None` and `self.__seed = None` (double-underscored = name-mangled, truly private), plus `self.variant = None` (the shuffle-bag–assigned problem type; see below).
 
 **`data(self)`**
 Default implementation returns `{}`. Subclasses override this to return the actual exercise data dict. Note: this is a pure function — it should generate fresh random data every time it's called (using Sage's `randrange`, `choice`, etc., which are seeded by `set_random_seed`).
@@ -653,11 +653,29 @@ Default implementation returns `{}`. Subclasses override this to return the actu
 **`graphics(data)`**
 Default decorated with `@provide_data`, returns `None`. Subclasses override this to return `{filename: sage_graphics_object}`.
 
-**`roll_data(self, seed=None)`**
-If `seed` is None, calls `set_random_seed()` (seeds from system entropy) and picks a random seed in [0,999]. Otherwise uses the given seed. Calls `set_random_seed(seed)` to make all random operations deterministic, then calls `self.data()` and stores the result in `self.__data`. Stores the seed in `self.__seed`.
+**`roll_data(self, seed=None, variant=None)`**
+If `seed` is None, calls `set_random_seed()` (seeds from system entropy) and picks a random seed in [0,999]. Otherwise uses the given seed. Stores `seed` in `self.__seed` and `variant` in `self.variant`, then calls `set_random_seed(seed)` to make all random operations deterministic, and finally calls `self.data()`, storing the result in `self.__data`.
 
 **`get_data(self)`**
-Returns `self.__data` with `"__seed__"` injected as a zero-padded 4-digit string. The `__seed__` key is special — it lets templates reference `{{__seed__}}` to construct image paths like `assets/IMG1/generated/{{__seed__}}/plot.png`.
+Returns `self.__data` with `"__seed__"` injected as a zero-padded 4-digit string. The `__seed__` key is special — it lets templates reference `{{__seed__}}` to construct image paths like `assets/IMG1/generated/{{__seed__}}/plot.png`. If a variant was assigned and is a primitive (`str`/`int`/`bool`), `"__variant__"` is also injected so templates can show it and the spread is easy to verify in `seeds.json`.
+
+#### Evenly spreading problem types: `variants` and `build_variant_bag`
+
+When an outcome has a limited, hand-authored set of *problem types* (e.g. 20–50 distinct word-problem formats, or whole hand-built exercises), choosing the type inside `data()` with `choice([...])` makes identical types cluster back-to-back, because each seed draws independently. To fix this, a generator may declare a class attribute:
+
+```python
+class Generator(BaseGenerator):
+    variants = ["derivative", "rate of change"]   # any list of labels, even dicts
+    def data(self):
+        kind = self.variant   # assigned by the wrapper, not rolled here
+        ...
+```
+
+**`variants`** — defaults to `None` (feature off; legacy behavior). When set to a non-empty list, the wrapper assigns each seed one label via an even *shuffle-bag* and exposes it as `self.variant`.
+
+**`build_variant_bag(self, amount)`** — returns a length-`amount` list of labels. Each "chunk" is a freshly shuffled full permutation of `self.variants`, so counts are as even as possible. If a new chunk's first label equals the previous chunk's last label, the chunk is re-shuffled (up to 20 tries) to prevent a repeat across the boundary. The bag is built under a fixed RNG seed (`set_random_seed(0)`), so the order is reproducible and the first-N prefix is stable across different `amount` values. For 12 seeds and 4 types you get e.g. `B C A D | A D C B | D A B C`.
+
+Numbers inside each exercise are still randomized per-seed exactly as before — only the *type* is now assigned externally. Backward compatible: generators that don't declare `variants` are unaffected.
 
 #### Function: `json_ready(obj)`
 
@@ -688,14 +706,16 @@ Steps:
 1. Parses command-line arguments from `sys.argv`
 2. Calls `load(generator_path)` — SageMath's `load()` function executes the generator file in the current namespace, making its `Generator` class available
 3. Creates a `Generator()` instance
-4. Loops `amount` times:
+4. If the generator declares `variants`, calls `generator.build_variant_bag(amount)` once to get the length-`amount` list of type labels (otherwise `variant_bag` is `None`)
+5. Loops `amount` times:
    - If `random` mode: picks a random seed in [0,999]
    - Otherwise: seed = loop index i
-   - Calls `generator.roll_data(seed=seed_int)` to generate the data
+   - Picks `variant = variant_bag[i]` if a bag exists, else `None`
+   - Calls `generator.roll_data(seed=seed_int, variant=variant)` to generate the data
    - Calls `generator.get_data()` and wraps with `json_ready()` to get serializable data
    - If `gen_images`: calls `generator.graphics()`, creates directories, saves each PNG
    - Appends `{"seed": seed_int, "data": data}` to `seeds` list
-5. Writes the full JSON: `{"seeds": [...], "generated_on": "...ISO timestamp..."}` to `output_path`
+6. Writes the full JSON: `{"seeds": [...], "generated_on": "...ISO timestamp..."}` to `output_path`
 
 ---
 
@@ -744,10 +764,12 @@ After `json_ready()`, `line['equation']` becomes a LaTeX string like `"3 x + 5 y
 
 ### `demo-bank/outcomes/EX/EX2/generator.sage`
 
-Demonstrates product rule derivative exercises.
+Demonstrates product rule derivative exercises, and is the worked example of the `variants` shuffle-bag feature.
 
 ```python
 class Generator(BaseGenerator):
+    variants = ["derivative", "rate of change"]
+
     def data(self):
         x = var("x")
         factors = [
@@ -759,7 +781,7 @@ class Generator(BaseGenerator):
         ]
         shuffle(factors)
         f = choice([-1, 1]) * randrange(2, 5) * factors[0] * factors[1]
-        variant = choice(["derivative", "rate of change"])
+        variant = self.variant   # assigned by the shuffle-bag, not rolled here
         return {
             "f": f,
             "dfdx": f.diff(),
@@ -767,7 +789,7 @@ class Generator(BaseGenerator):
         }
 ```
 
-`f.diff()` is Sage's symbolic differentiation. `e^x` is the natural exponential in Sage (not Python's `e**x`). After `json_ready()`, `f` becomes a LaTeX string like `"3 x^{4} \cos\left(x\right)"` and `dfdx` becomes the LaTeX for its derivative.
+`f.diff()` is Sage's symbolic differentiation. `e^x` is the natural exponential in Sage (not Python's `e**x`). After `json_ready()`, `f` becomes a LaTeX string like `"3 x^{4} \cos\left(x\right)"` and `dfdx` becomes the LaTeX for its derivative. The problem wording (`d_synonym`) comes from `self.variant`: rather than each seed independently rolling `choice(["derivative", "rate of change"])`, the wrapper hands out the two wordings in an even, shuffled spread, so they no longer clump back-to-back.
 
 ---
 

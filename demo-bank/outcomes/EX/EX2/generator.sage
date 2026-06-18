@@ -1,4 +1,10 @@
+# `variants` opts this outcome into the wrapper's even shuffle-bag: instead of
+# each seed independently rolling choice([...]) for the problem wording, which
+# clusters identical wordings back-to-back, the wrapper hands each seed one
+# evenly-spread, shuffled label via self.variant.
 class Generator(BaseGenerator):
+    variants = ["derivative", "rate of change"]
+
     def data(self):
         x = var("x")
 
@@ -13,8 +19,8 @@ class Generator(BaseGenerator):
         shuffle(factors)
         f = choice([-1,1])*randrange(2,5)*factors[0]*factors[1]
 
-        variant = choice(["derivative", "rate of change"])
-
+        # problem wording is assigned by the shuffle-bag, not chosen here
+        variant = self.variant
 
         return {
             "f": f,

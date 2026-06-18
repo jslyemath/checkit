@@ -158,9 +158,18 @@ def provide_data(func):
 
 # BaseGenerator class inherited by each outcome's Generator class to minimize boilerplate
 class BaseGenerator:
+    # Authors may set this to a list of "problem type" labels: strings, ints, or
+    # even dicts carrying a whole hand-built problem. When set, the wrapper
+    # assigns each seed one label via an even shuffle-bag, see build_variant_bag,
+    # and exposes it as self.variant for data() to branch on, instead of the
+    # author calling choice themselves. Leaving it None keeps the legacy
+    # behavior unchanged.
+    variants = None
+
     def __init__(self):
         self.__data = None
         self.__seed = None
+        self.variant = None
 
     def data(self):
         return {}
@@ -173,17 +182,44 @@ class BaseGenerator:
     def tikz_graphics(data):
         return None
 
-    def roll_data(self,seed=None):
+    def build_variant_bag(self,amount):
+        """
+        Returns a length-`amount` list of variant labels drawn from self.variants
+        using a shuffle-bag: each chunk is a freshly shuffled full permutation of
+        all variants, so counts are as even as possible. A bounded re-shuffle of
+        each new chunk prevents a label repeating across a chunk boundary. Built
+        under a fixed RNG seed so the order is reproducible and the first-N prefix
+        is stable across different `amount` values.
+        """
+        k = len(self.variants)
+        set_random_seed(0)
+        order, prev_last = [], None
+        while len(order) < amount:
+            chunk = list(range(k))
+            shuffle(chunk)
+            if k > 1 and prev_last is not None and chunk[0] == prev_last:
+                for _ in range(20):
+                    shuffle(chunk)
+                    if chunk[0] != prev_last:
+                        break
+            order += chunk
+            prev_last = chunk[-1]
+        return [self.variants[i] for i in order[:amount]]
+
+    def roll_data(self,seed=None,variant=None):
         if seed is None:
             set_random_seed()
             seed = randrange(1000)
         self.__seed = seed
+        self.variant = variant
         set_random_seed(seed)
         self.__data = self.data()
 
     def get_data(self):
         data = self.__data
         data["__seed__"] = f"{self.__seed:04}"
+        if isinstance(self.variant,(str,int,bool)):
+            data["__variant__"] = self.variant
         return self.__data
 
 # converts SageMath objects into latexified strings
@@ -212,6 +248,10 @@ if len(sys.argv) >= 4:
     load(generator_path) # must provide Generator class extending BaseGenerator
     generator = Generator()
 
+    # if the generator declares problem-type variants, assign them across the
+    # seeds with an even shuffle-bag instead of letting each seed roll its own
+    variant_bag = generator.build_variant_bag(amount) if getattr(generator,"variants",None) else None
+
     # preview/build to specified JSON file
     seeds = []
     for i in range(amount):
@@ -222,7 +262,8 @@ if len(sys.argv) >= 4:
             seed_int = int(randrange(1_000))
         else:
             seed_int = int(i)
-        generator.roll_data(seed=seed_int)
+        variant = variant_bag[i] if variant_bag is not None else None
+        generator.roll_data(seed=seed_int,variant=variant)
         seed  = {"seed":seed_int,"data":json_ready(generator.get_data())}
         if gen_images and i < image_amount:
             directory = os.path.dirname(seeds_path)
