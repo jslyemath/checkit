@@ -8,6 +8,8 @@
             return i.getAttribute('source')
         }
     }
+    // tikz-image stores its path without an extension; the compiled figure is a PNG
+    const tikzImageSrc = (i:Element) => imageSrc(i)+".png"
 </script>
 
 {#each nodes as node}
@@ -26,6 +28,8 @@
             "<svelte:self nodes={node.childNodes}/>"
         {:else if node.nodeName.toLowerCase() == "image"}
             <img style="max-width:100%" src={imageSrc(node)} alt={node.getAttribute('description')}/>
+        {:else if node.nodeName.toLowerCase() == "tikz-image"}
+            <img style="max-width:100%" src={tikzImageSrc(node)} alt={node.getAttribute('description')}/>
         {:else if node.nodeName.toLowerCase() == "url"}
             <a href={node.getAttribute("href")}>
                 {#if node.textContent.trim()===''}

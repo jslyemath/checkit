@@ -103,7 +103,7 @@
     </xsl:template>
 
     <xsl:template name="parseDisplay">
-        <xsl:apply-templates select="text()|stx:m|stx:me|stx:q|stx:c|stx:em|stx:url|stx:image"/>
+        <xsl:apply-templates select="text()|stx:m|stx:me|stx:q|stx:c|stx:em|stx:url|stx:image|stx:tikz-image"/>
     </xsl:template>
 
     <xsl:template match="stx:p">

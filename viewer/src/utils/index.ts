@@ -29,8 +29,9 @@ export const outcomeToStx = (o:Outcome,seed:number) => {
         return knowl
     }
     let stxElement = parser.parseFromString(stxString, "application/xml").querySelector(":scope")
-    stxElement.querySelectorAll("image").forEach(image => {
-        image.setAttribute("remote", `${location.protocol}//${location.host}${location.pathname.replace(/\/+$/, "")}`)
+    const remote = `${location.protocol}//${location.host}${location.pathname.replace(/\/+$/, "")}`
+    stxElement.querySelectorAll("image, tikz-image").forEach(image => {
+        image.setAttribute("remote", remote)
     });
     return stxElement
 }
