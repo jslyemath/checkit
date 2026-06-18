@@ -115,6 +115,7 @@ class Outcome():
         if not reload:
             try:
                 self._exercises
+                return            # already loaded and not a forced reload, so skip the file read (originally a bug?)
             except AttributeError:
                 pass # load is necessary
         try:
