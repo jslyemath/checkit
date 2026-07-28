@@ -1669,7 +1669,12 @@ Required attributes and elements:
   - `<path>` — path relative to the bank root pointing to the outcome directory
   - `<description>` — shown on the outcome page
 
+Optional elements:
+- `<ai-prompt>` — free prose prepended to the payload of the viewer's "Copy for AI Chatbot" button (see §12). Valid at bank level and inside any `<outcome>`; the outcome's value wins, then the bank's, then a generic built-in default. Parsed by `xml.optional_text()`, which dedents and strips, so the body can be indented to match the surrounding XML or not.
+
 The `<path>` element allows arbitrary directory organization. The demo bank uses `outcomes/EX/EX1` (nested), while the boilerplate uses `outcomes/EX1` (flat).
+
+**On adding optional elements:** use `xml.optional_text()` rather than `.find(...).text`. Banks authored against an older CheckIt won't have the element, and `.find()` returns `None` — so the required-element style (`ele.find(...).text`) raises `AttributeError` and refuses to open the bank at all. Every optional element must degrade to `None` and let the consumer fall back.
 
 ### `generator.sage`
 
@@ -2156,7 +2161,30 @@ Since `wrapper.sage` is loaded by `importlib.resources` at runtime, changes to i
 
 ### Making Exercise Versions Viewable by AI Helper Chatbots
 
-Currently the viewer is a JavaScript SPA that renders exercises dynamically. AI crawlers see only the empty HTML shell. To make exercises accessible to AI assistants:
+**These are two different goals and they need different solutions. Don't conflate them.**
+
+| | who is reading | sees the SPA's rendered DOM? |
+|---|---|---|
+| **A. Student shares an exercise with a chatbot** | browser assistant, or a chat window they paste into | yes — assistants read the rendered page, after JS |
+| **B. Crawler discoverability** | GPTBot, ClaudeBot, Googlebot | no — they fetch the URL and never run JS |
+
+Only **B** is blocked by the "SPA serves an empty shell" problem. The three options below address B. They do nothing for A, because a browser assistant already sees everything the student sees.
+
+#### Goal A — implemented: the "Copy for AI Chatbot" button
+
+A student-facing button on the outcome page (`routes/Outcome.svelte`) copies the currently-viewed exercise to the clipboard, built by `outcomeToAiText(bank, outcome, seed)` in `utils/index.ts`. The payload is: the bank author's prompt header, identifying context (slug, title, learning outcome, version, source URL), then the exercise **including its answer**, rendered as HTML.
+
+Three decisions worth preserving:
+
+- **HTML, not LaTeX.** `outcomeToHtml()` goes through `outcomeToStx()`, which stamps `@remote` with the page's absolute origin + path, so every `<img src>` is a fully-qualified public URL a chatbot can fetch to *see* the figure. The LaTeX output emits bank-relative `\includegraphics` / `\input{...tikz}` paths instead, which mean nothing off the authoring machine. HTML also leaves math as raw `\( \)` LaTeX rather than rendered KaTeX spans, which is more legible to a model, not less.
+- **Answers are included, deliberately.** This is a tutoring aid, not an assessment surface. Note the contrast with the *display* path: `Knowl.svelte` uses `{#if showOuttro}` (a conditional render, not CSS hiding), so a browser assistant reading the page does *not* see the answer until the student reveals it. The button is the explicit, opt-in channel for handing it over.
+- **The prompt header is bank-authored**, via `<ai-prompt>` in `bank.xml` at bank or outcome level (§8). This is the first use of the "bank declares something the viewer needs" channel — the same mechanism the bank-declared LaTeX preamble would use.
+
+Known limits, both inherent rather than bugs: the image URLs only resolve when the bank is **published** (from a local preview they point at `localhost`), and whether a given chatbot actually fetches a pasted URL is up to that chatbot. The button makes vision possible, not guaranteed.
+
+A related cheap win for goal A: image `description` attributes become the `alt` text, so a *data-driven* description (IMG1's `"Line with intercept {{intercept}} and slope {{slope}}"`) is far more useful to a model — and to a screen reader — than a static one (TIKZ's `"A triangle with its circumscribed circle"`, which omits the coordinates that make the figure specific).
+
+#### Goal B — crawler discoverability (not implemented)
 
 **Option 1: Add a static HTML export command.**
 Add a `checkit export-html` CLI command that, for each outcome and each of the first N seeds, calls `Exercise.html()` and writes the result to `docs/bank/<slug>/<seed>.html`. Also write a `docs/bank/index.html` with links to all pages. This creates a crawlable site.
@@ -2167,7 +2195,7 @@ Files to modify:
 - `dashboard/checkit/exercise.py` — `Exercise.html()` is already available
 
 **Option 2: Use server-side rendering.**
-Deploy the bank with a Python server that accepts `GET /bank/<slug>/<seed>` and returns fully rendered HTML (using `Exercise.html()` + the KaTeX CSS) with no JavaScript required.
+Deploy the bank with a Python server that accepts `GET /bank/<slug>/<seed>` and returns fully rendered HTML (using `Exercise.html()` + the KaTeX CSS) with no JavaScript required. **Note this abandons static hosting** — a bank currently deploys as files on GitHub Pages with no server anywhere, and Option 2 requires one to be running for the bank to be readable at all. That's a change to the project's deployment model, not just an added feature. Option 1 achieves the same crawlability while staying static.
 
 **Option 3: Add a JSON-LD metadata file.**
 Generate a `docs/exercises.jsonld` with exercise content in schema.org `Quiz` format. AI systems that understand structured data can consume this directly.
@@ -2302,6 +2330,14 @@ upstream merge doesn't silently revert them:
   `tkz-euclide` is *demo-bank's* choice and should not be pushed onto every
   CheckIt user. Upstreaming this means sending the `tikz` line only, or building
   the bank-declared preamble channel described below.
+- **"Copy for AI Chatbot" button** — student-facing button in
+  `routes/Outcome.svelte`, payload built by `outcomeToAiText()` in
+  `utils/index.ts`; new optional `<ai-prompt>` element in `bank.xml` (bank-level
+  with per-outcome override), parsed by the new `xml.optional_text()` helper and
+  carried to the viewer as an `ai_prompt` key on both `Bank.to_dict()` and
+  `Outcome.to_dict()`. `types.ts` gains matching optional fields. See §12; note
+  the `ai_prompt` key is the first thing a bank declares that the viewer reads
+  at runtime, so it is also the template for the bank-declared LaTeX preamble.
 - **image_seeds option** — added to the CLI generate command and threaded
   through Bank/Outcome.generate_exercises, sage(), and compile_tikz_for_outcome().
   Caps *rasterization only*; `.tikz` source is always written (see §12).
