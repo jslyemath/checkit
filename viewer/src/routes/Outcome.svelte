@@ -6,7 +6,7 @@
     import { instructorEnabled, assessmentOutcomeSlugs } from '../stores/instructor';
     import Bank from './Bank.svelte';
     import { push, querystring } from 'svelte-spa-router';
-    import { toggleCodeCell } from '../utils';
+    import { toggleCodeCell, outcomeToAiText } from '../utils';
 
     export let params:Params;
 
@@ -40,6 +40,15 @@
     const changeSeed = (diff:number) => {
         seed = Math.max(0,Math.min(19,seed+diff))
     }
+
+    let copied = false
+    let copyTimer:ReturnType<typeof setTimeout>
+    const copyForAi = async () => {
+        await navigator.clipboard.writeText(outcomeToAiText($bank,outcome,seed))
+        copied = true
+        clearTimeout(copyTimer)
+        copyTimer = setTimeout(()=>copied=false,2000)
+    }
 </script>
 
 <Bank {params}>
@@ -68,6 +77,13 @@
             <p>
                 <Button color="secondary" outline on:click={toggleCodeCell}>
                     Show/Hide Code Cell
+                </Button>
+            </p>
+        </Col>
+        <Col xs="auto">
+            <p>
+                <Button color="secondary" outline on:click={copyForAi}>
+                    {copied ? "Copied!" : "Copy for AI Chatbot"}
                 </Button>
             </p>
         </Col>

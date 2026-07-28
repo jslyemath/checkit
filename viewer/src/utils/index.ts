@@ -90,6 +90,49 @@ export const outcomeToPtx = (o:Outcome,seed:number) => {
     return transform.transformToDocument(e).querySelector(':scope').outerHTML.trim()
 }
 
+// Used when neither the outcome nor the bank supplies an <ai-prompt>. Kept
+// deliberately thin: the bank author owns the pedagogy, so the platform default
+// should orient the chatbot without prescribing how it ought to help.
+const DEFAULT_AI_PROMPT =
+    "The following is a practice exercise, together with its answer. " +
+    "Help me understand how to arrive at that answer."
+
+/**
+ * Builds the payload for the "Copy for AI Chatbot" button: a prompt header
+ * chosen by the bank author, some identifying context, then the exercise
+ * rendered as HTML *including* its answer.
+ *
+ * HTML rather than LaTeX on purpose. outcomeToHtml() runs through outcomeToStx,
+ * which stamps @remote with the page's absolute origin+path, so every <img src>
+ * comes out as a fully-qualified public URL that a chatbot can fetch to see the
+ * figure. The LaTeX output instead emits bank-relative \includegraphics /
+ * \input paths, which are meaningless to anything off this machine. HTML also
+ * leaves math as raw \( \) LaTeX rather than rendered KaTeX spans.
+ *
+ * Note the absolute URLs only resolve when the bank is *published* -- from a
+ * local preview they point at localhost, which no remote model can reach.
+ */
+export const outcomeToAiText = (bank:Bank, outcome:Outcome, seed:number) => {
+    const prompt = outcome.ai_prompt || bank.ai_prompt || DEFAULT_AI_PROMPT
+    const base = `${location.protocol}//${location.host}${location.pathname}`
+    return [
+        prompt,
+        "",
+        "---",
+        "",
+        `Exercise: ${outcome.slug} — ${outcome.title}`,
+        `Learning outcome: ${(outcome.description||"").trim()}`,
+        `Version: ${seed+1}`,
+        `Source: ${base}#/bank/${outcome.slug}/${seed+1}/`,
+        "",
+        "The exercise and its answer follow as HTML.",
+        "- Math is LaTeX, delimited by \\( \\) inline or \\[ \\] for display.",
+        "- Each <img> src is a public URL you may fetch to view the figure.",
+        "",
+        outcomeToHtml(outcome,seed),
+    ].join("\n")
+}
+
 export const toggleCodeCell = () => {codeCellIsOpen.update(x=>!x)}
 
 export const getOutcomeFromSlug = (bank:Bank,slug:string) =>
