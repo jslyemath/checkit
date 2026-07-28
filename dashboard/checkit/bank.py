@@ -3,7 +3,7 @@ import os, json, datetime, zipfile, shutil
 from pathlib import Path
 from . import static
 from .outcome import Outcome
-from .xml import CHECKIT_NS
+from .xml import CHECKIT_NS, optional_text
 
 class Bank():
     def __init__(self, path="."):
@@ -15,6 +15,9 @@ class Bank():
         self.title = xml.find(f"{CHECKIT_NS}title").text
         self.slug = xml.find(f"{CHECKIT_NS}slug").text
         self.url = xml.find(f"{CHECKIT_NS}url").text
+        # Optional prompt prepended to the viewer's "Copy for AI Chatbot"
+        # payload. Bank-level default; an outcome may override it.
+        self.ai_prompt = optional_text(xml, "ai-prompt")
         # create each outcome
         self._outcomes = [
             Outcome(
@@ -23,6 +26,7 @@ class Bank():
                 ele.find(f"{CHECKIT_NS}path").text,
                 ele.find(f"{CHECKIT_NS}description").text,
                 self,
+                ai_prompt=optional_text(ele, "ai-prompt"),
             )
             for ele in xml.find(f"{CHECKIT_NS}outcomes").iter(f"{CHECKIT_NS}outcome")
         ]
@@ -51,6 +55,7 @@ class Bank():
             "title": self.title,
             "slug": self.slug,
             "url": self.url,
+            "ai_prompt": self.ai_prompt,
             "generated_on": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "outcomes": olist,
         }

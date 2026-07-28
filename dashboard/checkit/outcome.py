@@ -5,12 +5,14 @@ from .wrapper import sage
 from .wrapper.tikz import compile_tikz_for_outcome
 
 class Outcome():
-    def __init__(self, title=None, slug=None, path=None, description=None, bank=None):
+    def __init__(self, title=None, slug=None, path=None, description=None, bank=None, ai_prompt=None):
         self.title = title
         self.slug = slug
         self.relpath = path
         self.description = description
         self.bank = bank
+        # None means "inherit the bank's ai_prompt"; see Bank.__init__
+        self.ai_prompt = ai_prompt
     
     def abspath(self):
         return os.path.join(self.bank.abspath(),self.relpath)
@@ -45,6 +47,7 @@ class Outcome():
             "title": self.title,
             "slug": self.slug,
             "description": self.description,
+            "ai_prompt": self.ai_prompt,
             "template": self.template(),
             "exercises": [e.to_dict() for e in exs],
         }

@@ -3,6 +3,17 @@
     <title>New CheckIt Bank</title>
     <slug>new-checkit-bank</slug>
     <url>https://checkit.clontz.org</url>
+    <!-- Optional. Prepended to the text the viewer's "Copy for AI Chatbot"
+         button places on a student's clipboard, ahead of the exercise and its
+         answer. Any <outcome> below may override it with its own <ai-prompt>.
+         Omit both and a generic default is used.
+    <ai-prompt>
+You are tutoring a student working through a practice exercise.
+The correct answer is included below. Do not simply restate it:
+ask what the student has already tried, then guide them one step
+at a time.
+    </ai-prompt>
+    -->
     <outcomes>
         <outcome>
             <title>Sample Outcome</title>
