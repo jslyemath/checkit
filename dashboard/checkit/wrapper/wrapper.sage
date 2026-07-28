@@ -265,20 +265,27 @@ if len(sys.argv) >= 4:
         variant = variant_bag[i] if variant_bag is not None else None
         generator.roll_data(seed=seed_int,variant=variant)
         seed  = {"seed":seed_int,"data":json_ready(generator.get_data())}
+        directory = os.path.dirname(seeds_path)
+        seed_path = os.path.join(directory, f"{seed_int:04}")
+        # TikZ source is a few hundred bytes of text, and the LaTeX output
+        # \input{}s it directly rather than a PNG. Print must therefore work for
+        # *every* seed, so this is written unconditionally -- neither --images
+        # nor --image-seeds gates it. (Rasterizing that source is what's
+        # expensive; see the gated block below.)
+        tikz = generator.tikz_graphics()
+        if tikz is not None:
+            os.makedirs(seed_path, exist_ok=True)
+            for name, source in tikz.items():
+                with open(os.path.join(seed_path, f"{name}.tikz"), "w") as f:
+                    f.write(source)
+        # Sage plots rasterize straight to PNG and are only consumed by the
+        # HTML/viewer surfaces, so they stay behind --images and --image-seeds.
         if gen_images and i < image_amount:
-            directory = os.path.dirname(seeds_path)
-            seed_path = os.path.join(directory, f"{seed_int:04}")
             graphics = generator.graphics()
             if graphics is not None:
                 os.makedirs(seed_path, exist_ok=True)
                 for filename in graphics:
                     graphics[filename].save(os.path.join(seed_path, f"{filename}.png"))
-            tikz = generator.tikz_graphics()
-            if tikz is not None:
-                os.makedirs(seed_path, exist_ok=True)
-                for name, source in tikz.items():
-                    with open(os.path.join(seed_path, f"{name}.tikz"), "w") as f:
-                        f.write(source)
         seeds.append(seed)
     data = {
         "seeds": seeds,
