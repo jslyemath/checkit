@@ -339,7 +339,7 @@ Calls `self.generate_exercises(regenerate)` to ensure data is fresh, then return
 ```
 
 **`Outcome.preview_exercises(self)`**
-Used by the (deprecated) Jupyter dashboard for "fresh preview". Calls `sage(self, preview_json, preview=True, images=True)` to generate 20 seeds, then `compile_tikz_for_outcome(self)` to turn any generated `.tikz` files into PNGs, reads them, and returns a list of `Exercise` objects.
+Used by the (deprecated) Jupyter dashboard for "fresh preview". Calls `sage(self, preview_json, preview=True, images=True)` to generate 20 seeds, then `compile_tikz_for_outcome(self, image_seeds=20)` to turn any generated `.tikz` files into PNGs, reads them, and returns a list of `Exercise` objects. The `image_seeds=20` matches preview mode's seed count — without it a preview taken after a 1000-seed build would walk and recompile every seed directory in the outcome.
 
 **`Outcome.html_preview(self, pregenerated=False)`**
 Used by the Jupyter dashboard. If `pregenerated=True`, picks a random already-generated exercise; otherwise calls `preview_exercises()`. Returns a long HTML string showing the rendered exercise, its JSON data, SpaTeXt XML, HTML, LaTeX, and PreTeXt.
@@ -353,7 +353,7 @@ Returns `<build_path>/seeds.json`.
 **`Outcome.generate_exercises(self, regenerate=False, images=False, amount=1_000, image_seeds=None)`**
 - If `regenerate=False`, tries `self.load_exercises()`. If that succeeds (seeds.json exists and is valid), returns early.
 - Otherwise calls `sage(self, self.seeds_json_path(), preview=False, images=images, amount=amount, image_seeds=image_seeds)` — this invokes the SageMath subprocess.
-- If `images=True`, then calls `compile_tikz_for_outcome(self)` to compile any `.tikz` files the generator wrote into PNGs.
+- If `images=True`, then calls `compile_tikz_for_outcome(self, image_seeds=image_seeds)` to rasterize the `.tikz` files the generator wrote into PNGs, honoring the same cap. (`.tikz` files themselves are written by `wrapper.sage` regardless of `images`; this step is only the PNG half.)
 - Then calls `self.load_exercises(reload=True)` to read the newly written file.
 
 **`Outcome.load_exercises(self, reload=False, strict=True)`**
@@ -527,7 +527,7 @@ Renders a sub-UI with two buttons: "Bank from cache" and "Regenerated bank". Cli
 A development script (not part of the installed package). Run as `python update_viewer.py` from inside `dashboard/`.
 
 **`main()`**
-1. Changes to `../demo-bank/` and runs `python -m checkit generate -r` to regenerate all demo exercises
+1. Changes to `../demo-bank/` and runs `python -m checkit generate -r -i --image-seeds 20` to regenerate all demo exercises. The `-i` is load-bearing: without it the demo bank is rebuilt with no images at all, and `build_docs.py` then publishes that over `docs/demo`, **deleting** previously published PNGs (this is what commit `d36c6a3` did). The cap holds the run to ~1 minute — the viewer only shows ~20 seeds, and `.tikz` source is written for every seed regardless, so LaTeX output is unaffected.
 2. Changes to `../viewer/` and runs `npm run build`
 3. Copies the Vite build output (`viewer/dist/`) to a temp directory
 4. Removes `assets/bank.json` from the copy (the viewer is meant to load bank.json from wherever it's deployed, not bundle a specific one)
@@ -545,6 +545,8 @@ Another development script at the repo root. Run to regenerate the docs site.
 2. Changes to `demo-bank/` and calls `bank.write_json()` and `bank.build_viewer()` — generates `demo-bank/docs/`
 3. Removes `docs/demo/` if it exists
 4. Copies `demo-bank/docs/` to `docs/demo/`
+
+Note that step 3 is a `shutil.rmtree` — `docs/demo/` is **replaced**, not merged. Whatever the regenerated `demo-bank/assets/` happens to contain is the entire published site. That is why step 1's `-i` flag matters: a regeneration without images produces an assets tree with none, and step 4 then publishes that emptiness over the committed PNGs. Commit `d36c6a3` deleted every published IMG1 image exactly this way.
 
 ---
 
@@ -724,9 +726,9 @@ Steps:
    - Picks `variant = variant_bag[i]` if a bag exists, else `None`
    - Calls `generator.roll_data(seed=seed_int, variant=variant)` to generate the data
    - Calls `generator.get_data()` and wraps with `json_ready()` to get serializable data
-   - If `gen_images and i < image_amount` (so the cap limits which seeds get images):
+   - Unconditionally calls `generator.tikz_graphics()`; if non-None, creates the seed directory and writes each value as a `<name>.tikz` file (these are compiled to PNG afterward by `tikz.py`, back in the Python layer — not by SageMath). Deliberately outside both gates: the source is a few hundred bytes of text and the LaTeX output `\input{}`s it, so print must have it for every seed.
+   - If `gen_images and i < image_amount` (so the cap limits which seeds get *rasterized*):
      - Calls `generator.graphics()`; if non-None, creates the seed directory and saves each value as `<filename>.png`
-     - Calls `generator.tikz_graphics()`; if non-None, creates the seed directory and writes each value as a `<name>.tikz` file (these are compiled to PNG afterward by `tikz.py`, back in the Python layer — not by SageMath)
    - Appends `{"seed": seed_int, "data": data}` to `seeds` list
 6. Writes the full JSON: `{"seeds": [...], "generated_on": "...ISO timestamp..."}` to `output_path`
 
@@ -2160,7 +2162,15 @@ CheckIt's image step supports multiple backends. Two are implemented:
 - **Sage graphics** — generators define a `graphics()` method returning `{name: <sage plot object>}`; wrapper.sage saves each as `<name>.png`.
 - **TikZ** — generators define a `tikz_graphics()` method returning `{name: <tikz source string>}`; wrapper.sage writes each as `<name>.tikz`, then `tikz.py`'s `compile_tikz_for_outcome()` compiles them to PNG via pdflatex + pdftoppm (PDF kept only in a temp dir, discarded after).
 
-Both are gated by the `images` flag and the `image_seeds` cap (render images only for the first N seeds — see below). PreFigure would be a third backend following the same shape as TikZ.
+The two backends are gated differently, and the asymmetry is deliberate:
+
+| | written by | gated by `--images`? | gated by `--image-seeds`? |
+|---|---|---|---|
+| `graphics()` → `.png` | wrapper.sage | yes | yes |
+| `tikz_graphics()` → `.tikz` | wrapper.sage | **no** | **no** |
+| `.tikz` → `.png` | tikz.py | yes | yes |
+
+Sage graphics rasterize immediately, and PNGs are only consumed by the HTML/viewer surfaces, so both gates apply. TikZ splits into a cheap text step and an expensive raster step: the LaTeX output `\input{}`s the `.tikz` source directly, so print needs it for every seed and it is written unconditionally; only the rasterization is capped. A PreFigure backend would follow the TikZ shape if its source is text, the Sage shape if it rasterizes directly.
 
 PreFigure (a Python library for generating mathematical figures as SVG/PNGs from XML descriptions) could replace Sage's `plot()` for image generation. The integration point is the `graphics()` method in generators and the image-saving loop in `wrapper.sage`.
 
@@ -2191,11 +2201,13 @@ The `generator_path` loaded by `wrapper.sage` runs in the SageMath namespace, so
 
 ### Limiting image rendering with `image_seeds` (--image-seeds)
 
-`generate --image-seeds N` renders images for only the first N seeds of each outcome, while still generating full seed *data* for all of them. Threaded through Bank.generate_exercises → Outcome.generate_exercises → sage() → wrapper.sage (as sys.argv[6]), and per-outcome (N applies to each outcome independently, not N total across the bank). Default (None) renders all.
+`generate --image-seeds N` **rasterizes** images for only the first N seeds of each outcome, while still generating full seed *data* for all of them. Threaded through Bank.generate_exercises → Outcome.generate_exercises → sage() → wrapper.sage (as sys.argv[6]) **and → compile_tikz_for_outcome()**, and per-outcome (N applies to each outcome independently, not N total across the bank). Default (None) renders all.
 
-Intended for fast local previews. Consumer exposure to un-rendered seeds:
+**The cap applies to PNGs only.** `wrapper.sage` writes a `.tikz` file for *every* seed, ungated by both `--images` and `--image-seeds`, because the LaTeX output `\input{}`s that source directly and print has to work for every seed. `--image-seeds` then limits how many of those get rasterized by `tikz.py`. (Before this was split, one gate covered both, so a low cap silently produced *no* `.tikz` file for the uncapped seeds and LaTeX assessments drawing on them failed with a missing-file error — while the note below claimed print was immune.)
+
+Intended for fast local previews. Consumer exposure to un-rasterized seeds:
 - Viewer: caps at ~20 seeds, so image_seeds >= 20 keeps it clean.
-- Print/PDF: uses the .tikz source via \input{}, needs no PNG at all.
+- Print/PDF: uses the .tikz source via \input{}, needs no PNG at all — and since the source is now always written, a low cap genuinely cannot break print.
 - LMS export: uses seeds 100–999, so a low image_seeds value produces broken   images if a TikZ outcome is exported. Use the full count for LMS-bound banks.
 
 ### Changing How Banks Are Structured
@@ -2261,12 +2273,23 @@ upstream merge doesn't silently revert them:
   Without these, TikZ figures render only in the html/latex/pretext export tabs,
   not in the default display mode.
 - **image_seeds option** — added to the CLI generate command and threaded
-  through Bank/Outcome.generate_exercises and sage().
+  through Bank/Outcome.generate_exercises, sage(), and compile_tikz_for_outcome().
+  Caps *rasterization only*; `.tikz` source is always written (see §12).
 - **tikz.py robustness** — judges pdflatex success by PDF existence (not exit
   code, since pgfplots can exit non-zero on recoverable warnings); a
   COMPILE_TIMEOUT backstop converts stuck compiles into bounded, reported
   errors (empirically, neither stdin=DEVNULL nor batchmode prevents the stall
   on a malformed figure — the timeout is the real protection).
+- **tikz.py incrementality** — `compile_tikz_for_outcome()` takes an
+  `image_seeds` cap and skips any figure whose `.png` is already no older than
+  its `.tikz`, printing a `compiled N / skipped M` line so the skip is visible
+  rather than silent. Previously it walked every seed directory and recompiled
+  unconditionally on every call, so a 20-seed preview after a 1000-seed build
+  paid ~30 minutes of pdflatex. A failed compile leaves no PNG, so failures
+  always retry. The cap reads the seed number from the directory name
+  (`f"{seed:04}"`); a non-numeric name raises rather than silently rasterizing
+  the wrong subset — relevant if wrapper.sage's unused `random` seed mode is
+  ever enabled, since seed numbers would stop matching loop indices.
 - **load_exercises() fix** — added the missing `return` on the cached path so
   the cache-skip optimization actually fires (upstream likely still has this
   no-op; watch on merge).

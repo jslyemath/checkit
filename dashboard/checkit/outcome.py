@@ -52,7 +52,10 @@ class Outcome():
     def preview_exercises(self):
         preview_json = os.path.join(self.build_path(),"preview.json")
         sage(self,preview_json,preview=True,images=True)
-        compile_tikz_for_outcome(self)
+        # preview mode generates 20 seeds (see wrapper.sage's amount_s), so cap
+        # compilation to match -- otherwise a preview taken after a full build
+        # would recompile every seed in the outcome.
+        compile_tikz_for_outcome(self,image_seeds=20)
         with open(os.path.join(preview_json)) as f:
             data = json.load(f)['seeds']
         return [Exercise(d["data"],d["seed"],self) for d in data]
@@ -107,7 +110,7 @@ class Outcome():
                 pass # generation is necessary
         sage(self,self.seeds_json_path(),preview=False,images=images,amount=amount,image_seeds=image_seeds)
         if images:
-            compile_tikz_for_outcome(self)
+            compile_tikz_for_outcome(self,image_seeds=image_seeds)
         self.load_exercises(reload=True)
 
 

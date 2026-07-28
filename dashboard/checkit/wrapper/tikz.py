@@ -11,24 +11,74 @@ PREAMBLE = r"""\documentclass[tikz,border=4pt]{standalone}
 # at an interactive prompt despite nonstopmode, or a runaway computation).
 COMPILE_TIMEOUT = 60
 
-def compile_tikz_for_outcome(outcome):
-    """Compile any .tikz files in the outcome's generated/ directory to PNG."""
+def compile_tikz_for_outcome(outcome, image_seeds=None):
+    """Compile the outcome's generated .tikz files to PNG.
+
+    wrapper.sage writes a .tikz for every seed, because the LaTeX output
+    \\input{}s the source and print has to work for all of them. PNGs are only
+    consumed by the HTML/viewer surfaces, so `image_seeds` mirrors the
+    --image-seeds cap and rasterizes just the first N seeds.
+
+    A figure whose PNG is already at least as new as its .tikz is skipped, so
+    re-running generation (or taking a 20-seed preview after a 1000-seed build)
+    doesn't recompile work that is already current.
+    """
     generated = outcome.build_path()  # assets/<slug>/generated/
     preamble = _load_preamble(outcome.bank.abspath())
-    for entry in os.listdir(generated):
+    compiled = 0
+    skipped = 0
+    for entry in sorted(os.listdir(generated)):
         seed_dir = os.path.join(generated, entry)
         if not os.path.isdir(seed_dir):
+            continue
+        if image_seeds is not None and _seed_number(seed_dir) >= image_seeds:
             continue
         for fname in os.listdir(seed_dir):
             if not fname.endswith(".tikz"):
                 continue
             name = fname[:-5]
+            tikz_path = os.path.join(seed_dir, fname)
+            png_path = os.path.join(seed_dir, f"{name}.png")
+            if _png_is_current(tikz_path, png_path):
+                skipped += 1
+                continue
             _compile_one(
-                tikz_path=os.path.join(seed_dir, fname),
-                png_path=os.path.join(seed_dir, f"{name}.png"),
+                tikz_path=tikz_path,
+                png_path=png_path,
                 name=name,
                 preamble=preamble,
             )
+            compiled += 1
+    if compiled or skipped:
+        print(
+            f"{outcome.slug}: compiled {compiled} TikZ figure(s), "
+            f"skipped {skipped} already up to date"
+        )
+
+def _seed_number(seed_dir):
+    """Seed directories are named for their seed (`f"{seed:04}"` in
+    wrapper.sage), which is how the --image-seeds cap is applied here. If that
+    naming ever changes, fail loudly rather than silently rasterizing the wrong
+    subset (or nothing at all)."""
+    entry = os.path.basename(seed_dir)
+    try:
+        return int(entry)
+    except ValueError as e:
+        raise RuntimeError(
+            f"Expected a numerically-named seed directory, got {seed_dir!r}. "
+            "compile_tikz_for_outcome() reads the seed number from the "
+            "directory name to apply the --image-seeds cap."
+        ) from e
+
+def _png_is_current(tikz_path, png_path):
+    """True when png_path exists and is no older than the .tikz it came from.
+
+    A failed compile leaves no PNG behind (see _compile_one), so failures always
+    retry rather than being cached as 'done'.
+    """
+    if not os.path.isfile(png_path):
+        return False
+    return os.path.getmtime(png_path) >= os.path.getmtime(tikz_path)
 
 def _load_preamble(bank_root):
     custom = os.path.join(bank_root, "tikz_preamble.tex")

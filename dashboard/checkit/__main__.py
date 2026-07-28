@@ -69,16 +69,17 @@ def new(directory):
     "-i",
     "--images",
     is_flag=True,
-    help="Generate images.",
+    help="Rasterize images to PNG. (TikZ .tikz source is written either way.)",
 )
 @click.option(
     "--image-seeds",
     default=None,
     type=int,
-    help="Render images for only the first N seeds (default: all). "
+    help="Rasterize images for only the first N seeds (default: all). "
+         "Applies to PNGs only -- TikZ .tikz source is written for every seed, "
+         "so LaTeX/print output is unaffected by this cap. "
          "The HTML viewer shows ~20 seeds and LMS export uses seeds 100-999, "
-         "so a low value produces broken images for those endusers. "
-         "Intended for quick local previews.",
+         "so a low value produces broken images for those endusers.",
 )
 @click.option(
     "-o",
