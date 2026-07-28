@@ -4,7 +4,12 @@ from checkit.utils import working_directory
 def main():
     with working_directory("../demo-bank"):
         print("building bank...")
-        subprocess.run("python -m checkit generate -r".split(" "))
+        # -i is required or the demo bank is rebuilt with no images at all,
+        # which build_docs.py then publishes over docs/demo -- deleting the
+        # previously published PNGs. The cap keeps this to about a minute:
+        # the viewer only ever shows ~20 seeds, and .tikz source is written for
+        # every seed regardless, so LaTeX output is unaffected by it.
+        subprocess.run("python -m checkit generate -r -i --image-seeds 20".split(" "))
 
     with working_directory("../viewer"):
         print("building viewer...")
