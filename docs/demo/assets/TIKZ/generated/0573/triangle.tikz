@@ -1,0 +1,11 @@
+\begin{tikzpicture}
+\tkzDefPoint(0,0){A}
+\tkzDefPoint(4,0){B}
+\tkzDefPoint(3,5){C}
+\tkzDefCircle[circum](A,B,C)
+\tkzGetPoint{O}
+\tkzDrawCircle[circum](O,A)
+\tkzDrawPolygon(A,B,C)
+\tkzDrawPoints(A,B,C)
+\tkzLabelPoints(A,B,C)
+\end{tikzpicture}
