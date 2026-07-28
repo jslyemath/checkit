@@ -3,6 +3,14 @@
     <title>Demo Bank</title>
     <slug>demo-bank</slug>
     <url>https://checkit.clontz.org</url>
+    <!-- Prepended to the viewer's "Copy for AI Chatbot" payload. Optional; any
+         outcome below may override it with its own <ai-prompt>. -->
+    <ai-prompt>
+You are tutoring a student working through a practice exercise.
+The correct answer is included below. Do not simply restate it:
+ask what the student has already tried, then guide them one step
+at a time.
+    </ai-prompt>
     <outcomes>
         <outcome>
             <title>Line Slopes</title>
@@ -67,6 +75,15 @@ Example of using manually-provided images.
             <description>
 Test outcome for TikZ image generation.
             </description>
+            <!-- Overrides the bank-level prompt, since this outcome's exercises
+                 are only meaningful if the chatbot actually looks at the figure. -->
+            <ai-prompt>
+You are tutoring a student on a geometry exercise that includes a
+figure. First fetch the image URL below and describe what you see,
+so the student can confirm you are both looking at the same
+triangle. Then guide them toward the answer one step at a time
+rather than restating it.
+            </ai-prompt>
         </outcome>
     </outcomes>
 </bank>
