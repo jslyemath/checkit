@@ -57,27 +57,33 @@
         node.select()
     }
 
-    const copyForAi = async () => {
+    const copyForAi = () => {
         const text = outcomeToAiText($bank,outcome,seed)
         clearTimeout(copyTimer)
-        try {
-            // writeText() resolving is the *only* trustworthy success signal:
-            // per spec it resolves after the clipboard is actually written.
-            await navigator.clipboard.writeText(text)
-            manualText = ''
-            copyState = 'copied'
-            copyTimer = setTimeout(()=>copyState='idle',2000)
-        } catch {
-            // document.execCommand('copy') was tried here as a fallback and
-            // deliberately removed. On a browser that denies clipboard writes it
-            // still returns true AND fires a copy event carrying clipboardData,
-            // while writing nothing -- verified on the published site. Since its
-            // success cannot be distinguished from its failure, using it
-            // reintroduces the exact "looks like it worked" bug this branch
-            // exists to prevent. Showing the text is the only honest fallback.
+
+        // Show the confirmation immediately rather than awaiting writeText().
+        // Firefox performs the copy but does not settle the promise the way
+        // Chrome does, so `await`ing it here meant the copy succeeded while
+        // copyState was never assigned and no confirmation ever appeared.
+        // Nothing is claimed permanently: a genuine rejection downgrades to the
+        // textarea below, which is the case that actually matters.
+        manualText = ''
+        copyState = 'copied'
+        copyTimer = setTimeout(()=>copyState='idle',2000)
+
+        navigator.clipboard.writeText(text).catch(() => {
+            // Real refusal (NotAllowedError): retract the confirmation and show
+            // the text so the student can copy it by hand.
+            //
+            // document.execCommand('copy') was tried as a fallback here and
+            // deliberately removed: on a browser that denies clipboard writes it
+            // still returns true AND fires a copy event carrying clipboardData
+            // while writing nothing, so its success is indistinguishable from
+            // its failure.
+            clearTimeout(copyTimer)
             manualText = text
             copyState = 'failed'
-        }
+        })
     }
 
     // Which exercise the current copy state belongs to, so the reset below can
