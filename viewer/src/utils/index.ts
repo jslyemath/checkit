@@ -16,28 +16,53 @@ import assessmentTemplate from '../templates/assessmentTemplate.tex?raw'
 
 const parser = new DOMParser()
 
-export const outcomeToStx = (o:Outcome,seed:number) => {
+const errorStx = (message:string) =>
+    `<knowl><content><p><em>ERROR:</em> ${message}</p></content></knowl>`
+
+/**
+ * The SpaTeXt for one exercise, as a **Document**.
+ *
+ * Every XSLT caller must pass this rather than its root element. The three
+ * stylesheets key their wrapper off `<xsl:template match="/">`, and `/` matches
+ * the document node -- so handing transformToDocument() an Element means that
+ * template never fires and the wrapper is never emitted.
+ *
+ * Chrome papers over this by resolving an element source to its owner document,
+ * so it produced correct output either way. Firefox follows the spec, and
+ * measuring it there showed the difference exactly:
+ *
+ *   source = document -> <div class="stx">ROOT<div class="stx-knowl">…</div></div>
+ *   source = element  -> <div class="stx-knowl">…</div>          (no wrapper)
+ *
+ * With no wrapper, outcomeToHtml()'s lookup returned null and `.outerHTML` threw
+ * "can't access property outerHTML, l is null", taking down every caller --
+ * including the "Copy for AI Chatbot" button.
+ */
+export const outcomeToStxDocument = (o:Outcome,seed:number) => {
     let stxString:string
     try {
         stxString = Mustache.render(o.template, o.exercises[seed]['data'])
     } catch (error) {
-        stxString = "<knowl><content><p><em>ERROR:</em> Mustache template could not be parsed.</p></content></knowl>"
+        stxString = errorStx("Mustache template could not be parsed.")
     }
-    if (parser.parseFromString(stxString, "application/xml").querySelector('parsererror')) {
-        let knowl = document.createElement("knowl")
-        knowl.insertAdjacentHTML("afterbegin","<content><p><em>ERROR:</em> XML could not be parsed.</p></content>")
-        return knowl
+    let doc = parser.parseFromString(stxString, "application/xml")
+    if (doc.querySelector('parsererror')) {
+        doc = parser.parseFromString(errorStx("XML could not be parsed."), "application/xml")
     }
-    let stxElement = parser.parseFromString(stxString, "application/xml").querySelector(":scope")
     const remote = `${location.protocol}//${location.host}${location.pathname.replace(/\/+$/, "")}`
-    stxElement.querySelectorAll("image, tikz-image").forEach(image => {
+    doc.querySelectorAll("image, tikz-image").forEach(image => {
         image.setAttribute("remote", remote)
     });
-    return stxElement
+    return doc
 }
 
+// The root element, for the Svelte display path (Knowl.svelte walks an Element).
+// XSLT callers want outcomeToStxDocument instead -- see the note above.
+export const outcomeToStx = (o:Outcome,seed:number) =>
+    outcomeToStxDocument(o,seed).documentElement
+
 export const outcomeToLatex = (o:Outcome,seed:number) => {
-    const e = outcomeToStx(o,seed)
+    const e = outcomeToStxDocument(o,seed)
     const transform = new XSLTProcessor()
     const xslDom = parser.parseFromString(latexXsl, "application/xml")
     transform.importStylesheet(xslDom)
@@ -49,7 +74,7 @@ export const outcomeToHtml = (
     mathMode:'default'|'canvas'|'brightspace'='default',
     solutions:'show'|'hide'|'only'='show'
 ) => {
-    const e = outcomeToStx(o,seed)
+    const e = outcomeToStxDocument(o,seed)
     const transform = new XSLTProcessor()
     const xslDom = parser.parseFromString(htmlXsl, "application/xml")
     transform.importStylesheet(xslDom)
@@ -113,7 +138,7 @@ export const outcomeToHtml = (
 }
 
 export const outcomeToPtx = (o:Outcome,seed:number) => {
-    const e = outcomeToStx(o,seed)
+    const e = outcomeToStxDocument(o,seed)
     const transform = new XSLTProcessor()
     const xslDom = parser.parseFromString(ptxXsl, "application/xml")
     transform.importStylesheet(xslDom)
