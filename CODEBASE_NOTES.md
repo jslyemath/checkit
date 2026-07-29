@@ -976,6 +976,8 @@ class Generator(BaseGenerator):
 
 SpaTeXt uses three XSLT 1.0 stylesheets. There are two physically separate copies: `dashboard/checkit/static/` (used server-side by lxml) and `viewer/src/spatext/xsl/` (used client-side by the browser's `XSLTProcessor`). The two copies are identical in content.
 
+> **The client-side half has an expiry date.** Browsers are removing `XSLTProcessor` — Chrome stable around 2026-11-17, with Firefox and WebKit following. See "Browsers are removing XSLT" near the end of this document before investing in the browser-side transform path.
+
 ### The SpaTeXt XML Vocabulary
 
 Before explaining the stylesheets, here is the complete SpaTeXt element reference. All elements are in the namespace `https://spatext.clontz.org`.
@@ -1302,18 +1304,29 @@ Uses hash routing — the URL path for routing is the part after `#`:
 
 ### Core Utilities (`utils/index.ts`)
 
-**`outcomeToStx(outcome, seed)`**
-Converts an outcome + seed index to a SpaTeXt DOM element.
+**`outcomeToStxDocument(outcome, seed)`** and **`outcomeToStx(outcome, seed)`**
+Converts an outcome + seed index to SpaTeXt — as a **Document** and as its root **Element** respectively.
 1. Calls `Mustache.render(outcome.template, outcome.exercises[seed]['data'])` — renders the Mustache template with the exercise data
-2. If Mustache fails, returns a knowl with an error message
+2. If Mustache fails, substitutes a knowl with an error message
 3. Parses the resulting XML string via `DOMParser`
-4. If XML parsing fails (e.g., malformed XML from bad generator output), returns an error knowl
+4. If XML parsing fails (e.g., malformed XML from bad generator output), substitutes an error knowl
 5. Finds all `<image>` and `<tikz-image>` elements (`querySelectorAll("image, tikz-image")`) and sets their `remote` attribute to the current page's origin + pathname (so relative image paths work correctly when the viewer is served from a subdirectory)
-6. Returns the root DOM element
+6. `outcomeToStxDocument` returns the Document; `outcomeToStx` returns its `documentElement`
+
+> **Which one to call, and why it matters.** Anything feeding `XSLTProcessor` must pass the **Document**; only the Svelte display path (`Knowl.svelte`, which walks an Element) takes the Element.
+>
+> All three stylesheets emit their wrapper from `<xsl:template match="/">`, and `/` matches the *document node*. Hand `transformToDocument()` an Element and that template never fires, so the wrapper is never emitted. Measured in Firefox:
+>
+> ```
+> source = document -> <div class="stx">ROOT<div class="stx-knowl">…</div></div>
+> source = element  -> <div class="stx-knowl">…</div>          (no wrapper)
+> ```
+>
+> Chrome resolves an element source to its owner document and matches `/` anyway, so this was invisible there for years while being broken in Firefox. The symptom was `outcomeToHtml()`'s wrapper lookup returning null and `.outerHTML` throwing "can't access property outerHTML, l is null", which took down every caller — and, because the throw happened while *building* the payload, presented as a clipboard bug in the "Copy for AI Chatbot" button.
 
 **`outcomeToHtml(outcome, seed, mathMode, solutions)`**
-1. Calls `outcomeToStx` to get the SpaTeXt element
-2. Creates an `XSLTProcessor`, loads `html.xsl`, transforms the element
+1. Calls `outcomeToStxDocument` to get the SpaTeXt document
+2. Creates an `XSLTProcessor`, loads `html.xsl`, transforms the document
 3. If `mathMode == 'canvas'` or `'brightspace'`: renders all `[data-latex]` spans using KaTeX with MathML output (for LMS compatibility where KaTeX CSS may not be loaded)
 4. If `solutions == 'hide'`: removes all `.stx-outtro` elements
 5. If `solutions == 'only'`: removes `.stx-intro` and `.stx-content` elements
@@ -2306,6 +2319,78 @@ To change the `seeds.json` format (e.g., add metadata per exercise):
 - Changes must be made in both places
 - The final `bank.json` format is derived from `Outcome.to_dict()` which calls `e.to_dict()` → `{"seed": self.seed, "data": self.data}`
 - The viewer TypeScript type `Exercise = {seed: number; data: Object}` would also need updating
+
+## Browsers are removing XSLT (hard deadline, ~Nov 2026)
+
+**This is a dated architectural risk, not a hypothetical.** Firefox already prints
+`XSLT will be removed from this web browser soon` to the console when the viewer
+runs a transform (observed 2026-07-29 on the published demo).
+
+Status: removal of XSLT from the web platform reached **stage 3** at WHATWG
+(whatwg/html#11523), meaning broad cross-engine agreement. It is not one vendor's
+decision — Chromium proposed it, Mozilla's standards position is *positive*
+(mozilla/standards-positions#1287), and WebKit has also signalled intent. The
+rationale is security (libxslt and friends are aging C/C++ with a long history of
+memory-safety bugs) plus very low remaining usage.
+
+Chrome's published schedule:
+
+| Chrome | date | effect |
+|---|---|---|
+| 146 | 2026-03-10 | Enterprise Policy escape hatch available |
+| 152 | 2026-08-25 | Origin Trial available |
+| **158** | **2026-11-17** | **XSLT stops working on stable for everyone else** |
+| 176 | 2027-08-17 | Origin Trial + Enterprise Policy end; off for all |
+
+### What this breaks in CheckIt
+
+Everything that calls `XSLTProcessor` in `viewer/src/utils/index.ts` —
+`outcomeToLatex()`, `outcomeToHtml()`, `outcomeToPtx()` — and therefore:
+
+- `Exercise.svelte`'s Raw HTML / LaTeX / PreTeXt instructor tabs
+- `Export.svelte`'s Canvas, Brightspace and Moodle exports
+- `Assessment.svelte`'s generated assessment LaTeX (via `outcomeToLatex`)
+- `Outcome.svelte`'s "Copy for AI Chatbot" button (via `outcomeToHtml`)
+
+**What does *not* break:** the default student-facing display path. `Knowl.svelte`
+→ `ContentNodes` → `ParagraphNodes` render SpaTeXt directly from the DOM;
+`outcomeToStx()` uses `DOMParser`, not `XSLTProcessor`. Students browsing
+exercises are unaffected. So does the whole Python/dashboard side, which
+transforms with `lxml` server-side and is entirely outside the browser.
+
+### Options
+
+1. **Precompute the derived formats at generate time (recommended).** The Python
+   layer already performs exactly these three transforms via `lxml`
+   (`Exercise.html()` / `.latex()` / `.pretext()`). Emit them per seed at build
+   time and have the viewer fetch rather than transform.
+
+   The strong argument for this is not the deadline — it is that the transforms
+   currently exist **twice**, once in `lxml` and once in `XSLTProcessor`, which is
+   the reason the three stylesheets are duplicated across
+   `dashboard/checkit/static/` and `viewer/src/spatext/xsl/` and must be kept in
+   sync (see §5). It is also what produced the document-vs-element bug: the
+   browser path silently required a different source node type than the Python
+   path, and only Firefox ever said so. Precomputing collapses two
+   implementations into one.
+
+   Size is the design problem: 1000 seeds × 3 formats is far too much for
+   `bank.json`, which every visitor downloads on load. Emitting per-seed files
+   under `assets/<slug>/generated/<seed>/` and fetching on demand keeps the
+   initial payload unchanged. Note the consumers need different seed ranges —
+   viewer ~20, assessments 20+, LMS export 100–999 — so a partial precompute
+   reintroduces the same coverage trap as `--image-seeds` (§ image_seeds).
+
+2. **Replace browser XSLT with a JS/WASM implementation** (a libxslt WASM build,
+   SaxonJS, or hand-porting the stylesheets to TS). Keeps transforms client-side,
+   but adds a dependency and *preserves* the dual-implementation problem that
+   caused this bug in the first place.
+
+3. **Drop derived formats from the browser entirely**, moving export to the CLI.
+   Smallest amount of code, largest loss of function for instructors.
+
+Sources: whatwg/html#11523, mozilla/standards-positions#1287,
+https://developer.chrome.com/docs/web-platform/deprecating-xslt
 
 ## Local divergences from upstream StevenClontz/checkit
 
