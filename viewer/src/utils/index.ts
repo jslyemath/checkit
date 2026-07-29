@@ -53,9 +53,39 @@ export const outcomeToHtml = (
     const transform = new XSLTProcessor()
     const xslDom = parser.parseFromString(htmlXsl, "application/xml")
     transform.importStylesheet(xslDom)
-    let ele = transform.transformToDocument(e).querySelector("div.stx")
+    const doc = transform.transformToDocument(e)
+    // `div[class~="stx"]` rather than `div.stx`: a plain attribute selector with
+    // the same semantics, but not subject to how a given engine treats `class`
+    // in a non-HTML document. Firefox returned null from the class-selector form
+    // here, so `.outerHTML` threw "can't access property outerHTML, l is null"
+    // and every caller of outcomeToHtml() died with it -- including the "Copy for
+    // AI Chatbot" button, which looked like a clipboard bug for several rounds.
+    //
+    // Note documentElement is NOT usable instead: Chrome honors
+    // <xsl:output method="html"/> and returns an HTML document, so its root is
+    // <html> and using it drags a <html><body> wrapper into the output.
+    //
+    // If this still throws, the message reports what the transform actually
+    // produced, since the alternative explanation is that it yielded nothing at
+    // all -- and that is the fact needed to tell the two cases apart.
+    let ele = doc.querySelector('div[class~="stx"]')
+    if (!ele) {
+        const root = doc.documentElement
+        throw new Error(
+            "html.xsl transform produced no div.stx wrapper. " +
+            `Root element: ${root ? root.nodeName : "(none)"}. ` +
+            `Output began: ${
+                root ? new XMLSerializer().serializeToString(root).slice(0,200) : "(empty document)"
+            }`
+        )
+    }
+    // Class selectors below are written as [class~="..."] for the same reason:
+    // ".foo" only matches in HTML documents, so in Firefox these silently
+    // matched nothing -- meaning LMS math conversion and solution filtering did
+    // nothing at all rather than failing loudly. [class~="foo"] is a plain
+    // attribute selector with identical semantics that works in both.
     if (mathMode == 'canvas' || mathMode == 'brightspace') {
-        ele.querySelectorAll(".math[data-latex]").forEach((math)=>{
+        ele.querySelectorAll('[class~="math"][data-latex]').forEach((math)=>{
             katex.render(
                 math.getAttribute("data-latex"),
                 math,
@@ -67,15 +97,15 @@ export const outcomeToHtml = (
         })
     }
     if (solutions=="hide") {
-        ele.querySelectorAll('.stx-outtro').forEach((outtro)=>{
+        ele.querySelectorAll('[class~="stx-outtro"]').forEach((outtro)=>{
             outtro.parentElement.removeChild(outtro)
         })
     }
     if (solutions=="only") {
-        ele.querySelectorAll('.stx-intro').forEach((intro)=>{
+        ele.querySelectorAll('[class~="stx-intro"]').forEach((intro)=>{
             intro.parentElement.removeChild(intro)
         })
-        ele.querySelectorAll('.stx-content').forEach((content)=>{
+        ele.querySelectorAll('[class~="stx-content"]').forEach((content)=>{
             content.parentElement.removeChild(content)
         })
     }
