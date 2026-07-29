@@ -50,54 +50,53 @@
     let manualText = ''
     let copyTimer:ReturnType<typeof setTimeout>
 
-    // Older fallback: execCommand only needs the user gesture we're already
-    // inside, not the permission the async Clipboard API requires. Deprecated,
-    // so it's a second chance rather than the primary path.
-    const legacyCopy = (text:string) => {
-        const ta = document.createElement('textarea')
-        ta.value = text
-        ta.setAttribute('readonly','')
-        ta.style.position = 'fixed'
-        ta.style.top = '0'
-        ta.style.opacity = '0'
-        document.body.appendChild(ta)
-        ta.select()
-        let ok = false
-        try { ok = document.execCommand('copy') } catch { ok = false }
-        document.body.removeChild(ta)
-        return ok
+    // Focus and select the fallback textarea as soon as it appears, so the
+    // student only has to press Ctrl/Cmd+C.
+    const selectAll = (node:HTMLTextAreaElement) => {
+        node.focus()
+        node.select()
     }
 
     const copyForAi = async () => {
         const text = outcomeToAiText($bank,outcome,seed)
-        let ok = false
-        try {
-            await navigator.clipboard.writeText(text)
-            ok = true
-        } catch {
-            ok = legacyCopy(text)
-        }
         clearTimeout(copyTimer)
-        if (ok) {
+        try {
+            // writeText() resolving is the *only* trustworthy success signal:
+            // per spec it resolves after the clipboard is actually written.
+            await navigator.clipboard.writeText(text)
             manualText = ''
             copyState = 'copied'
             copyTimer = setTimeout(()=>copyState='idle',2000)
-        } else {
+        } catch {
+            // document.execCommand('copy') was tried here as a fallback and
+            // deliberately removed. On a browser that denies clipboard writes it
+            // still returns true AND fires a copy event carrying clipboardData,
+            // while writing nothing -- verified on the published site. Since its
+            // success cannot be distinguished from its failure, using it
+            // reintroduces the exact "looks like it worked" bug this branch
+            // exists to prevent. Showing the text is the only honest fallback.
             manualText = text
             copyState = 'failed'
         }
+    }
+
+    const resetCopyState = () => {
+        clearTimeout(copyTimer)
+        copyState = 'idle'
+        manualText = ''
     }
 
     // Routing here is hash-based, so moving to another outcome or version never
     // reloads the page. Without this reset, a "Copied!"/"Copy blocked" state --
     // and the previous exercise's text sitting in the textarea -- would follow
     // the student onto the next exercise.
-    $: {
-        params; seed;
-        clearTimeout(copyTimer)
-        copyState = 'idle'
-        manualText = ''
-    }
+    //
+    // The body MUST stay in a function rather than being inlined here. Inline,
+    // `clearTimeout(copyTimer)` reads copyTimer, which makes it a dependency of
+    // this block -- and copyForAi's own `copyTimer = setTimeout(...)` would then
+    // re-trigger the block and reset copyState to 'idle' in the same flush that
+    // set it to 'copied', so the confirmation never rendered at all.
+    $: { params; seed; resetCopyState() }
 </script>
 
 <Bank {params}>
@@ -173,14 +172,15 @@
         <Row>
             <Col>
                 <p class="text-danger mb-1">
-                    Your browser blocked clipboard access. Select the text below
-                    and copy it manually.
+                    Your browser blocked clipboard access. The text below is
+                    already selected — press Ctrl+C (or Cmd+C) to copy it.
                 </p>
                 <textarea
                     class="form-control text-monospace"
                     rows="12"
                     readonly
                     value={manualText}
+                    use:selectAll
                     on:focus={(e)=>e.currentTarget.select()}
                 />
             </Col>
