@@ -80,7 +80,13 @@
         }
     }
 
-    const resetCopyState = () => {
+    // Which exercise the current copy state belongs to, so the reset below can
+    // distinguish "the student navigated" from "this statement merely re-ran".
+    let copyStateExercise = ''
+
+    const resetCopyStateIfMoved = (exercise:string) => {
+        if (exercise === copyStateExercise) return
+        copyStateExercise = exercise
         clearTimeout(copyTimer)
         copyState = 'idle'
         manualText = ''
@@ -91,12 +97,17 @@
     // and the previous exercise's text sitting in the textarea -- would follow
     // the student onto the next exercise.
     //
-    // The body MUST stay in a function rather than being inlined here. Inline,
-    // `clearTimeout(copyTimer)` reads copyTimer, which makes it a dependency of
-    // this block -- and copyForAi's own `copyTimer = setTimeout(...)` would then
-    // re-trigger the block and reset copyState to 'idle' in the same flush that
-    // set it to 'copied', so the confirmation never rendered at all.
-    $: { params; seed; resetCopyState() }
+    // Two things stop this from eating its own confirmation, both learned the
+    // hard way:
+    //   1. The body stays in a function. Inlined, `clearTimeout(copyTimer)`
+    //      reads copyTimer, making it a dependency here -- so copyForAi's
+    //      `copyTimer = setTimeout(...)` re-triggered this and reset copyState
+    //      in the same flush that set it to 'copied'.
+    //   2. The reset is idempotent, keyed on the exercise actually displayed.
+    //      `params` is a prop object whose identity the router may renew on any
+    //      re-render, and how often that happens varies by browser, so an
+    //      unconditional reset here cannot be relied on.
+    $: resetCopyStateIfMoved(`${params.outcomeSlug}/${seed}`)
 </script>
 
 <Bank {params}>
