@@ -459,9 +459,16 @@ These two functions use Python's `importlib.resources` API to read files that we
 
 ### `dashboard/checkit/wrapper/__init__.py`
 
-Defines the `sage()` function that runs the SageMath generation subprocess.
+Defines `run_generator()`, which launches the generation subprocess, and the
+`RUNTIMES` table that decides *which* subprocess. The generator's file extension
+selects the runtime -- `generator.py` runs under `sys.executable` with
+`wrapper.py`, `generator.sage` runs under `sage` with `wrapper.sage`. See
+"Generator runtimes" near the end of this document.
 
-**`sage(outcome, output_path, preview=True, images=False, amount=1_000, random=False, image_seeds=None)`**
+(Formerly named `sage()`. Renamed because a function named `sage()` that may
+launch Python is actively misleading.)
+
+**`run_generator(outcome, output_path, preview=True, images=False, amount=1_000, random=False, image_seeds=None)`**
 
 Parameters:
 - `outcome` — an `Outcome` instance; provides `outcome.generator_path()` and `outcome.bank.abspath()`
@@ -550,12 +557,19 @@ Note that step 3 is a `shutil.rmtree` — `docs/demo/` is **replaced**, not merg
 
 ---
 
-## 4. Detailed Walkthrough of Every `.sage` File
+## 4. Detailed Walkthrough of the Generator Runtimes
 
-SageMath (`.sage`) files look like Python but are preprocessed by SageMath before execution. Key differences:
-- `^` is exponentiation (Python's `**`)
-- Many mathematical objects like `var`, `randrange`, `choice`, `shuffle`, `ZZ`, `QQ`, `SR`, `matrix`, etc. are available as global names
-- `set_random_seed(n)` makes all subsequent random operations deterministic with seed `n`
+There are two, chosen by a generator's file extension (see "Generator runtimes"
+near the end of this document). **`wrapper/wrapper.py` is the default**;
+`wrapper/wrapper.sage` is retained for banks that need SageMath. The demo bank is
+entirely `.py`, so nothing here exercises the Sage path any more.
+
+SageMath (`.sage`) files look like Python but are preprocessed by SageMath before execution. Key differences -- each of which is a silent-failure hazard when porting a generator to `.py`:
+- `^` is exponentiation (Python's `**`; in Python `^` is bitwise XOR)
+- `a == b` builds a symbolic equation (in Python it compares and returns a bool -- use `Eq(a, b)`)
+- `1/3` is an exact rational (in Python it is a float -- use `Rational(1, 3)`)
+- Many mathematical objects like `var`, `randrange`, `choice`, `shuffle`, `ZZ`, `QQ`, `SR`, `matrix`, etc. are available as global names. `wrapper.py` supplies its own equivalents explicitly via `GENERATOR_NAMESPACE`.
+- `set_random_seed(n)` makes all subsequent random operations deterministic with seed `n` (`wrapper.py` maps this onto `random.seed`)
 
 ### `dashboard/checkit/wrapper/wrapper.sage`
 
@@ -1838,7 +1852,9 @@ Note the triple braces `{{{a}}}` — Mustache uses `{{{...}}}` for unescaped HTM
 
 The `CheckIt` class is available to all generator authors without any import. Here is complete documentation of every method with examples.
 
-> Several of these helpers exist to work around Sage-specific behavior, and porting them is the bulk of the work in "Dropping the SageMath dependency" near the end of this document. Note in particular that `vars()`'s name-shuffling is **not** Sage-specific — SymPy sorts terms by symbol name too, so that helper would still be needed.
+> **This class now exists in both runtimes** — here for `wrapper.sage`, and re-implemented against SymPy in `wrapper/wrapper.py`. The public method names and signatures are identical on purpose; a change to one belongs in both. See "Generator runtimes" near the end of this document.
+>
+> Note `vars()`'s name-shuffling is **not** a Sage workaround: SymPy orders the terms of a sum by symbol name too, so the helper is needed in both. By contrast `var("zw", latex_name="w")` *was* Sage-specific and is gone — SymPy has no display-name override, and the helper that used it takes an explicitly ordered list anyway.
 
 ### `CheckIt.vars(*latex_names, random_order=True)`
 
@@ -2025,7 +2041,11 @@ This global variable is read in `App.svelte` as `window['bankJsonUrl']`. When de
 
 ### Python Dependencies (`setup.cfg`)
 
-> **SageMath is deliberately absent from this list, and always has been.** It cannot be pip-installed, so `pip install checkit-dashboard` succeeds without it and only fails later, at `generate` time, when the subprocess cannot find the `sage` binary. That also means Sage is the sole reason authoring needs a container — see "Dropping the SageMath dependency" near the end of this document.
+> **SageMath is deliberately absent from this list, and always has been.** It cannot be pip-installed. As of 2026-08-04 it is also no longer needed: the default runtime is plain Python + SymPy, and `sage` is invoked only for a `generator.sage`. See "Generator runtimes" near the end of this document.
+
+**`sympy`** — the default generator runtime's math backend. Used by `wrapper/wrapper.py` for symbolic expressions, `latex()` output and exact matrix work. Added to `install_requires` 2026-08-04.
+
+**`matplotlib`** — an *optional extra* (`pip install checkit-dashboard[plots]`), deliberately not in `install_requires`: only banks whose generators call `plot()` need it, and `tikz_graphics()` needs no Python plotting library at all. `plot()` raises a clear message when it is missing.
 
 **`ipywidgets`** — Jupyter widget framework. Used only in `dashboard.py` (deprecated). Provides `widgets.Output`, `widgets.Dropdown`, `widgets.Button`, `widgets.HBox`, etc.
 
@@ -2396,166 +2416,145 @@ transforms with `lxml` server-side and is entirely outside the browser.
 Sources: whatwg/html#11523, mozilla/standards-positions#1287,
 https://developer.chrome.com/docs/web-platform/deprecating-xslt
 
-## Dropping the SageMath dependency (proposal, not implemented)
+## Generator runtimes: plain Python (default) and SageMath (optional)
 
-Motivation: SageMath does not run natively on Windows, so authoring requires a
-Codespace/devcontainer. That is friction on every edit-test cycle.
+**Implemented 2026-08-04.** Authoring no longer requires SageMath, and therefore
+no longer requires a container: `generate`, TikZ compilation, rendering to
+LaTeX/HTML/PreTeXt, the viewer build and `build_docs.py` all run on a Windows
+host. Sage was *demoted*, not removed — `wrapper.sage` is untouched and fully
+functional for anyone who has Sage installed.
 
-Everything in this section marked **[verified]** was checked against this repo or
-against SymPy 1.14 on 2026-08-04. Everything marked **[assumed]** was not.
+### The seam: the generator's file extension picks the runtime
 
-### Sage is the only thing forcing the container [verified]
+There is no setting and no config field. A generator declares what it needs by
+its own filename:
 
-On a Windows host with no container: `pdflatex`, `pdftoppm`, `node`, `npm` and
-`python` are all present and working — TeX Live 2025 compiles the TikZ figures
-locally, the viewer builds, and `Bank`/`Outcome`/`Exercise` import and run. Only
-`sage` is missing. This is one dependency, not a web of them.
-
-Note also that **`sage` is not a pip dependency and never was** — `setup.cfg`'s
-`install_requires` is `ipywidgets, lxml, latex2mathml, pystache, click, trogon`.
-`pip install checkit-dashboard` already succeeds without Sage; it fails later, at
-`generate` time, when the subprocess cannot find the `sage` binary.
-
-### The coupling is small and already isolated [verified]
-
-Sage is reached exactly once, through a subprocess in `wrapper/__init__.py`:
-
-```python
-subprocess.run(["sage", wrapper_path, generator_path, output_path, ...])
-```
-
-Generators never `import sage`; `wrapper.sage` `load()`s them into whatever
-namespace it provides. Nothing else in the Python package touches Sage —
-`bank.py`, `outcome.py`, `exercise.py` and `wrapper/tikz.py` are all Sage-free.
-
-The full coupling is therefore:
-
-1. the literal command `"sage"` in `wrapper/__init__.py`
-2. the hardcoded filename `wrapper.sage` (`wrapper/__init__.py`)
-3. the hardcoded filename `generator.sage` (`Outcome.generator_path()`, and the
-   `checkit new` scaffold in `__main__.py`)
-4. the Sage-flavored contents of `wrapper.sage` itself (the `CheckIt` helpers,
-   `BaseGenerator`, and `json_ready`)
-
-### What Sage actually provides here
-
-| job | site | replacement |
+| file | interpreter | wrapper |
 |---|---|---|
-| symbolic expressions + `latex()` | `json_ready()` latexifies every value | SymPy `latex()` **[verified]** |
-| exact linear algebra | `CheckIt` matrix helpers, MX1 | SymPy `Matrix`, `Rational` **[verified]** |
-| plotting | `graphics()` → `.save(path)` | matplotlib, or the TikZ backend (needs no Python plotting at all) |
-| seeded RNG | `randrange`, `shuffle`, `choice`, `set_random_seed` | stdlib `random` **[assumed]** |
+| `generator.py` | `sys.executable` (the interpreter running checkit) | `wrapper/wrapper.py` |
+| `generator.sage` | `sage` | `wrapper/wrapper.sage` |
 
-SymPy 1.14 checks, run against the constructs the demo bank actually uses:
+Defined in `wrapper/__init__.py`'s `RUNTIMES` dict; resolved by
+`Outcome.generator_path()`, which looks for `generator.py` first and falls back
+to `generator.sage`. Consequences worth knowing:
 
-```
-latex(3*x + 5)                -> 3 x + 5
-latex(3*x**4*cos(x))          -> 3 x^{4} \cos{\left(x \right)}
-latex(diff(3*x**4*cos(x), x)) -> - 3 x^{4} \sin{\left(x \right)} + 12 x^{3} \cos{\left(x \right)}
-latex(exp(x))                 -> e^{x}
-latex(Rational(1,3))          -> \frac{1}{3}
-latex(Matrix([[1,2],[3,4]]))  -> \left[\begin{matrix}1 & 2\\3 & 4\end{matrix}\right]
-Symbol('x_1')                 -> x_{1}
-```
+- **A bank may mix the two.** Migration is per-outcome, not all-or-nothing.
+- **Adding a third runtime is one more `RUNTIMES` entry** plus a filename in
+  `Outcome.GENERATOR_FILENAMES`. Nothing else changes.
+- `sys.executable`, not the string `"python"` — on a machine with several
+  Pythons the bare name resolves to whatever is first on PATH, which is often
+  not the environment checkit is installed in.
 
-Three findings worth having before anyone starts:
+The entry point was renamed `sage()` → `run_generator()`, since a function named
+`sage()` that may launch Python is actively misleading.
 
-- **`expr.diff()` with no argument works** in SymPy, inferring the single free
-  symbol. EX2 relies on this. (An earlier draft of this note claimed it raises;
-  that was wrong.)
-- **`Matrix.rref()` returns a tuple** `(rref_matrix, pivot_columns)`, whereas Sage
-  splits this across `.rref()` and `.pivots()`. Same information, different shape.
-- **`Matrix.nullspace()`** is the analogue of Sage's `right_kernel`, but Sage was
-  called with `basis='pivot'`; SymPy's basis differs, so
-  `latex_solution_set_from_matrix` would emit a correct but differently
-  parametrized solution set.
+### Why this was cheap: the important seam already existed
 
-### The genuinely hard parts
+`json_ready()` converts every generated value to a **string** before it reaches
+`seeds.json`. No backend object has ever crossed that boundary, so `bank.py`,
+`exercise.py`, the XSLTs and the viewer were always runtime-agnostic and needed
+no changes at all. The subprocess wall was already in the right place; only what
+runs *inside* it changed.
 
-**1. The Sage preparser — the main cost.** Sage rewrites source before executing:
-`^` means exponentiation, `1/3` is an exact `Rational`, integer literals are Sage
-`Integer`s. In plain Python `^` is bitwise XOR and `1/3` is a float. `EX2` contains
-`x^randrange(2,10)` **[verified by reading]**, which under plain Python silently
-becomes XOR rather than erroring. This is a **syntax migration of every existing
-generator**, and it fails quietly. Any port needs a lint pass for `^` and bare
-integer division, not just a runtime swap.
+**Do not collapse either wall.** Importing sympy directly into `outcome.py` for
+convenience, or letting a SymPy object into `seeds.json`, would undo this.
 
-**2. No `latex_name` equivalent in SymPy [verified].** SymPy sorts terms by symbol
-name exactly as Sage does — `latex(z+y+x)` gives `x + y + z` — so
-`CheckIt.vars()`'s deliberate name-shuffling **is still needed**, not obsolete.
-But `MX1` uses `var("zw", latex_name="w")`, Sage's trick for naming a symbol `zw`
-so it sorts last while rendering as `w`. SymPy has no display-name override, so
-that needs a different mechanism (a custom printer, or post-processing the LaTeX).
+### What `wrapper/wrapper.py` contains
 
-**3. Matrix subdivisions.** `A.subdivide([], [columns-1])` draws the augmented
-matrix bar and `CheckIt.latex_system_from_matrix` reads `.subdivisions()`. SymPy
-has no equivalent; the split index would have to be carried alongside the matrix.
+A SymPy-backed port of `wrapper.sage` that keeps the CLI signature, the
+author-facing names, and the `BaseGenerator` / `CheckIt` / `provide_data` API.
+Two pieces had no SymPy equivalent and are implemented here:
 
-**4. `random_matrix(QQ, algorithm='echelonizable')`.** No SymPy equivalent. The
-surrounding logic in `simple_random_matrix_of_rank` is already hand-rolled, so
-this is finishing that job rather than starting one.
+- **`CheckItMatrix`** — wraps a SymPy `Matrix` and carries the augmented-matrix
+  *subdivision* (the vertical bar) that Sage matrices track natively. Exposes the
+  subset of Sage's matrix API the helpers and generators actually use, including
+  `rref()` returning just the reduced matrix (SymPy returns a `(matrix, pivots)`
+  tuple) so the helper code reads the same in both runtimes.
+- **`_random_full_column_rank`** — replaces
+  `random_matrix(QQ, …, algorithm='echelonizable')`. Starts from an identity
+  block, then applies random unimodular row operations, which preserve both rank
+  and integrality so the result stays exactly solvable by hand.
 
-**5. `graphics()` returns objects with `.save(path)` [assumed].** Matplotlib
-figures use `.savefig()`, so either the `BaseGenerator` contract changes or the
-Python wrapper adapts. See §12 "Image generation backends", which already
-anticipates a `.save(path)`-shaped interface.
+`GENERATOR_NAMESPACE` is the author-facing surface — the names a `generator.py`
+sees without importing anything. Sage supplies its equivalents automatically;
+here they are listed explicitly. Extend that dict to give authors more.
 
-### Who would actually miss Sage
+### Migration hazard: three Sage-isms that fail *silently*
 
-- **Algebra, precalculus, calculus, linear algebra, discrete, intro stats** —
-  SymPy is a genuine replacement; no meaningful loss.
-- **Number theory** — SymPy's `ntheory` covers `isprime`, `factorint`, `nextprime`.
-- **Combinatorics** — workable for a standard course via `math.comb`/`perm`,
-  `itertools`, and SymPy's `catalan`/`bell`/`stirling`/`partition`. Sage's posets,
-  species and symmetric functions have no equivalent.
-- **Abstract algebra** — the real exposure. Sage's GAP-backed group theory,
-  polynomial rings over arbitrary rings and `GF(q)` are well ahead. SymPy's
-  `combinatorics` (permutation groups) plus the `galois` package covers most
-  undergraduate material, but a bank built around Galois theory or nontrivial
-  group structure would feel the loss. **[assumed — not tested]**
+Porting the eight demo generators surfaced exactly three real differences, and
+**none of them raise an error** — they produce wrong output:
 
-### Recommended shape: demote Sage to an option, don't remove it
+| Sage | plain Python | seen in |
+|---|---|---|
+| `x^p` — exponentiation | **bitwise XOR** | EX2, `checkit new` scaffold |
+| `a == b` — builds an equation | **compares, returns `False`** | EX1 |
+| `-A/B` — exact `Rational` | **float** `-0.666…` | EX1 |
 
-Because the interpreter is already a subprocess parameter, adding a **plain-Python
-runtime as the default** while keeping Sage opt-in is a contained change. A bank
-declares which runtime it wants (`bank.xml` is the natural home, alongside
-`<ai-prompt>`; unlike that field this one never needs to reach the viewer, so it
-stops at `Bank.__init__`).
+Use `x**p`, `Eq(a, b)` and `Rational(-A, B)`. Any future bulk migration wants an
+automated scan for `^` and bare integer division rather than a read-through; EX1
+would otherwise have shipped `0.6666666666666666` as a slope indefinitely.
 
-Payoffs: the common case becomes `pip install checkit-dashboard` working on
-Windows with no container; abstract-algebra authors keep Sage by declaring it; and
-no existing bank breaks, since old banks declare the runtime they already use.
+Also dropped: MX1's `var("zw", latex_name="w")`. Sage used it to give a symbol a
+sort key different from its printed name. SymPy has no display-name override —
+but that helper takes an explicitly ordered list, so the trick was unnecessary.
+Note `CheckIt.vars()`'s name-shuffling **is** still needed: SymPy orders the
+terms of a sum by symbol name exactly as Sage does.
 
-Rough order, each step testable on a Windows host:
+### Verified
 
-1. `wrapper.py` beside `wrapper.sage` — port `json_ready` to `sympy.latex`, RNG to
-   `random`, keep `BaseGenerator`/`variants` byte-identical in behavior
-2. port the `CheckIt` helpers (the matrix ones are the real work)
-3. make the interpreter and the `generator.*` filename runtime-dependent
-   (`wrapper/__init__.py`, `Outcome.generator_path()`, the `checkit new` scaffold)
-4. port demo-bank generators one at a time — `TIKZ` and `EX3` use only `randrange`
-   and are nearly free
+On a Windows host with no Sage installed: all eight outcomes generate; all eight
+render through `Exercise.latex()`/`.html()`; EX2's product rule, MX1's
+system-matrix correspondence and EX1's exact `-7` slope are correct; KaTeX
+renders SymPy's LaTeX in the browser with zero errors; `--image-seeds` still caps
+PNGs while writing `.tikz` for every seed; `build_docs.py` completes; and an
+assessment generated from the viewer compiles under `pdflatex` to a printable PDF
+containing the TikZ figure — drawn from a seed past the image cap, so it had no
+PNG and relied on the `.tikz` source.
 
-### Ramifications to accept before starting
+### Known gaps and future options
 
-- **Two implementations of the `CheckIt` helpers.** Supporting both runtimes means
-  the helper library exists twice, in Sage flavor and SymPy flavor. That is the
-  same dual-implementation trap that produced the six-file XSLT sync requirement
-  and the document-vs-element bug (§5, §6). Mitigate by keeping backend-agnostic
-  logic in a shared `.py` module imported by both wrappers, and letting only the
-  algebra differ — but accept that some duplication is real.
-- **Regenerating changes every exercise.** The RNGs differ, so seed *N* produces
-  different content under the two runtimes. `build_variant_bag`'s
-  `set_random_seed(0)` shuffle-bag also reshuffles, so variant assignment changes
-  too. Fine for a new bank; for one already published to students mid-term, the
-  version numbers they were given stop matching.
-- **LaTeX output changes cosmetically.** SymPy's `\cos{\left(x \right)}` is not
-  byte-identical to Sage's spacing and bracing. The mathematics is the same, but
-  every rendered exercise shifts slightly — worth a visual diff pass, and worth
-  knowing before diffing generated output and assuming something broke.
-- **The demo bank documents every feature**, so a second runtime raises the
-  question of whether it demonstrates both, or migrates wholesale. Migrating
-  wholesale is cleaner but removes the worked Sage examples.
+- **`matplotlib` is an optional extra** (`pip install checkit-dashboard[plots]`),
+  not a hard dependency: only banks calling `plot()` need it, and
+  `tikz_graphics()` needs no Python plotting library at all. `plot()` raises a
+  clear message when it is absent. The built-in `plot()` is deliberately simple
+  (single expression, one variable, fixed range) — Sage's is far richer, and a
+  bank needing more should either use `tikz_graphics()` or extend
+  `GENERATOR_NAMESPACE`.
+- **Output is not comparable across runtimes.** The RNGs differ, so seed *N*
+  yields different content, `build_variant_bag`'s shuffle-bag reassigns variants,
+  and SymPy's LaTeX spacing differs cosmetically from Sage's. A bank that
+  switches regenerates from scratch; do not diff generated output across the
+  change and conclude something broke.
+- **Nothing in this repo exercises the Sage path any more** — every demo
+  generator is now `.py`, by choice. `wrapper.sage` is working code rather than a
+  stub, but it is untested code from here on. If it is ever revived, expect to
+  fix bit-rot.
+- **Duplicated `CheckIt` helpers.** The helper library now exists twice, in Sage
+  flavor and SymPy flavor. This was accepted deliberately rather than abstracted
+  away up front: an interface designed against a single implementation is usually
+  the wrong interface. Should a third runtime ever be wanted, the options are, in
+  increasing order of cost:
+  1. leave the duplication alone (fine while only one runtime is maintained);
+  2. factor the backend-specific operations behind a small adapter — `latex`,
+     `symbol`, `matrix`, `rref`, `nullspace` — leaving the algorithmic bulk of
+     `CheckIt` written once. Design it by extracting what `wrapper.py` and
+     `wrapper.sage` genuinely share, not by guessing;
+  3. a source-to-source translator. Viable for *syntax* (`^` → `**`) and worth it
+     as a one-time, reviewed, committed codemod for generator files. Not viable
+     for semantics: `A.rref()` returns different shapes in the two libraries and
+     `random_matrix(algorithm='echelonizable')` has no SymPy counterpart at all,
+     so no text rewriter can bridge them. Never at runtime — the code that ran
+     would not be in the repo to grep, diff or breakpoint.
+- **The devcontainer still installs SageMath**, which is now optional. It could
+  be slimmed considerably, or kept as the "full" environment for anyone who wants
+  the Sage runtime available.
+- **Abstract algebra remains the real gap** if the Sage runtime is ever needed:
+  Sage's GAP-backed group theory, polynomial rings over arbitrary rings and
+  `GF(q)` are well ahead of SymPy. Combinatorics is workable via `math.comb`,
+  `itertools` and SymPy's `catalan`/`bell`/`stirling`; algebra, precalculus,
+  calculus, linear algebra, discrete and intro stats are fully covered.
+  *(Assessed, not tested.)*
+
 
 ## Local divergences from upstream StevenClontz/checkit
 
@@ -2575,6 +2574,18 @@ upstream merge doesn't silently revert them:
   `outcomeToStx` (utils/index.ts) stamps `@remote` on `image, tikz-image`.
   Without these, TikZ figures render only in the html/latex/pretext export tabs,
   not in the default display mode.
+- **Plain-Python generator runtime** — `wrapper/wrapper.py` (SymPy-backed)
+  alongside the untouched `wrapper.sage`; the generator's file extension selects
+  which runs (`RUNTIMES` in `wrapper/__init__.py`, resolved by
+  `Outcome.generator_path()`). `sage()` renamed `run_generator()`. `sympy` added
+  to `install_requires`, `matplotlib` as a `[plots]` extra. All eight demo
+  generators ported to `.py`, so upstream's `.sage` versions are gone here.
+  Authoring no longer needs a container. See "Generator runtimes" for the three
+  silent Sage-isms an upstream merge could reintroduce (`^`, `==`, `1/3`).
+- **update_viewer.py Windows portability** — uses `sys.executable` rather than
+  the literal `"python"`, resolves `npm` via `shutil.which` (it is `npm.cmd` on
+  Windows), and passes `check=True` so a failed generate stops the build instead
+  of silently publishing an empty demo site.
 - **TikZ packages in the assessment preamble** — `viewer/src/templates/`
   `assessmentTemplate.tex` loads `tikz` and `tkz-euclide` alongside `graphicx`.
   Without them the LaTeX output's `\input{<source>.tikz}` hits an undefined
@@ -2620,7 +2631,9 @@ upstream merge doesn't silently revert them:
 
 ## Codespace / devcontainer notes
 
-> The container exists for exactly one reason: SageMath does not run natively on Windows. TeX Live, poppler and Node all install fine on a Windows host, and everything except `generate` already runs there. See "Dropping the SageMath dependency" above for what removing that constraint would take.
+> **The container is no longer required.** It existed for exactly one reason — SageMath does not run natively on Windows — and as of 2026-08-04 the default generator runtime is plain Python + SymPy. The whole pipeline, including `generate`, TikZ compilation, the viewer build and `build_docs.py`, has been run end to end on a Windows host with no Sage installed. See "Generator runtimes" above.
+>
+> The devcontainer still installs SageMath and could be slimmed considerably, or kept as the "full" environment for anyone who wants the optional Sage runtime available.
 
 - The devcontainer installs a current TeX Live (2026) from upstream tlnet (scheme-infraonly + tlmgr), NOT Debian's apt texlive (which is 2019 and too old for current tkz-euclide/tkz-elements). Add LaTeX packages by extending the tlmgr install list in .devcontainer/setup.sh.
 - poppler-utils (pdftoppm) is installed via apt in setup.sh.
