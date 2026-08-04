@@ -1,5 +1,12 @@
-import os, subprocess, glob, shutil, tempfile
+import os, subprocess, glob, shutil, sys, tempfile
 from checkit.utils import working_directory
+
+def _npm():
+    """npm is npm.cmd on Windows, which bare subprocess.run() will not find."""
+    found = shutil.which("npm")
+    if found is None:
+        raise RuntimeError("npm is not installed or not on PATH; cannot build the viewer.")
+    return found
 
 def main():
     with working_directory("../demo-bank"):
@@ -9,11 +16,21 @@ def main():
         # previously published PNGs. The cap keeps this to about a minute:
         # the viewer only ever shows ~20 seeds, and .tikz source is written for
         # every seed regardless, so LaTeX output is unaffected by it.
-        subprocess.run("python -m checkit generate -r -i --image-seeds 20".split(" "))
+        #
+        # sys.executable, not "python": on a machine with several Pythons the
+        # bare name resolves to whatever is first on PATH, which is often not
+        # the environment checkit is installed in.
+        #
+        # check=True on both calls: without it a failed generate was ignored and
+        # the build carried on to publish a stale or empty demo site.
+        subprocess.run(
+            [sys.executable, "-m", "checkit", "generate", "-r", "-i", "--image-seeds", "20"],
+            check=True,
+        )
 
     with working_directory("../viewer"):
         print("building viewer...")
-        subprocess.run("npm run build".split(" "))
+        subprocess.run([_npm(), "run", "build"], check=True)
 
     print('zipping up viewer')
     with tempfile.TemporaryDirectory() as temporary_directory:

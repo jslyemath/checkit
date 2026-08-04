@@ -21,7 +21,12 @@ class Generator(BaseGenerator):
             r"\tkzDefPoint(" + str(cx) + "," + str(cy) + r"){C}" "\n"
             r"\tkzDefCircle[circum](A,B,C)" "\n"
             r"\tkzGetPoint{O}" "\n"
-            r"\tkzDrawCircle[circum](O,A)" "\n"
+            # \tkzDrawCircle(O,A), not [circum]: `circum` is an option of
+            # \tkzDefCircle above, not of \tkzDrawCircle. Passing it here made
+            # every compile emit "I do not know the key '/tikz/circum'".
+            # pdflatex recovers and still draws the circle, so the figure looked
+            # fine and the error went unnoticed -- but it is noise in every log.
+            r"\tkzDrawCircle(O,A)" "\n"
             r"\tkzDrawPolygon(A,B,C)" "\n"
             r"\tkzDrawPoints(A,B,C)" "\n"
             r"\tkzLabelPoints(A,B,C)" "\n"
