@@ -4,7 +4,7 @@
 \tkzDefPoint(1,4){C}
 \tkzDefCircle[circum](A,B,C)
 \tkzGetPoint{O}
-\tkzDrawCircle[circum](O,A)
+\tkzDrawCircle(O,A)
 \tkzDrawPolygon(A,B,C)
 \tkzDrawPoints(A,B,C)
 \tkzLabelPoints(A,B,C)

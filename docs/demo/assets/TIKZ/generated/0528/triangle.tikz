@@ -1,10 +1,10 @@
 \begin{tikzpicture}
-\tkzDefPoint(1,2){A}
-\tkzDefPoint(6,1){B}
-\tkzDefPoint(4,6){C}
+\tkzDefPoint(0,2){A}
+\tkzDefPoint(5,0){B}
+\tkzDefPoint(4,5){C}
 \tkzDefCircle[circum](A,B,C)
 \tkzGetPoint{O}
-\tkzDrawCircle[circum](O,A)
+\tkzDrawCircle(O,A)
 \tkzDrawPolygon(A,B,C)
 \tkzDrawPoints(A,B,C)
 \tkzLabelPoints(A,B,C)
