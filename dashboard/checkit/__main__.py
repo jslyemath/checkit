@@ -27,7 +27,7 @@ def new(directory):
     # copy sample outcome template/generator
     example_outcome_dir = os.path.join(directory,'outcomes','EX1')
     os.makedirs(example_outcome_dir, exist_ok=True)
-    for filename in ["template.xml","generator.sage"]:
+    for filename in ["template.xml","generator.py"]:
         with open(os.path.join(example_outcome_dir,filename),"w") as f:
             f.write(static.read_resource(filename))
     # copy devcontainer stuff

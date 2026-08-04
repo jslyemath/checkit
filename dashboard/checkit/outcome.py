@@ -1,7 +1,7 @@
 from .exercise import Exercise
 import os, json, random
 from html import escape as escape_html
-from .wrapper import sage
+from .wrapper import run_generator
 from .wrapper.tikz import compile_tikz_for_outcome
 
 class Outcome():
@@ -34,11 +34,18 @@ class Outcome():
         with open(self.template_filepath()) as f:
             return f.read()
 
+    # Preference order when an outcome directory holds more than one. The
+    # extension is what selects the runtime -- see wrapper/__init__.py RUNTIMES.
+    GENERATOR_FILENAMES = ("generator.py", "generator.sage")
+
     def generator_path(self):
-        return os.path.join(
-            self.abspath(),
-            "generator.sage"
-        )
+        for filename in self.GENERATOR_FILENAMES:
+            path = os.path.join(self.abspath(), filename)
+            if os.path.isfile(path):
+                return path
+        # None present. Return the preferred name so the FileNotFoundError
+        # raised downstream names a real, expected location.
+        return os.path.join(self.abspath(), self.GENERATOR_FILENAMES[0])
 
     def to_dict(self,regenerate=False):
         self.generate_exercises(regenerate)
@@ -54,7 +61,7 @@ class Outcome():
 
     def preview_exercises(self):
         preview_json = os.path.join(self.build_path(),"preview.json")
-        sage(self,preview_json,preview=True,images=True)
+        run_generator(self,preview_json,preview=True,images=True)
         # preview mode generates 20 seeds (see wrapper.sage's amount_s), so cap
         # compilation to match -- otherwise a preview taken after a full build
         # would recompile every seed in the outcome.
@@ -111,7 +118,7 @@ class Outcome():
                 return
             except RuntimeError:
                 pass # generation is necessary
-        sage(self,self.seeds_json_path(),preview=False,images=images,amount=amount,image_seeds=image_seeds)
+        run_generator(self,self.seeds_json_path(),preview=False,images=images,amount=amount,image_seeds=image_seeds)
         if images:
             compile_tikz_for_outcome(self,image_seeds=image_seeds)
         self.load_exercises(reload=True)

@@ -11,11 +11,13 @@ class Generator(BaseGenerator):
         A.subdivide([],[columns-1])
 
         # construct variables
+        # plain var("w"): Sage used var("zw",latex_name="w") so the symbol would
+        # sort after z while printing as w. Order here comes from this list's
+        # position, not the symbol name, so the trick is unnecessary.
         xs=choice([
             [var("x_"+str(i+1)) for i in range(0,columns-1)],
-            [var("x"),var("y"),var("z"),var("zw",latex_name="w")][0:columns-1],
+            [var("x"),var("y"),var("z"),var("w")][0:columns-1],
         ])
-
 
         return {
             "system": CheckIt.latex_system_from_matrix(A,variable_list=xs),

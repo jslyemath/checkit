@@ -9,9 +9,10 @@ class Generator(BaseGenerator):
         x = var("x")
 
         # define possible factors
+        # `**`, not `^`: in Python `^` is bitwise XOR, not exponentiation.
         factors = [
-            x^randrange(2,10),
-            e^x,
+            x**randrange(2,10),
+            e**x,
             cos(x),
             sin(x),
             log(x),

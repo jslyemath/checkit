@@ -9,9 +9,13 @@ class Generator(BaseGenerator):
             B = randrange(1,10)*choice([-1,1])
         C = randrange(-9,10)
         # standard equation
+        # Eq(...), not `==`: in Python `==` compares and returns a bool, where
+        # Sage's `==` built a symbolic equation.
         line1 = {
-            'equation': (A*x+B*y==C),
-            'slope': -A/B,
+            'equation': Eq(A*x+B*y, C),
+            # Rational(...), not `-A/B`: plain Python division would give a
+            # float (-0.666...) instead of an exact fraction.
+            'slope': Rational(-A,B),
         }
 
         # Genereate random line with slope m
@@ -19,7 +23,7 @@ class Generator(BaseGenerator):
         b = randrange(-9,10)
         # slope-intercept equation
         line2 = {
-            'equation': (y==m*x+b),
+            'equation': Eq(y, m*x+b),
             'slope': m,
         }
 
