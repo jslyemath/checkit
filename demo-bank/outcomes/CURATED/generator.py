@@ -6,7 +6,7 @@
 #
 # The pattern matters whenever a skill cannot be randomized algorithmically and
 # the problems have to be written by hand.
-import slye_demo
+import bank_helpers as bh
 
 CURATED = [
     ("<m>7 + 0 = 7</m>", "additive identity"),
@@ -46,5 +46,5 @@ class Generator(BaseGenerator):
             "statement": statement,
             "property": prop,
             "provenance": provenance,
-            "seed_shown": slye_demo.spell(self.seed) if self.seed < 13 else str(self.seed),
+            "seed_shown": bh.spell(self.seed) if self.seed < 13 else str(self.seed),
         }

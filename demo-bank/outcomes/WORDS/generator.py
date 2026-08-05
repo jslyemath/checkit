@@ -11,7 +11,7 @@
 #
 # The one rule: the emitted string must be valid XML. Bare & and < inside math
 # have to be written &amp; and &lt;.
-import slye_demo
+import bank_helpers as bh
 
 NAMES = ["Avery", "Blake", "Casey", "Devon", "Emerson", "Harper"]
 ITEMS = [("notebook", 3), ("binder", 5), ("marker", 2), ("folder", 1)]
@@ -27,20 +27,20 @@ class Generator(BaseGenerator):
         # Two sentence shapes, so the math does not sit in a fixed position.
         if choice([True, False]):
             sentence = (
-                f"{buyer} bought <m>{count}</m> {item}s at <m>{slye_demo.money(unit)}</m> "
-                f"each and paid an extra <m>{slye_demo.money(extra)}</m> in tax. "
+                f"{buyer} bought <m>{count}</m> {item}s at <m>{bh.money(unit)}</m> "
+                f"each and paid an extra <m>{bh.money(extra)}</m> in tax. "
                 f"How much did {buyer} spend in all?"
             )
         else:
             sentence = (
-                f"After paying <m>{slye_demo.money(extra)}</m> in tax, {buyer} spent "
-                f"<m>{slye_demo.money(total)}</m> on {slye_demo.spell(count)} {item}s. "
+                f"After paying <m>{bh.money(extra)}</m> in tax, {buyer} spent "
+                f"<m>{bh.money(total)}</m> on {bh.spell(count)} {item}s. "
                 f"If every {item} cost the same, what did {friend} pay for one?"
             )
 
         return {
             "sentence": sentence,
-            "answer": slye_demo.money(total),
-            "unit": slye_demo.money(unit),
-            "parts": slye_demo.readable_list([f"{count} {item}s", "tax"]),
+            "answer": bh.money(total),
+            "unit": bh.money(unit),
+            "parts": bh.readable_list([f"{count} {item}s", "tax"]),
         }

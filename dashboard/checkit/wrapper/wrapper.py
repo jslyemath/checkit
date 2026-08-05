@@ -595,12 +595,19 @@ def load_generator(generator_path):
     # cannot `import` a helper module that sits beside it or at the bank root,
     # and a bank has to resort to runpy tricks to share code between outcomes.
     #
-    # Two locations, most specific first: the generator's own directory, then
-    # the bank root. A shared module (say slye_math.py) lives at the bank root
-    # and is importable from every outcome.
+    # Two locations: the generator's own directory, then the bank root. A
+    # shared module (bank_helpers.py) lives at the bank root and is importable
+    # from every outcome.
+    #
+    # Appended, NOT inserted at position 0. Prepending would let a bank file
+    # shadow the standard library -- a bank_helpers.py sitting next to a
+    # math.py or random.py would break the runtime in a thoroughly confusing
+    # way. Appending means the worst case is a bank module being ignored
+    # because an installed package already claims the name, which is confined
+    # to the file that misnamed itself.
     for path in (os.path.dirname(os.path.abspath(generator_path)), os.getcwd()):
         if path not in sys.path:
-            sys.path.insert(0, path)
+            sys.path.append(path)
 
     namespace = dict(GENERATOR_NAMESPACE)
     with open(generator_path, encoding="utf-8") as f:
