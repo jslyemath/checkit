@@ -22,14 +22,14 @@ There are three major components:
 
 2. **The Viewer** (Svelte/TypeScript single-page application, lives in `viewer/`): A browser-based interface that reads `bank.json`, renders exercises using KaTeX for math, allows students to page through versions 1–20, and gives instructors tools to build PDF assessments and export to LMSes.
 
-3. **A Bank** (a directory the instructor creates, example in `demo-bank/`): Contains a `bank.xml` manifest, an `outcomes/` directory tree, and for each outcome a `generator.sage` file (SageMath Python code) plus a `template.xml` file (SpaTeXt XML with Mustache placeholders).
+3. **A Bank** (a directory the instructor creates, example in `demo-bank/`): Contains a `bank.xml` manifest, an `outcomes/` directory tree, and for each outcome a `generator.py` file (plain Python; `generator.sage` selects the optional SageMath runtime instead) plus a `template.xml` file (SpaTeXt XML with Mustache placeholders). A bank may also hold `bank_helpers.py` at its root, importable from every generator.
 
 The intermediate representation between Python generation and browser display is called **SpaTeXt** (Spatial Text) — a small, well-defined XML vocabulary rooted in a `<knowl>` element, using the namespace `https://spatext.clontz.org`. Three XSLT stylesheets transform SpaTeXt into HTML, LaTeX, and PreTeXt. These stylesheets exist in two identical copies: one bundled inside the Python package (`dashboard/checkit/static/`) for server-side rendering, and one compiled into the browser viewer (`viewer/src/spatext/xsl/`) for client-side rendering.
 
 ### High-level data flow
 
 ```
-bank.xml + generator.sage + template.xml
+bank.xml + generator.py + template.xml
          |
          | python -m checkit generate
          v
@@ -85,7 +85,8 @@ checkit/                             (repo root)
 │       │   ├── __init__.py          read_resource() and open_resource() helpers
 │       │   ├── bank.xml             boilerplate bank manifest for `checkit new`
 │       │   ├── template.xml         boilerplate SpaTeXt template for `checkit new`
-│       │   ├── generator.sage       boilerplate generator for `checkit new`
+│       │   ├── generator.py         boilerplate generator for `checkit new`
+│       │   ├── bank_helpers.py      boilerplate shared-helpers module for `checkit new`
 │       │   ├── html.xsl             XSLT: SpaTeXt -> HTML (used server-side)
 │       │   ├── latex.xsl            XSLT: SpaTeXt -> LaTeX (used server-side)
 │       │   ├── pretext.xsl          XSLT: SpaTeXt -> PreTeXt XML (used server-side)
@@ -103,33 +104,40 @@ checkit/                             (repo root)
 │   ├── bank.xml                     manifest listing 8 outcomes
 │   ├── assets/                      manually placed image files (IMG2 images)
 │   │   └── IMG2/                    contains 1.png, 2.png, 3.png (digit images)
+│   ├── bank_helpers.py              shared helpers, importable from any generator
 │   └── outcomes/                    one subfolder per learning outcome
 │       ├── EX/
 │       │   ├── EX1/                 Line Slopes outcome
-│       │   │   ├── generator.sage
+│       │   │   ├── generator.py
 │       │   │   └── template.xml
 │       │   ├── EX2/                 Product Rule outcome
-│       │   │   ├── generator.sage
+│       │   │   ├── generator.py
 │       │   │   └── template.xml
 │       │   └── EX3/                 Tasks/Subtasks demo outcome
-│       │       ├── generator.sage
+│       │       ├── generator.py
 │       │       └── template.xml
 │       ├── IMG/
 │       │   ├── IMG1/                Generating Images outcome
-│       │   │   ├── generator.sage
+│       │   │   ├── generator.py
 │       │   │   └── template.xml
 │       │   └── IMG2/                Manual Images outcome
-│       │       ├── generator.sage
+│       │       ├── generator.py
 │       │       └── template.xml
 │       ├── MX/
 │       │   └── MX1/                 Matrix Example outcome
-│       │       ├── generator.sage
+│       │       ├── generator.py
 │       │       └── template.xml
 │       ├── TIKZ/                    TikZ image-generation test outcome (tkz-euclide)
-│       │   ├── generator.sage
+│       │   ├── generator.py
 │       │   └── template.xml
-│       └── XML/                     XML Entities demo outcome
-│           ├── generator.sage
+│       ├── XML/                     XML Entities demo outcome
+│       │   ├── generator.py
+│       │   └── template.xml
+│       ├── CURATED/                 hand-written problems keyed to self.seed
+│       │   ├── generator.py
+│       │   └── template.xml
+│       └── WORDS/                   math embedded in a generated sentence
+│           ├── generator.py
 │           └── template.xml
 │
 └── viewer/                          Svelte/TypeScript SPA
@@ -226,9 +234,9 @@ The `click.group` root. Has `short_help="CheckIt command line interface"`. No lo
 **`new(directory)` — `checkit new [DIRECTORY]`:**
 - `directory` defaults to `'new-checkit-bank'`
 - Creates `<directory>/` (warns if it exists)
-- Creates `<directory>/outcomes/EX1/` and copies `template.xml` and `generator.sage` from the bundled static resources
+- Creates `<directory>/outcomes/EX1/` and copies `template.xml` and `generator.py` from the bundled static resources
 - Creates `<directory>/.devcontainer/` and copies `setup.sh` and `devcontainer.json`
-- Copies `bank.xml` and `README.md` into the root
+- Copies `bank.xml`, `README.md` and `bank_helpers.py` into the root
 - Copies `gitignore.txt` as `.gitignore`
 - Writes `requirements.txt` containing `checkit-dashboard == 0.2.7`
 - Prints a success message
@@ -324,7 +332,7 @@ Returns the full path to `<outcome_dir>/template.xml`.
 Reads and returns the raw text of `template.xml`.
 
 **`Outcome.generator_path(self)`**
-Returns the full path to `<outcome_dir>/generator.sage`.
+Returns the full path to the outcome's generator, trying `GENERATOR_FILENAMES` in order — `generator.py` first, then `generator.sage`. **The extension is what selects the runtime** (see "Generator runtimes"). If neither exists it returns the `generator.py` path, so the `FileNotFoundError` raised downstream names an expected location.
 
 **`Outcome.to_dict(self, regenerate=False)`**
 Calls `self.generate_exercises(regenerate)` to ensure data is fresh, then returns:
@@ -748,7 +756,7 @@ Steps:
 
 ---
 
-### `demo-bank/outcomes/EX/EX1/generator.sage`
+### `demo-bank/outcomes/EX/EX1/generator.py`
 
 This generator illustrates how to use Sage's symbolic algebra to create a two-part problem about line slopes.
 
@@ -791,7 +799,7 @@ After `json_ready()`, `line['equation']` becomes a LaTeX string like `"3 x + 5 y
 
 ---
 
-### `demo-bank/outcomes/EX/EX2/generator.sage`
+### `demo-bank/outcomes/EX/EX2/generator.py`
 
 Demonstrates product rule derivative exercises, and is the worked example of the `variants` shuffle-bag feature.
 
@@ -822,7 +830,7 @@ class Generator(BaseGenerator):
 
 ---
 
-### `demo-bank/outcomes/EX/EX3/generator.sage`
+### `demo-bank/outcomes/EX/EX3/generator.py`
 
 Minimal generator for demonstrating nested task/subtask structure:
 
@@ -843,7 +851,7 @@ The `"first"` key holds a nested dict, which Mustache uses with `{{#first}}...{{
 
 ---
 
-### `demo-bank/outcomes/MX/MX1/generator.sage`
+### `demo-bank/outcomes/MX/MX1/generator.py`
 
 Demonstrates `CheckIt.simple_random_matrix_of_rank` and `CheckIt.latex_system_from_matrix`:
 
@@ -870,7 +878,7 @@ class Generator(BaseGenerator):
 
 ---
 
-### `demo-bank/outcomes/IMG/IMG1/generator.sage`
+### `demo-bank/outcomes/IMG/IMG1/generator.py`
 
 Demonstrates generated graphics:
 
@@ -903,7 +911,7 @@ The `@provide_data` decorator means `graphics()` receives the processed `data` d
 
 ---
 
-### `demo-bank/outcomes/IMG/IMG2/generator.sage`
+### `demo-bank/outcomes/IMG/IMG2/generator.py`
 
 Demonstrates manually-placed images:
 
@@ -918,7 +926,7 @@ Randomly selects `"1"`, `"2"`, or `"3"` — corresponding to pre-existing files 
 
 ---
 
-### `demo-bank/outcomes/XML/generator.sage`
+### `demo-bank/outcomes/XML/generator.py`
 
 Demonstrates XML entity usage (`&amp;`, `&gt;`) and Mustache boolean sections:
 
@@ -949,7 +957,7 @@ class Generator(BaseGenerator):
 
 ---
 
-### `demo-bank/outcomes/TIKZ/generator.sage`
+### `demo-bank/outcomes/TIKZ/generator.py`
 
 Demonstrates the TikZ image backend (the `tikz_graphics()` method) using `tkz-euclide`:
 
@@ -983,6 +991,48 @@ class Generator(BaseGenerator):
 ```
 
 `data()` picks three random points; `tikz_graphics()` builds a TikZ picture string drawing the triangle and its circumscribed circle, returning `{"triangle": <source>}`. Unlike `graphics()` (which returns Sage plot objects), `tikz_graphics()` returns **raw LaTeX/TikZ source strings**. The wrapper writes the source to `<build_path>/<seed:04d>/triangle.tikz`, and `wrapper/tikz.py`'s `compile_tikz_for_outcome()` then compiles it to `triangle.png` (pdflatex → pdftoppm). The template references it via `<tikz-image source="assets/TIKZ/generated/{{__seed__}}/triangle">` (note: no `.png` extension — the XSLT appends it; see §5). Because this outcome relies on `tkz-euclide`, it requires a current TeX Live (see the Codespace/devcontainer notes at the end).
+
+### `demo-bank/outcomes/CURATED/generator.py`
+
+Demonstrates **`self.seed`** and **`bank_helpers.py`**, and exists for the case where a skill cannot be randomized algorithmically and the problems must be written by hand.
+
+```python
+import bank_helpers as bh
+
+CURATED = [ (r"<m>7 + 0 = 7</m>", "additive identity"), ... ]   # 20 of them
+
+class Generator(BaseGenerator):
+    def data(self):
+        if self.seed < len(CURATED):
+            statement, prop = CURATED[self.seed]   # one per public seed
+        else:
+            statement, prop = choice(CURATED)      # random above
+```
+
+Seeds 0-19 — the range the viewer exposes — serve the twenty hand-written problems in a fixed order, so a student paging through sees each exactly once. Higher seeds, which printed assessments draw from, choose freely. Before `self.seed` existed this had to be faked through some other parameter, since `get_data()` only reveals `__seed__` *after* `data()` has run.
+
+Note the `r"..."` prefixes: a LaTeX literal in a `.py` file needs a raw string, or `` in `rac` becomes a formfeed. Python emits a `SyntaxWarning` for this, but it is easy to miss.
+
+### `demo-bank/outcomes/WORDS/generator.py`
+
+Demonstrates **math embedded inside a generated sentence**, for word problems where the generator — not the template — decides the sentence shape, so the template cannot know where the math will fall.
+
+```python
+sentence = (f"{buyer} bought <m>{count}</m> {item}s at <m>{bh.money(unit)}</m> "
+            f"each and paid an extra <m>{bh.money(extra)}</m> in tax. ...")
+```
+
+The template injects it with Mustache's **triple brace**, `{{{sentence}}}`, which does not escape. The parsed SpaTeXt therefore contains real `<m>` elements, indistinguishable from ones a template author wrote, and every output format handles it normally:
+
+```
+LaTeX    After paying \(\$6.00\) in tax, Devon spent \(\$30.00\) on eight notebooks...
+HTML     After paying <span class="math inline-math" data-latex="\$6.00">...
+PreTeXt  After paying <m>\$6.00</m> in tax, Devon spent <m>\$30.00</m>...
+```
+
+**This is why SpaTeXt needs no inline-delimiter support.** A generator that must serve both a web renderer and a LaTeX one emits `<m>` as the single canonical form; a consumer that wants raw LaTeX converts `<m>x</m>` to `\(x\)` on its own side.
+
+The one rule: the emitted string must be **valid XML**. Bare `&` and `<` inside the math have to be written `&amp;` and `&lt;` — see the `XML` outcome, which exists to document exactly that.
 
 ---
 
@@ -1532,26 +1582,27 @@ sage(self, self.seeds_json_path(), preview=False, images=False, amount=1000)
 
 1. Computes `amount_s = "1000"`, `random_s = "no"`
 2. Gets the path to `wrapper.sage` via `importlib.resources.path("checkit.wrapper", "wrapper.sage")`
-3. Creates a temp directory, copies `wrapper.sage` there
+3. Picks the runtime from the generator's extension (`RUNTIMES`), and copies the matching wrapper (`wrapper.py` here) to a temp directory
 4. Uses `working_directory(outcome.bank.abspath())` to change to the bank root
 5. Runs:
    ```
-   sage /tmp/xxx/wrapper.sage /home/user/my-bank/outcomes/EX1/generator.sage
+   <sys.executable> /tmp/xxx/wrapper.py /home/user/my-bank/outcomes/EX1/generator.py
         /home/user/my-bank/assets/EX1/generated/seeds.json 1000 no
    ```
+   (a `generator.sage` would instead run `sage /tmp/xxx/wrapper.sage ...`)
 
-### Step 5: SageMath execution
+### Step 5: Generator execution
 
-SageMath runs `wrapper.sage`. The script:
+The wrapper runs. The script:
 
 1. Reads `sys.argv`:
-   - `generator_path = "outcomes/EX1/generator.sage"` (relative to bank root, since we cd'd there)
+   - `generator_path = "outcomes/EX1/generator.py"` (relative to bank root, since we cd'd there)
    - `seeds_path = "/home/user/my-bank/assets/EX1/generated/seeds.json"`
    - `amount = 1000`
    - `random = False`
    - `gen_images = False`
 
-2. Calls `load("outcomes/EX1/generator.sage")` — executes the generator file, making `Generator` available in scope. The generator class definition in that file uses `BaseGenerator` and `CheckIt`, which are already defined in `wrapper.sage`.
+2. Calls `load_generator("outcomes/EX1/generator.py")` — appends the generator's folder and the bank root to `sys.path` (so `import bank_helpers` works), then executes the generator file in a namespace built from `GENERATOR_NAMESPACE`, which supplies `BaseGenerator`, `CheckIt`, `provide_data` and the math names. (`wrapper.sage` instead uses Sage's `load()`, since Sage puts those names in scope for free.)
 
 3. Creates `generator = Generator()`.
 
@@ -1640,10 +1691,10 @@ my-bank/
 ├── bank.xml
 ├── outcomes/
 │   ├── SLUG1/
-│   │   ├── generator.sage
+│   │   ├── generator.py
 │   │   └── template.xml
 │   └── SLUG2/
-│       ├── generator.sage
+│       ├── generator.py
 │       └── template.xml
 └── assets/          (created by `checkit generate`)
     ├── bank.json
@@ -1705,7 +1756,9 @@ The `<path>` element allows arbitrary directory organization. The demo bank uses
 
 **On adding optional elements:** use `xml.optional_text()` rather than `.find(...).text`. Banks authored against an older CheckIt won't have the element, and `.find()` returns `None` — so the required-element style (`ele.find(...).text`) raises `AttributeError` and refuses to open the bank at all. Every optional element must degrade to `None` and let the consumer fall back.
 
-### `generator.sage`
+### `generator.py` (or `generator.sage`)
+
+The file extension selects the runtime: `generator.py` runs under plain Python + SymPy, `generator.sage` under SageMath. `.py` is the default and the one `checkit new` scaffolds.
 
 Every generator file must define a `Generator` class that extends `BaseGenerator`. The minimum viable generator:
 
@@ -1806,7 +1859,7 @@ Here is a minimal but complete bank that generates "add two fractions" problems:
 </bank>
 ```
 
-**`outcomes/FR1/generator.sage`:**
+**`outcomes/FR1/generator.py`:**
 ```python
 class Generator(BaseGenerator):
     def data(self):
@@ -2592,6 +2645,68 @@ PNG and relied on the `.tikz` source.
   calculus, linear algebra, discrete and intro stats are fully covered.
   *(Assessed, not tested.)*
 
+
+## Planned: porting the course banks, and a separate print tool
+
+Not started. Recorded so the reasoning survives.
+
+### Context
+
+The course banks (`mat-106-checkit`, `mat-206-checkit`) predate the Python
+runtime. Each outcome there holds a `pygenerator.py` with the real logic and a
+25-line `generator.sage` shim that `runpy`-loads it and inserts `outcomes/` into
+`sys.path`. There was never duplicated logic — the shim existed only because
+Sage could not otherwise reach a plain-Python file, and because the bank root
+was not importable. **Both reasons are now gone.**
+
+Those banks also each carry a copy of a print pipeline (`pdfgenerator.py`,
+`skillcheckpoints.sty`, `main_template.tex`) that turns a roster CSV into a
+single PDF: many exercise versions, distributed by seating chart, student names
+inserted, answer keys appended. That is *not* CheckIt's assessment builder, which
+produces one anonymous assessment.
+
+### The bank port
+
+1. Move `slye_math.py` from `outcomes/` to the **bank root**, renamed
+   `bank_helpers.py` — `load_generator()` adds the bank root and the generator's
+   own folder to `sys.path`, not `outcomes/`.
+2. `pygenerator.py` → `generator.py`, wrapped in the `Generator` class; delete
+   `generator.sage`. Roughly 775 lines of shim disappear across 31 outcomes.
+3. Drop the `mode='html'|'latex'` parameter. Only ~9 generators branch on it, and
+   8 of those are formatting; emit `<m>` in the string instead (see the `WORDS`
+   walkthrough) and let the print side convert. `R1` is the exception — it
+   selects genuinely different content and wants `variants`, or splitting in two.
+4. Convert `course_progress` and friends to **`variants`**. Only five outcomes
+   read them (R1, R2, W4, W4-E, W5) and most are binary, so the variant space is
+   small. Today the value is frozen in each shim, so advancing the semester means
+   editing files and regenerating; as a variant it is pregenerated across all
+   cases and *filtered* at print time.
+5. Check LaTeX literals are raw strings: `"rac"` makes `` a formfeed.
+
+### The print tool
+
+Belongs in **its own repo**, installed as a package depending on
+`checkit-dashboard` — not in the platform (Google OAuth and seating charts are
+not platform concerns, and it would worsen upstream merges) and not in a bank
+(there are two, and the pipeline is currently copied between them by hand).
+
+Intended shape: consume a bank's pregenerated `seeds.json` rather than importing
+generators, so printing needs no generation step and printed versions are
+reproducible. Draw from **seeds ≥ 20**, which the viewer does not expose, so
+students cannot look up the printed version. Join the roster locally — student
+names never enter the bank at all.
+
+Open questions, all deliberately unanswered:
+
+- `skillcheckpoints.sty` and `main_template.tex` may have drifted between the two
+  banks, and the `.sty` wants cleaning up regardless. Whether the package ships
+  one layout with overrides or needs real theming depends on how far apart they
+  are. The layout must stay **instructor-editable** either way; whether that
+  means exposing the files directly or providing a mechanism is undecided.
+- The eventual goal is a GUI replacing much of the current Google Sheet: pull
+  responses from Google Forms directly, set up the form and sheet for a new
+  course, and drive printing. That makes the existing CSV-scraping code
+  throwaway, so it is not worth porting carefully.
 
 ## Local divergences from upstream StevenClontz/checkit
 
