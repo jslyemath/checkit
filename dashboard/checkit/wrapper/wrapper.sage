@@ -211,6 +211,7 @@ class BaseGenerator:
             set_random_seed()
             seed = randrange(1000)
         self.__seed = seed
+        self.seed = seed
         self.variant = variant
         set_random_seed(seed)
         self.__data = self.data()
