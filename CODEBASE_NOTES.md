@@ -1696,6 +1696,8 @@ Required attributes and elements:
   - `<path>` — path relative to the bank root pointing to the outcome directory
   - `<description>` — shown on the outcome page
 
+Alongside `bank.xml`, a bank may hold **`bank_helpers.py`** at its root — shared functions any generator can `import bank_helpers`. Scaffolded by `checkit new`; see "Generator runtimes" for how it is put on the import path.
+
 Optional elements:
 - `<ai-prompt>` — free prose prepended to the payload of the viewer's "Copy for AI Chatbot" button (see §12). Valid at bank level and inside any `<outcome>`; the outcome's value wins, then the bank's, then a generic built-in default. Parsed by `xml.optional_text()`, which dedents and strips, so the body can be indented to match the surrounding XML or not.
 
@@ -2479,6 +2481,41 @@ Two pieces had no SymPy equivalent and are implemented here:
 sees without importing anything. Sage supplies its equivalents automatically;
 here they are listed explicitly. Extend that dict to give authors more.
 
+### What a generator can reach: bank helpers and its own seed
+
+**`bank_helpers.py` at the bank root** is where a bank author puts functions more
+than one generator needs. `checkit new` scaffolds it with a docstring and two
+example functions. Any generator does `import bank_helpers as bh`, however deeply
+nested its outcome folder is.
+
+This works because `load_generator()` adds two directories to `sys.path`: the
+generator's own folder, then the bank root. Neither is there by default —
+running a script puts only *that script's* directory on the path, which here is
+the wrapper's temp directory, and cwd (the bank root) is not on `sys.path` in
+Python 3. Without this a bank has to resort to `runpy` tricks to share code
+between outcomes.
+
+They are **appended, not inserted at position 0**. Prepending would let a bank
+file shadow the standard library — a `math.py` or `random.py` at the bank root
+would break the runtime in a thoroughly confusing way. Appending means the worst
+case is a bank module being ignored because an installed package already claims
+the name, which is confined to the file that misnamed itself. Verified: a
+bank-root `math.py` that raises on import does not affect generation.
+
+Distinguish this from the built-in **`CheckIt` class**, which ships with the
+platform, is available without importing, and is *ours* to maintain.
+`bank_helpers.py` is the author's and is *theirs*.
+
+**`self.seed`** is readable inside `data()`, alongside the existing
+`self.variant`. It exists for skills that cannot be randomized algorithmically:
+serve a fixed, hand-written problem for each of the ~20 seeds the viewer exposes,
+and choose randomly above that, where printed assessments draw from. See the
+`CURATED` demo outcome.
+
+Note the seed was always *stored* — but under a name-mangled `self.__seed`, and
+`get_data()` only added it to the returned dict as `__seed__` *after* `data()`
+had already run. So it was unreachable at the moment a generator needed it.
+
 ### Migration hazard: three Sage-isms that fail *silently*
 
 Porting the eight demo generators surfaced exactly three real differences, and
@@ -2574,6 +2611,11 @@ upstream merge doesn't silently revert them:
   `outcomeToStx` (utils/index.ts) stamps `@remote` on `image, tikz-image`.
   Without these, TikZ figures render only in the html/latex/pretext export tabs,
   not in the default display mode.
+- **Bank helper modules + `self.seed`** — `load_generator()` appends the
+  generator's folder and the bank root to `sys.path`, so a bank can share code
+  via `bank_helpers.py` (scaffolded by `checkit new`) instead of `runpy` tricks;
+  and `roll_data()` sets a plain `self.seed` so `data()` can branch on which
+  version it is producing. Demo outcomes CURATED and WORDS cover both.
 - **Plain-Python generator runtime** — `wrapper/wrapper.py` (SymPy-backed)
   alongside the untouched `wrapper.sage`; the generator's file extension selects
   which runs (`RUNTIMES` in `wrapper/__init__.py`, resolved by

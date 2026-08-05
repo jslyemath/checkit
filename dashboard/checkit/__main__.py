@@ -36,8 +36,9 @@ def new(directory):
     for filename in ["setup.sh","devcontainer.json"]:
         with open(os.path.join(devcontainer_dir,filename),"w") as f:
             f.write(static.read_resource(filename))
-    # copy dashboard notebook, bank manifest, README
-    for filename in ["bank.xml","README.md"]:
+    # copy bank manifest, README, and the shared-helpers module every generator
+    # in the bank can import (see bank_helpers.py's own docstring)
+    for filename in ["bank.xml","README.md","bank_helpers.py"]:
         with open(os.path.join(directory,filename),"w") as f:
             f.write(static.read_resource(filename))
     # copy gitignore
