@@ -85,5 +85,21 @@ triangle. Then guide them toward the answer one step at a time
 rather than restating it.
             </ai-prompt>
         </outcome>
+        <outcome>
+            <title>Curated Problems</title>
+            <slug>CURATED</slug>
+            <path>outcomes/CURATED</path>
+            <description>
+Hand-written problems keyed to the seed, with random selection above the public range.
+            </description>
+        </outcome>
+        <outcome>
+            <title>Word Problems</title>
+            <slug>WORDS</slug>
+            <path>outcomes/WORDS</path>
+            <description>
+Math embedded inside a generated sentence rather than placed by the template.
+            </description>
+        </outcome>
     </outcomes>
 </bank>

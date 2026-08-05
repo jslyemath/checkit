@@ -456,6 +456,12 @@ class BaseGenerator:
     def __init__(self):
         self.__data = None
         self.__seed = None
+        # Both are read by data(). `seed` lets a generator branch on *which*
+        # version it is -- e.g. serving a fixed, hand-written problem for each
+        # of the ~20 seeds the viewer exposes and drawing randomly above that.
+        # Without it a generator can only see the seed after data() has already
+        # run, via get_data()'s __seed__ key, which is too late to use.
+        self.seed = None
         self.variant = None
 
     def data(self):
@@ -492,6 +498,7 @@ class BaseGenerator:
             random.seed()
             seed = random.randrange(1000)
         self.__seed = seed
+        self.seed = seed
         self.variant = variant
         random.seed(seed)
         self.__data = self.data()
@@ -579,6 +586,22 @@ def load_generator(generator_path):
 
     The Python analogue of wrapper.sage's `load(generator_path)`.
     """
+    # Make bank-local helper modules importable from a generator.
+    #
+    # Running a script puts *that script's* directory on sys.path, which here is
+    # the wrapper's own temp directory -- not the bank. The current working
+    # directory is the bank root (wrapper/__init__.py enters it before spawning
+    # us), but cwd is not on sys.path in Python 3. So without this a generator
+    # cannot `import` a helper module that sits beside it or at the bank root,
+    # and a bank has to resort to runpy tricks to share code between outcomes.
+    #
+    # Two locations, most specific first: the generator's own directory, then
+    # the bank root. A shared module (say slye_math.py) lives at the bank root
+    # and is importable from every outcome.
+    for path in (os.path.dirname(os.path.abspath(generator_path)), os.getcwd()):
+        if path not in sys.path:
+            sys.path.insert(0, path)
+
     namespace = dict(GENERATOR_NAMESPACE)
     with open(generator_path, encoding="utf-8") as f:
         source = f.read()
