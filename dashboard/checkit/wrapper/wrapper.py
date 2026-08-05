@@ -72,12 +72,20 @@ class _Plot:
         self._figure.savefig(path, bbox_inches="tight")
 
 
-def plot(expr, xrange=(-10, 10), points=200, **kwargs):
-    """A simple 2-D plot of a SymPy expression, mirroring Sage's plot()."""
+def plot(expr, xrange=(-10, 10), yrange=None, points=400, **kwargs):
+    """A 2-D plot of a SymPy expression, styled like a school coordinate grid.
+
+    Deliberately not matplotlib's defaults, which draw a boxed chart with
+    auto-chosen ticks -- students cannot read a coordinate off that. Instead:
+    axes cross at the origin with arrowheads, a gridline and a tick at *every*
+    integer, and an equal aspect ratio so a slope of 1 actually looks like 45
+    degrees.
+    """
     try:
         import matplotlib
         matplotlib.use("Agg")  # no display in a generation subprocess
         import matplotlib.pyplot as plt
+        from matplotlib.ticker import MultipleLocator
     except ImportError as e:
         raise RuntimeError(
             "plot() requires matplotlib, which is not installed. Either "
@@ -88,6 +96,7 @@ def plot(expr, xrange=(-10, 10), points=200, **kwargs):
     x = free[0] if free else Symbol("x")
     f = sympy.lambdify(x, expr, "math")
     lo, hi = xrange
+    ylo, yhi = yrange if yrange is not None else (lo, hi)
     xs, ys = [], []
     for i in range(points + 1):
         xv = lo + (hi - lo) * i / points
@@ -97,11 +106,41 @@ def plot(expr, xrange=(-10, 10), points=200, **kwargs):
             continue
         xs.append(xv)
         ys.append(yv)
-    figure, axes = plt.subplots()
-    axes.plot(xs, ys, **kwargs)
-    axes.axhline(0, linewidth=0.8)
-    axes.axvline(0, linewidth=0.8)
-    axes.grid(True, linewidth=0.3)
+
+    figure, axes = plt.subplots(figsize=(5, 5))
+    axes.plot(xs, ys, linewidth=2, zorder=3, **kwargs)
+    axes.set_xlim(lo, hi)
+    axes.set_ylim(ylo, yhi)
+    # Equal aspect: without it matplotlib stretches to fill the figure and the
+    # slope a student measures off the picture is not the slope of the line.
+    axes.set_aspect("equal")
+
+    # A tick and a gridline at every integer, so values can be read off.
+    axes.xaxis.set_major_locator(MultipleLocator(1))
+    axes.yaxis.set_major_locator(MultipleLocator(1))
+    axes.grid(True, linewidth=0.5, color="0.85", zorder=0)
+
+    # Axes through the origin rather than around the outside.
+    axes.spines["left"].set_position("zero")
+    axes.spines["bottom"].set_position("zero")
+    axes.spines["right"].set_visible(False)
+    axes.spines["top"].set_visible(False)
+    for side in ("left", "bottom"):
+        axes.spines[side].set_linewidth(1.2)
+        axes.spines[side].set_zorder(2)
+
+    # Arrowheads on both ends of both axes -- the textbook convention, showing
+    # the axes continue rather than stopping at the edge of the picture. Drawn
+    # in axis coordinates so they land at the ends regardless of the range.
+    axes.plot(1, 0, ">k", markersize=5, transform=axes.get_yaxis_transform(), clip_on=False)
+    axes.plot(0, 0, "<k", markersize=5, transform=axes.get_yaxis_transform(), clip_on=False)
+    axes.plot(0, 1, "^k", markersize=5, transform=axes.get_xaxis_transform(), clip_on=False)
+    axes.plot(0, 0, "vk", markersize=5, transform=axes.get_xaxis_transform(), clip_on=False)
+
+    axes.tick_params(axis="both", labelsize=7, length=3)
+    # The "0" label sits on top of the other axis and just adds clutter.
+    axes.xaxis.set_major_formatter(lambda v, _: "" if abs(v) < 1e-9 else f"{v:g}")
+    axes.yaxis.set_major_formatter(lambda v, _: "" if abs(v) < 1e-9 else f"{v:g}")
     return _Plot(figure)
 
 
@@ -183,8 +222,22 @@ class CheckItMatrix:
 
     def _latex(self, printer):
         """Lets sympy.latex() render this wrapper, so a generator can return a
-        matrix straight out of data() and have json_ready() latexify it."""
-        return printer.doprint(self._m)
+        matrix straight out of data() and have json_ready() latexify it.
+
+        When the matrix is subdivided, render an `array` with a `|` in the
+        column spec so an augmented matrix shows its vertical bar. SymPy's own
+        matrix printer emits a plain `matrix` environment and has no notion of
+        subdivisions, so without this the bar Sage drew was silently lost and an
+        augmented matrix looked like an ordinary one.
+        """
+        if self._col_split is None:
+            return printer.doprint(self._m)
+        spec = "c" * self._col_split + "|" + "c" * (self._m.cols - self._col_split)
+        body = " \\\\ ".join(
+            " & ".join(printer.doprint(self._m[i, j]) for j in range(self._m.cols))
+            for i in range(self._m.rows)
+        )
+        return r"\left[\begin{array}{" + spec + "}" + body + r"\end{array}\right]"
 
     def __repr__(self):
         return repr(self._m)
