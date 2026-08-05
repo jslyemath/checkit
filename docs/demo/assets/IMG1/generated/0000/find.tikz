@@ -1,4 +1,0 @@
-\begin{tikzpicture}
-  \draw (0,0) -- (2,2) -- (4,0) -- cycle;
-  \node at (2,0.8) {hello};
-\end{tikzpicture}
