@@ -1,5 +1,6 @@
 import importlib.resources
 import subprocess, os, sys, tempfile, shutil
+from .. import PUBLIC_SEEDS
 from ..utils import working_directory
 
 # The generator's file extension selects the runtime. This is the whole runtime
@@ -26,7 +27,7 @@ def run_generator(outcome, output_path, preview=True, images=False,
     building to a seeds.json file at output_path.
     """
     if preview:
-        amount_s = "20"
+        amount_s = str(PUBLIC_SEEDS)
         random_s = "no"
     else:
         amount_s = str(amount)

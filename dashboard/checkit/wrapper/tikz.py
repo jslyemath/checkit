@@ -20,7 +20,7 @@ def compile_tikz_for_outcome(outcome, image_seeds=None):
     --image-seeds cap and rasterizes just the first N seeds.
 
     A figure whose PNG is already at least as new as its .tikz is skipped, so
-    re-running generation (or taking a 20-seed preview after a 1000-seed build)
+    re-running generation (or taking a short preview after a 1000-seed build)
     doesn't recompile work that is already current.
     """
     generated = outcome.build_path()  # assets/<slug>/generated/

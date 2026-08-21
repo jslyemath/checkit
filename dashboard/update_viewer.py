@@ -1,4 +1,5 @@
 import os, subprocess, glob, shutil, sys, tempfile
+from checkit import PUBLIC_SEEDS
 from checkit.utils import working_directory
 
 def _npm():
@@ -14,8 +15,8 @@ def main():
         # -i is required or the demo bank is rebuilt with no images at all,
         # which build_docs.py then publishes over docs/demo -- deleting the
         # previously published PNGs. The cap keeps this to about a minute:
-        # the viewer only ever shows ~20 seeds, and .tikz source is written for
-        # every seed regardless, so LaTeX output is unaffected by it.
+        # the viewer only ever shows PUBLIC_SEEDS seeds, and .tikz source is
+        # written for every seed regardless, so LaTeX output is unaffected.
         #
         # sys.executable, not "python": on a machine with several Pythons the
         # bare name resolves to whatever is first on PATH, which is often not
@@ -24,7 +25,8 @@ def main():
         # check=True on both calls: without it a failed generate was ignored and
         # the build carried on to publish a stale or empty demo site.
         subprocess.run(
-            [sys.executable, "-m", "checkit", "generate", "-r", "-i", "--image-seeds", "20"],
+            [sys.executable, "-m", "checkit", "generate", "-r", "-i",
+             "--image-seeds", str(PUBLIC_SEEDS)],
             check=True,
         )
 

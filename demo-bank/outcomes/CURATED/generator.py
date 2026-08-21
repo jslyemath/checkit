@@ -1,8 +1,12 @@
 # Demonstrates two things a generator could not do before:
 #   * `import` a helper module from the bank root (slye_demo)
 #   * branch on `self.seed`, which is what lets a fixed, hand-written problem
-#     serve each of the ~20 versions the viewer exposes while higher seeds --
+#     serve the first len(CURATED) versions while higher seeds -- including
 #     the ones printed assessments draw from -- are chosen randomly.
+#
+#     Note this list is shorter than the number of versions the viewer exposes,
+#     so the later public versions repeat. A real bank using this pattern would
+#     write one problem per public seed.
 #
 # The pattern matters whenever a skill cannot be randomized algorithmically and
 # the problems have to be written by hand.
@@ -34,7 +38,7 @@ CURATED = [
 class Generator(BaseGenerator):
     def data(self):
         if self.seed < len(CURATED):
-            # The seeds the viewer shows: every student sees all of them, in a
+            # The first seeds, in a
             # fixed order, so nothing is missed and nothing repeats.
             statement, prop = CURATED[self.seed]
             provenance = "curated"

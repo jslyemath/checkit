@@ -246,7 +246,7 @@ Options:
 - `-a`/`--amount` (default 1000): number of seeds to generate
 - `-r`/`--regenerate` (flag): if set, regenerates even if seeds.json already exists
 - `-i`/`--images` (flag): if set, also generates PNG graphics
-- `--image-seeds` (int, default None / no short flag): render images for only the first N seeds of each outcome, while still generating full seed *data* for all of them. Intended for quick local previews; a low value produces broken images for the viewer (~20 seeds) and LMS export (seeds 100–999). See §12 "Limiting image rendering with `image_seeds`".
+- `--image-seeds` (int, default None / no short flag): render images for only the first N seeds of each outcome, while still generating full seed *data* for all of them. Intended for quick local previews; a low value produces broken images for the viewer (`PUBLIC_SEEDS`, currently 50) and LMS export (seeds 100–999). See §12 "Limiting image rendering with `image_seeds`".
 - `-o`/`--outcome` (default "ALL"): name of a specific outcome slug to generate; "ALL" generates everything
 
 Logic:
@@ -347,7 +347,7 @@ Calls `self.generate_exercises(regenerate)` to ensure data is fresh, then return
 ```
 
 **`Outcome.preview_exercises(self)`**
-Used by the (deprecated) Jupyter dashboard for "fresh preview". Calls `sage(self, preview_json, preview=True, images=True)` to generate 20 seeds, then `compile_tikz_for_outcome(self, image_seeds=20)` to turn any generated `.tikz` files into PNGs, reads them, and returns a list of `Exercise` objects. The `image_seeds=20` matches preview mode's seed count — without it a preview taken after a 1000-seed build would walk and recompile every seed directory in the outcome.
+Used by the (deprecated) Jupyter dashboard for "fresh preview". Calls `run_generator(self, preview_json, preview=True, images=True)` to generate `PUBLIC_SEEDS` seeds, then `compile_tikz_for_outcome(self, image_seeds=PUBLIC_SEEDS)` to turn any generated `.tikz` files into PNGs, reads them, and returns a list of `Exercise` objects. Using the same constant for both matches preview mode's seed count — without it a preview taken after a 1000-seed build would walk and recompile every seed directory in the outcome.
 
 **`Outcome.html_preview(self, pregenerated=False)`**
 Used by the Jupyter dashboard. If `pregenerated=True`, picks a random already-generated exercise; otherwise calls `preview_exercises()`. Returns a long HTML string showing the rendered exercise, its JSON data, SpaTeXt XML, HTML, LaTeX, and PreTeXt.
@@ -542,7 +542,7 @@ Renders a sub-UI with two buttons: "Bank from cache" and "Regenerated bank". Cli
 A development script (not part of the installed package). Run as `python update_viewer.py` from inside `dashboard/`.
 
 **`main()`**
-1. Changes to `../demo-bank/` and runs `python -m checkit generate -r -i --image-seeds 20` to regenerate all demo exercises. The `-i` is load-bearing: without it the demo bank is rebuilt with no images at all, and `build_docs.py` then publishes that over `docs/demo`, **deleting** previously published PNGs (this is what commit `d36c6a3` did). The cap holds the run to ~1 minute — the viewer only shows ~20 seeds, and `.tikz` source is written for every seed regardless, so LaTeX output is unaffected.
+1. Changes to `../demo-bank/` and runs `python -m checkit generate -r -i --image-seeds 20` to regenerate all demo exercises. The `-i` is load-bearing: without it the demo bank is rebuilt with no images at all, and `build_docs.py` then publishes that over `docs/demo`, **deleting** previously published PNGs (this is what commit `d36c6a3` did). The cap holds the run down — the viewer only shows `PUBLIC_SEEDS` seeds, and `.tikz` source is written for every seed regardless, so LaTeX output is unaffected.
 2. Changes to `../viewer/` and runs `npm run build`
 3. Copies the Vite build output (`viewer/dist/`) to a temp directory
 4. Removes `assets/bank.json` from the copy (the viewer is meant to load bank.json from wherever it's deployed, not bundle a specific one)
@@ -1009,7 +1009,7 @@ class Generator(BaseGenerator):
             statement, prop = choice(CURATED)      # random above
 ```
 
-Seeds 0-19 — the range the viewer exposes — serve the twenty hand-written problems in a fixed order, so a student paging through sees each exactly once. Higher seeds, which printed assessments draw from, choose freely. Before `self.seed` existed this had to be faked through some other parameter, since `get_data()` only reveals `__seed__` *after* `data()` has run.
+Seeds below `len(CURATED)` serve the hand-written problems in a fixed order; higher seeds, including the ones printed assessments draw from, choose freely. Note the demo's list holds twenty problems while the viewer now exposes `PUBLIC_SEEDS` (50), so its later public versions repeat — a real bank using this pattern would write one problem per public seed. Before `self.seed` existed this had to be faked through some other parameter, since `get_data()` only reveals `__seed__` *after* `data()` has run.
 
 Note the `r"..."` prefixes: a LaTeX literal in a `.py` file needs a raw string, or `` in `rac` becomes a formfeed. Python emits a `SyntaxWarning` for this, but it is easy to miss.
 
@@ -1416,7 +1416,7 @@ Picks a uniformly random element from an array.
 
 **`getRandomAssessmentFromSlugs(bank, slugs)`**
 Builds an `Assessment` object:
-1. For each slug, finds the outcome and picks a random seed from `[20, exercises.length)` (skipping the first 20 "public" versions)
+1. For each slug, finds the outcome and picks a random seed from `[PUBLIC_SEEDS, exercises.length)` (skipping the publicly visible versions, so a student cannot look up the printed one)
 2. Generates LaTeX for each exercise and concatenates with `\newpage` between them
 3. Renders the full `assessmentTemplate.tex` using Mustache with a `version` (timestamp) and an `exercises` array
 4. Returns `{exercises: [...], latex: "full document LaTeX string"}`
@@ -2351,7 +2351,7 @@ The `generator_path` loaded by `wrapper.sage` runs in the SageMath namespace, so
 **The cap applies to PNGs only.** `wrapper.sage` writes a `.tikz` file for *every* seed, ungated by both `--images` and `--image-seeds`, because the LaTeX output `\input{}`s that source directly and print has to work for every seed. `--image-seeds` then limits how many of those get rasterized by `tikz.py`. (Before this was split, one gate covered both, so a low cap silently produced *no* `.tikz` file for the uncapped seeds and LaTeX assessments drawing on them failed with a missing-file error — while the note below claimed print was immune.)
 
 Intended for fast local previews. Consumer exposure to un-rasterized seeds:
-- Viewer: caps at ~20 seeds, so image_seeds >= 20 keeps it clean.
+- Viewer: caps at `PUBLIC_SEEDS` (50), so image_seeds >= 50 keeps it clean.
 - Print/PDF: uses the .tikz source via \input{}, needs no PNG at all — and since the source is now always written, a low cap genuinely cannot break print.
 - LMS export: uses seeds 100–999, so a low image_seeds value produces broken   images if a TikZ outcome is exported. Use the full count for LMS-bound banks.
 
@@ -2514,15 +2514,22 @@ want the same seeds, and that asymmetry is the opening:
 
 | surface | formats | seeds | source |
 |---|---|---|---|
-| instructor tabs | html, latex, ptx | 0-19 | `Exercise.svelte` |
-| Copy for AI Chatbot | html | 0-19 | `outcomeToAiText` |
-| assessment builder | latex | 20-999 | `getRandomAssessmentFromSlugs` |
+| instructor tabs | html, latex, ptx | 0 to PUBLIC_SEEDS-1 | `Exercise.svelte` |
+| Copy for AI Chatbot | html | 0 to PUBLIC_SEEDS-1 | `outcomeToAiText` |
+| assessment builder | latex | PUBLIC_SEEDS-999 | `getRandomAssessmentFromSlugs` |
 | LMS export | html x2 (hide + only) | 100-999 | `Export.svelte` (`Array(900)`, `seed=i+100`) |
 
-Two things fall out. PreTeXt is **only ever needed for the 20 public seeds**.
-And inlining all three formats for seeds 0-19 costs about **400 KB on a 1.49 MB
-file** — a 27% increase, which is affordable. Only seeds 20+ are forced out
-into separate fetches.
+PreTeXt is **only ever needed for the public seeds**, which is the one clean
+saving available.
+
+**The inline-tier arithmetic changed when `PUBLIC_SEEDS` went from 20 to 50 on
+2026-08-21.** One seed in all three formats is ~20 KB across the demo's ten
+outcomes. At 20 seeds that was ~400 KB on a 1.49 MB `bank.json`, a comfortable
+27%. At 50 it is **~1.0 MB, a 65% increase**, which is no longer obviously
+affordable for a payload every visitor downloads on load. Re-measure against a
+real bank before committing to the inline tier; dropping PreTeXt from it (~725
+KB, +49%) or fetching per-seed files for the whole range are both now live
+options.
 
 Also worth knowing: the LMS export calls `outcomeToHtml` twice per seed across
 900 seeds, so **1,800 transforms per outcome per export**, on the main thread.
@@ -2578,9 +2585,11 @@ Sequence, in dependency order:
    is the step with a real deadline; the rest is ordinary work that can happen
    whenever.
 
-2. **Emit precomputed formats at generate time, in two tiers.** Inline seeds
-   0-19 (all three formats) into `bank.json` at ~27% growth — that alone
-   fixes the instructor tabs and the AI button with no new fetch machinery. Emit
+2. **Emit precomputed formats at generate time, in two tiers.** Inline the
+   public seeds (all three formats) into `bank.json` — that alone fixes the
+   instructor tabs and the AI button with no new fetch machinery, but see the
+   size note above: at `PUBLIC_SEEDS` = 50 this is ~65% growth rather than the
+   27% the 20-seed figure suggested, so measure before committing to it. Emit
    the heavy ranges as per-outcome bundles under `assets/<slug>/generated/`,
    fetched lazily only when an instructor actually clicks Assessment or Export.
    The ranges differ per surface, so a partial precompute reintroduces the
@@ -2807,7 +2816,7 @@ platform, is available without importing, and is *ours* to maintain.
 
 **`self.seed`** is readable inside `data()`, alongside the existing
 `self.variant`. It exists for skills that cannot be randomized algorithmically:
-serve a fixed, hand-written problem for each of the ~20 seeds the viewer exposes,
+serve a fixed, hand-written problem for each of the seeds the viewer exposes,
 and choose randomly above that, where printed assessments draw from. See the
 `CURATED` demo outcome.
 

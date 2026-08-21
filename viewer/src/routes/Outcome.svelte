@@ -6,7 +6,7 @@
     import { instructorEnabled, assessmentOutcomeSlugs } from '../stores/instructor';
     import Bank from './Bank.svelte';
     import { push, querystring } from 'svelte-spa-router';
-    import { toggleCodeCell, outcomeToAiText } from '../utils';
+    import { toggleCodeCell, outcomeToAiText, PUBLIC_SEEDS } from '../utils';
 
     export let params:Params;
 
@@ -38,7 +38,7 @@
     }
 
     const changeSeed = (diff:number) => {
-        seed = Math.max(0,Math.min(19,seed+diff))
+        seed = Math.max(0,Math.min(PUBLIC_SEEDS-1,seed+diff))
     }
 
     // 'failed' is a real state, not an error case to hide: browsers can and do
@@ -129,7 +129,7 @@
                 <label class="input-group-text" for="versionSelect">Version</label>
                 <button class="btn btn-dark" on:click={()=>changeSeed(-1)}>&laquo;</button>
                 <select class="form-select" label="versionSelect" bind:value={seed}>
-                    {#each Array(20) as _, i}
+                    {#each Array(PUBLIC_SEEDS) as _, i}
                         <option value={i}>
                             {i+1}
                         </option>
