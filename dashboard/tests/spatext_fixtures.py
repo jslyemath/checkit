@@ -58,12 +58,32 @@ LIST_CONTENT = f"""<knowl mode="exercise" {NS}>
     <outtro><p>Either order is fine.</p></outtro>
 </knowl>"""
 
+# inline and display mathematics, for the MathML consumer.
+# Written as a raw string with %-substitution rather than an f-string: LaTeX is
+# full of braces, and \frac{1}{3} inside an f-string would be read as a
+# placeholder.
+MATH = r"""<knowl mode="exercise" %s>
+    <content>
+        <p>Simplify <m>\frac{1}{3}</m> and then solve:</p>
+        <p><m mode="display">x^2 + y^2 = z^2</m></p>
+    </content>
+    <outtro><p><me>a = b</me></p></outtro>
+</knowl>""" % NS
+
+# an image, whose src depends on the @remote base URL
+IMAGE = f"""<knowl mode="exercise" {NS}>
+    <content><p>What does this show? <image source="assets/IMG2/2.png" description="The digit two."/></p></content>
+    <outtro><p>The digit two.</p></outtro>
+</knowl>"""
+
 ALL = {
     "SIMPLE": SIMPLE,
     "TASKS": TASKS,
     "TITLED": TITLED,
     "NO_OUTTRO": NO_OUTTRO,
     "LIST_CONTENT": LIST_CONTENT,
+    "MATH": MATH,
+    "IMAGE": IMAGE,
 }
 
 # viewer `solutions` value -> (subset value, the classes utils/index.ts removes)

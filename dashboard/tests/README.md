@@ -36,6 +36,8 @@ and stays meaningful as the stylesheets change.
 
 ## The invariants being protected
 
+**Subset filtering**
+
 - `subset` filtering agrees with the viewer's `solutions` filtering, for every
   fixture and every value
 - omitting `subset` means `'all'` — the viewer never passes it, so the default
@@ -43,12 +45,34 @@ and stays meaningful as the stylesheets change.
 - the `<ol>` wrapper survives `subset='answer'`, so an instructor's answer key
   keeps its numbering
 - `subset='statement'` and `subset='answer'` are not silently no-ops
+
+**The MathML consumer**
+
+- `consumer='basic'` keeps LaTeX delimiters; `'canvas'` and `'brightspace'`
+  produce MathML and no delimiters
+- a fraction becomes `<mfrac>`, not the same characters laid out flat
+- display and inline maths are distinguished (`display="block"` / `"inline"`)
+- every math span is converted, its LaTeX text removed, and its `data-latex`
+  attribute kept so the source stays recoverable
+
+**The remote base URL**
+
+- an exercise with images refuses to render HTML without `remote=`
+- `remote` is prepended to `@source`, tolerates trailing slashes, and applies
+  under every subset and consumer
+- `remote=''` still yields the old root-relative paths
+
+**Both copies**
+
 - the dashboard and viewer copies of all three stylesheets are byte-identical
 - `Exercise` refuses parameters it cannot honour rather than ignoring them
 
-The suite has been mutation-checked: changing the default, dropping the outtro
-guard, and guarding the whole `xsl:choose` (which would lose the `<ol>`) are
-each caught.
+The suite is mutation-checked. Each of these was introduced and confirmed to
+turn the suite red: changing the `subset` default, dropping the outtro guard,
+guarding the whole `xsl:choose` (which would lose the `<ol>`), leaving the LaTeX
+text beside the MathML, rendering display maths as inline, skipping the MathML
+conversion, dropping the missing-`remote` check, and not stripping a trailing
+slash from `remote`.
 
 ## The browser harness
 
