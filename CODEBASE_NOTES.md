@@ -2522,14 +2522,46 @@ want the same seeds, and that asymmetry is the opening:
 PreTeXt is **only ever needed for the public seeds**, which is the one clean
 saving available.
 
-**The inline-tier arithmetic changed when `PUBLIC_SEEDS` went from 20 to 50 on
-2026-08-21.** One seed in all three formats is ~20 KB across the demo's ten
-outcomes. At 20 seeds that was ~400 KB on a 1.49 MB `bank.json`, a comfortable
-27%. At 50 it is **~1.0 MB, a 65% increase**, which is no longer obviously
-affordable for a payload every visitor downloads on load. Re-measure against a
-real bank before committing to the inline tier; dropping PreTeXt from it (~725
-KB, +49%) or fetching per-seed files for the whole range are both now live
-options.
+**Measure the payload compressed, not raw.** An earlier version of this section
+said inlining the public seeds at `PUBLIC_SEEDS` = 50 costs "~1.0 MB, a 65%
+increase", and concluded it was no longer affordable. That figure was raw JSON
+bytes, which is not what a visitor downloads. Measured on the live site
+(2026-08-21, `performance.getEntriesByType('resource')`):
+
+```
+decodedBodySize (uncompressed): 1,420,295 bytes
+transferSize    (over the wire):  152,441 bytes
+compression ratio: 9.3x            download: 168 ms
+```
+
+`bank.json` is overwhelmingly repetitive -- the same tags, slugs and LaTeX
+fragments over and over -- so it compresses about tenfold, and precomputed HTML
+is *more* repetitive still. Rebuilding the published demo bank with seeds 0-49
+inlined:
+
+| inlined | raw | gzipped |
+|---|---|---|
+| nothing (today) | 1.42 MB | 148 KB |
+| html only | 1.81 MB (+28%) | 163 KB (+10%) |
+| html + latex | 2.07 MB (+46%) | 173 KB (+17%) |
+| all three formats | 2.33 MB (+64%) | **180 KB (+22%)** |
+
+So the honest cost of the full inline tier is about **32 KB more over the
+wire**, on a request that currently takes 168 ms. That is affordable, and the
+earlier warning was wrong. A course bank has roughly 3x the outcomes of the
+demo, so expect roughly 3x these figures and still well under a megabyte.
+
+Two costs compression does *not* remove, and neither is a blocker: the browser
+still parses the full uncompressed JSON (2.33 MB rather than 1.42 MB) and holds
+it in memory, and the raw file still occupies disk in the bank repo. Note also
+that `docs/**` is committed here, and generated files are marked `binary` in
+`.gitattributes` for good reason (see the corrupt-merge incident) -- a
+3x-larger generated JSON makes that more important, not less.
+
+> **Principle.** For anything served over HTTP, "how big is the file" is the
+> wrong question; "how many bytes cross the wire, and how long does that take"
+> is the right one. They differ here by a factor of nine, which is more than
+> enough to reverse a decision.
 
 Also worth knowing: the LMS export calls `outcomeToHtml` twice per seed across
 900 seeds, so **1,800 transforms per outcome per export**, on the main thread.
@@ -2587,9 +2619,8 @@ Sequence, in dependency order:
 
 2. **Emit precomputed formats at generate time, in two tiers.** Inline the
    public seeds (all three formats) into `bank.json` — that alone fixes the
-   instructor tabs and the AI button with no new fetch machinery, but see the
-   size note above: at `PUBLIC_SEEDS` = 50 this is ~65% growth rather than the
-   27% the 20-seed figure suggested, so measure before committing to it. Emit
+   instructor tabs and the AI button with no new fetch machinery, and costs
+   about 32 KB more over the wire (see the payload measurements above). Emit
    the heavy ranges as per-outcome bundles under `assets/<slug>/generated/`,
    fetched lazily only when an instructor actually clicks Assessment or Export.
    The ranges differ per surface, so a partial precompute reintroduces the
