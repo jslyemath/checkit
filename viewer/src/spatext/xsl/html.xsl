@@ -6,6 +6,24 @@
 
     <xsl:output method="html"/>
 
+    <!-- Subset is 'statement', 'answer', or 'all'.
+
+         This mirrors the filtering the viewer performs in JavaScript after the
+         transform (utils/index.ts, the `solutions` argument to outcomeToHtml):
+             'all'       == solutions 'show'  : everything
+             'statement' == solutions 'hide'  : drop every stx-outtro
+             'answer'    == solutions 'only'  : drop every stx-intro and stx-content
+         Those two implementations must agree; see CODEBASE_NOTES.md.
+
+         Restored from ccc9b09 (Jan 2022), which lost it in the fde75e8 SpaTeXt
+         rewrite while leaving Exercise.html_ele()'s signature behind, so the
+         parameter was accepted and silently ignored for four years.
+
+         There is deliberately no `consumer` parameter yet. ccc9b09 had one, but
+         nothing in this stylesheet reads it, and declaring an unused parameter
+         is what created the original bug. It arrives with the MathML work. -->
+    <xsl:param name="subset" select="'all'"/>
+
     <!-- kill undefined elements -->
     <xsl:template match="*"/>
 
@@ -18,10 +36,17 @@
         </div>
     </xsl:template>
 
+    <!-- Nested knowls re-enter this template, so guarding here filters every
+         level at once, matching the viewer, whose querySelectorAll removal is
+         likewise global. The <ol>/<li> wrapper is deliberately outside the
+         guards: the viewer strips only stx-intro/stx-content, so list numbering
+         survives subset='answer' and must survive here too. -->
     <xsl:template match="stx:knowl">
         <div class="stx-knowl">
             <xsl:apply-templates select="stx:title[1]"/>
-            <xsl:apply-templates select="stx:intro[1]"/>
+            <xsl:if test="$subset != 'answer'">
+                <xsl:apply-templates select="stx:intro[1]"/>
+            </xsl:if>
             <xsl:choose>
                 <xsl:when test="stx:knowl">
                     <ol>
@@ -33,10 +58,14 @@
                     </ol>
                 </xsl:when>
                 <xsl:otherwise>
-                    <xsl:apply-templates select="stx:content[1]"/>
+                    <xsl:if test="$subset != 'answer'">
+                        <xsl:apply-templates select="stx:content[1]"/>
+                    </xsl:if>
                 </xsl:otherwise>
             </xsl:choose>
-            <xsl:apply-templates select="stx:outtro[1]"/>
+            <xsl:if test="$subset != 'statement'">
+                <xsl:apply-templates select="stx:outtro[1]"/>
+            </xsl:if>
         </div>
     </xsl:template>
 
