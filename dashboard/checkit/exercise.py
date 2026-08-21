@@ -129,13 +129,12 @@ class Exercise:
                 "This exercise contains images, so its HTML needs an absolute "
                 "base URL, but remote= was not given. Pass the URL of the "
                 "directory that contains assets/, e.g. "
-                "remote='https://checkit.clontz.org/demo'. Without it every "
+                "remote='https://jslyemath.github.io/checkit/demo'. Without it every "
                 "<img src> is root-relative and resolves against whatever host "
                 "displays the HTML -- an LMS or a chatbot -- where it will 404. "
                 "bank.xml's <url> is deliberately not used as a default: it "
                 "names the bank's home page, which need not be where assets/ "
-                "lives (the demo bank declares https://checkit.clontz.org but "
-                "publishes under /demo/). Pass remote='' to keep the old "
+                "lives). Pass remote='' to keep the old "
                 "root-relative behaviour."
             )
         transform = etree.XSLT(etree.fromstring(read_resource("html.xsl")))

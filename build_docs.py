@@ -10,7 +10,10 @@ with working_directory("dashboard"):
 with working_directory("demo-bank"):
     bank = Bank()
     print("generating bank data")
-    bank.write_json()
+    # remote= is required because this bank has figures: precomputed HTML must
+    # carry absolute <img src> values. The bank's own <url> is the directory the
+    # site publishes to, so it is the right base.
+    bank.write_json(remote=bank.url)
     print("building bank viewer")
     bank.build_viewer()
 

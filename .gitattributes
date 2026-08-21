@@ -1,1 +1,12 @@
+# Generated build output. Marked binary so git never attempts a textual merge:
+# two rebuilds produce two differently-hashed bundles, git decided they were
+# renames of each other, and spliced two minified files together with conflict
+# markers inside -- 1.1 MB of corrupt JavaScript. See CODEBASE_NOTES.md.
+#
+# The JSON files are here for the same reason and are now much larger: bank.json
+# carries the precomputed formats for the public seeds, and each derived.json
+# carries the rest. All are regenerated wholesale by build_docs.py, so a merge
+# of one is never meaningful.
 docs/demo/assets/*.js binary
+docs/demo/assets/bank.json binary
+docs/demo/assets/**/derived.json binary

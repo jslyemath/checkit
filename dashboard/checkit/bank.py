@@ -88,7 +88,7 @@ class Bank():
                     "Precomputing HTML needs an absolute base URL for images, "
                     f"and these outcomes have images: {', '.join(with_images)}. "
                     "Pass --remote with the URL of the directory containing "
-                    "assets/, e.g. --remote https://checkit.clontz.org/demo . "
+                    "assets/, e.g. --remote https://jslyemath.github.io/checkit/demo . "
                     "Use --no-precompute to skip precomputation entirely."
                 )
         build_path = os.path.join(self.build_path(),f"bank.json")

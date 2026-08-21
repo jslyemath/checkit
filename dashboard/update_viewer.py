@@ -1,5 +1,6 @@
 import os, subprocess, glob, shutil, sys, tempfile
 from checkit import PUBLIC_SEEDS
+from checkit.bank import Bank
 from checkit.utils import working_directory
 
 def _npm():
@@ -24,9 +25,16 @@ def main():
         #
         # check=True on both calls: without it a failed generate was ignored and
         # the build carried on to publish a stale or empty demo site.
+        #
+        # --remote is required because the demo bank has figures: precomputed
+        # HTML has to carry absolute <img src> values or they 404 wherever the
+        # HTML ends up. It comes from the bank's own <url>, which for this bank
+        # is the directory the site publishes to, so there is no second place
+        # to keep in sync.
+        remote = Bank().url
         subprocess.run(
             [sys.executable, "-m", "checkit", "generate", "-r", "-i",
-             "--image-seeds", str(PUBLIC_SEEDS)],
+             "--image-seeds", str(PUBLIC_SEEDS), "--remote", remote],
             check=True,
         )
 
