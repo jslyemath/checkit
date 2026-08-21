@@ -72,8 +72,9 @@ checkit/                             (repo root)
 │   ├── setup.cfg                    package metadata, deps, entry points
 │   ├── setup.py                     minimal shim for editable installs
 │   ├── update_viewer.py             dev script: builds viewer and zips it into the package
+│   ├── tests/                       unittest suite (see "Tests")
 │   └── checkit/                     the actual Python package
-│       ├── __init__.py              exports VERSION = '0.2.7'
+│       ├── __init__.py              VERSION, PUBLIC_SEEDS, and the precompute format lists
 │       ├── __main__.py              CLI entry point (click + trogon)
 │       ├── bank.py                  Bank class
 │       ├── dashboard.py             deprecated Jupyter widget dashboard
@@ -189,10 +190,8 @@ checkit/                             (repo root)
         │   │   ├── ContentNodes.svelte  dispatches block-level nodes (p, list, knowl)
         │   │   ├── ParagraphNodes.svelte  dispatches inline nodes (m, me, em, c, q, url, image, tikz-image)
         │   │   └── TitleNodes.svelte  inline nodes allowed inside a title (m, c, em, q)
-        │   └── xsl/
-        │       ├── html.xsl         SpaTeXt -> HTML (browser-side, identical to static copy)
-        │       ├── latex.xsl        SpaTeXt -> LaTeX (browser-side)
-        │       └── pretext.xsl      SpaTeXt -> PreTeXt XML (browser-side)
+        │   (there is no xsl/ here any more: the viewer stopped transforming
+        │    SpaTeXt in Aug 2026 and reads precomputed formats instead)
         └── templates/
             ├── assessmentTemplate.tex   LaTeX document template for PDF assessments
             ├── canvasManifest.xml       IMS Common Cartridge manifest template
@@ -209,10 +208,17 @@ checkit/                             (repo root)
 ### `dashboard/checkit/__init__.py`
 
 ```python
-VERSION = '0.2.7'
+VERSION = '0.2.8.1'
+PUBLIC_SEEDS = 50
+INLINE_FORMATS = ("html", "latex", "pretext")
+BUNDLE_FORMATS = ("html", "latex")
+BUNDLE_FILENAME = "derived.json"
 ```
+(comments elided; each constant carries a long one explaining its failure mode)
 
-This is the entire file. It exports a single string constant holding the current package version. This value is imported by `__main__.py` (to write `requirements.txt` for new banks) and is referenced in `setup.cfg` via `version = attr: checkit.VERSION`. It also appears hardcoded in `App.svelte`'s footer.
+Exports `VERSION`, `PUBLIC_SEEDS`, and the precompute coverage lists (`INLINE_FORMATS`, `BUNDLE_FORMATS`, `BUNDLE_FILENAME`).
+
+`VERSION` is read by `setup.cfg` (`version = attr: checkit.VERSION`), so it becomes the wheel's version and filename, and by `__main__.py` when writing a new bank's `requirements.txt`. It is **`0.2.8.1`, not `0.2.8`** — see "Packaging and distribution" for why sharing upstream's number is actively dangerous, and why the obvious `0.2.8+slye.1` does not work. The footer in `App.svelte` still says v0.2.8, which is the upstream release this forked from.
 
 ---
 
@@ -238,7 +244,7 @@ The `click.group` root. Has `short_help="CheckIt command line interface"`. No lo
 - Creates `<directory>/.devcontainer/` and copies `setup.sh` and `devcontainer.json`
 - Copies `bank.xml`, `README.md` and `bank_helpers.py` into the root
 - Copies `gitignore.txt` as `.gitignore`
-- Writes `requirements.txt` containing `checkit-dashboard == 0.2.7`
+- Writes `requirements.txt` pointing at **this fork's release wheel URL**, with a comment explaining why. It deliberately does *not* write `checkit-dashboard == {VERSION}`: that resolves on PyPI, where the name belongs to upstream. See "Packaging and distribution".
 - Prints a success message
 
 **`generate(amount, regenerate, images, image_seeds, outcome)` — `checkit generate`:**
@@ -1038,9 +1044,9 @@ The one rule: the emitted string must be **valid XML**. Bare `&` and `<` inside 
 
 ## 5. Detailed Walkthrough of Every XSLT File
 
-SpaTeXt uses three XSLT 1.0 stylesheets. There are two physically separate copies: `dashboard/checkit/static/` (used server-side by lxml) and `viewer/src/spatext/xsl/` (used client-side by the browser's `XSLTProcessor`). The two copies are identical in content.
+SpaTeXt uses three XSLT 1.0 stylesheets, and they live in exactly one place: `dashboard/checkit/static/`, used server-side by `lxml`.
 
-> **The client-side half has an expiry date.** Browsers are removing `XSLTProcessor` — Chrome stable around 2026-11-17, with Firefox and WebKit following. See "Browsers are removing XSLT" near the end of this document before investing in the browser-side transform path.
+> **This used to be two copies.** A second, byte-identical set lived in `viewer/src/spatext/xsl/` and ran in the browser via `XSLTProcessor`, kept in sync by hand — which meant adding a SpaTeXt element required coordinated edits in six files, and which caused the document-vs-element bug. Browsers are removing `XSLTProcessor` (Chrome stable 2026-11-17), so in August 2026 the transforms moved to build time: the dashboard renders each exercise ahead of time and the viewer reads the result. The browser copy is gone. See "Browsers are removing XSLT" for the whole migration.
 
 ### The SpaTeXt XML Vocabulary
 
@@ -1075,7 +1081,7 @@ Children of `<knowl>`:
 
 `<tikz-image>` is wired into every rendering path the same way `<image>` is — but getting there required fixing two bugs that left it half-implemented:
 
-1. **Dead XSLT rules (all three stylesheets, both copies):** the `stx:tikz-image` template existed, but the `parseDisplay` template — which lists exactly which inline children of a `<p>` to process — only selected `…|stx:url|stx:image`, *not* `stx:tikz-image`. In XSLT, `apply-templates` with an explicit `select` processes only the listed nodes, so a `<tikz-image>` inside a paragraph was silently skipped and its rule never fired. The element therefore rendered as nothing in **every** output (HTML, LaTeX, PreTeXt — server-side and in the viewer's export tabs). Fixed by adding `|stx:tikz-image` to the `parseDisplay` select in all six files.
+1. **Dead XSLT rules (all three stylesheets, both copies):** the `stx:tikz-image` template existed, but the `parseDisplay` template — which lists exactly which inline children of a `<p>` to process — only selected `…|stx:url|stx:image`, *not* `stx:tikz-image`. In XSLT, `apply-templates` with an explicit `select` processes only the listed nodes, so a `<tikz-image>` inside a paragraph was silently skipped and its rule never fired. The element therefore rendered as nothing in **every** output (HTML, LaTeX, PreTeXt — server-side and in the viewer's export tabs). Fixed by adding `|stx:tikz-image` to the `parseDisplay` select in all six files. (Six because the stylesheets were duplicated at the time; there are three now, and this trap costs half as much as a result.)
 2. **Interactive Svelte path:** `outcomeToStx` (in `utils/index.ts`) stamped `@remote` only on `image` tags, and `ParagraphNodes.svelte` dispatched only `m/me/c/em/q/image/url`, so `<tikz-image>` was dropped in the default interactive **display** mode. Fixed by extending the remote-stamping query to `"image, tikz-image"` and adding a `tikz-image` case to `ParagraphNodes.svelte` (its `src` reuses the image helper and appends `.png`).
 
 Because `viewer.zip` is a gitignored build artifact, the viewer-side fixes only reach end users after `update_viewer.py` (or `build_docs.py`) regenerates it.
@@ -1086,7 +1092,7 @@ Because `viewer.zip` is a gitignored build artifact, the viewer-side fixes only 
 
 ---
 
-### `html.xsl` (both copies are identical)
+### `html.xsl`
 
 **Output method:** HTML
 
@@ -1160,7 +1166,7 @@ Same as `stx:image` but appends `.png` to `source` (the template stores the path
 
 ---
 
-### `latex.xsl` (both copies identical)
+### `latex.xsl`
 
 **Output method:** text (plain string output)
 
@@ -1214,7 +1220,7 @@ Same as `stx:image` but appends `.png` to `source` (the template stores the path
 
 ---
 
-### `pretext.xsl` (both copies identical)
+### `pretext.xsl`
 
 **Output method:** XML (indented)
 
@@ -2144,14 +2150,18 @@ This global variable is read in `App.svelte` as `window['bankJsonUrl']`. When de
 
 ### Changing Output Formats
 
-The output formats are defined entirely by the three XSLT stylesheets. There are **two copies** of each that must be kept in sync:
-- `dashboard/checkit/static/html.xsl` (server-side, used by lxml)
-- `viewer/src/spatext/xsl/html.xsl` (browser-side, used by XSLTProcessor)
+The output formats are defined entirely by the three XSLT stylesheets, and since August 2026 there is **one copy** of each, in `dashboard/checkit/static/`.
 
 To change how a SpaTeXt element renders in HTML:
-1. Locate the `<xsl:template match="stx:element_name">` rule in both `html.xsl` files
-2. Modify the template in both files identically
-3. Rebuild the viewer: `cd dashboard && python update_viewer.py` (rebuilds `viewer.zip`)
+1. Locate the `<xsl:template match="stx:element_name">` rule in `html.xsl`
+2. Modify it
+3. Run `python -m unittest discover -s dashboard/tests -t dashboard/tests`
+4. Regenerate any bank you want to see the change in — the viewer reads
+   precomputed output, so an edit to a stylesheet does nothing until
+   `checkit generate` runs again
+
+Note step 4 is new and easy to forget: the browser no longer transforms
+anything, so stylesheet edits reach a published site only through regeneration.
 
 To add a new SpaTeXt element (e.g., `<stx:alert>`):
 1. Add `<xsl:template match="stx:alert">` to all three stylesheets (html, latex, pretext) in both locations
@@ -2398,6 +2408,182 @@ To change the `seeds.json` format (e.g., add metadata per exercise):
 - Changes must be made in both places
 - The final `bank.json` format is derived from `Outcome.to_dict()` which calls `e.to_dict()` → `{"seed": self.seed, "data": self.data}`
 - The viewer TypeScript type `Exercise = {seed: number; data: Object}` would also need updating
+
+## Packaging and distribution: how a bank gets its CheckIt
+
+A bank never contains CheckIt; it *installs* it. There are three routes, they
+behave very differently, and confusing them fails quietly rather than loudly.
+
+**Editable install** — what this repo's own `.venv` uses. A `.pth` file
+(`__editable__.checkit_dashboard-*.pth`) points Python at
+`dashboard/checkit/` in the working tree, so `import checkit` loads the source
+directly and every edit takes effect with no reinstall. This is why platform
+work here needs no build step. It only works where the source lives.
+
+**A wheel built from a working tree** — `cd dashboard && python -m build
+--wheel`. Contains everything, including `viewer.zip`, because setuptools copies
+from the tree rather than from git. This is the route for anyone else.
+
+**PyPI** — and the trap. `checkit-dashboard` on PyPI is **upstream's** package.
+Version 0.2.8 there was published by Steven Clontz on 2026-08-01 and is
+different code from this fork's 0.2.8. A bank pinning `checkit-dashboard ==
+0.2.8` installs upstream, works, and silently lacks every change in this fork.
+`checkit new` therefore writes the fork's release-wheel URL instead of a version
+pin.
+
+### viewer.zip decides which routes work
+
+`viewer.zip` is the compiled browser app with no bank data in it: `npm run
+build` produces `viewer/dist/`, `update_viewer.py` deletes the placeholder
+`assets/bank.json` from a copy, zips the rest into `checkit/static/viewer.zip`,
+and `Bank.build_viewer()` extracts it into a bank's `docs/` before copying that
+bank's own `assets/` alongside. It exists so a bank author can publish a site
+without ever installing Node.
+
+It is a **gitignored build artifact**, and that has a consequence worth stating
+plainly:
+
+| route | ships viewer.zip? | why |
+|---|---|---|
+| editable install | yes | reads the working tree |
+| wheel built locally | yes | setuptools copies from the tree |
+| `pip install git+https://...` | **no** | pip clones the repo, where it is not tracked |
+
+So a git URL in a bank's `requirements.txt` produces an install whose
+`checkit viewer` fails on a missing resource. Distribute a wheel, not a git ref.
+
+Committing `viewer.zip` would make git installs work, and is tempting, but the
+filenames inside are content-hashed while the zip stores each file's *mtime* —
+which `npm run build` rewrites every run. The bytes therefore change on every
+build even when nothing meaningful did, so it would produce a stream of
+meaningless 1.1 MB diffs. Making the zip deterministic would fix that; nobody
+has needed to yet.
+
+### VERSION: `0.2.8.1`, and why not `0.2.8+slye.1`
+
+The fork needs a version distinct from upstream's, or `pip show
+checkit-dashboard` cannot tell you which one is installed.
+
+`0.2.8+slye.1` is the semantically correct form — a PEP 440 *local version*
+means precisely "this upstream release plus local changes" — and it does not
+survive GitHub. Uploading
+`checkit_dashboard-0.2.8+slye.1-py3-none-any.whl` to a release rewrites the `+`
+to `.`, and pip then refuses the stored file outright:
+
+```
+ERROR: Invalid wheel filename (invalid version):
+'checkit_dashboard-0.2.8.slye.1-py3-none-any'
+```
+
+The wheel would have been undownloadable-by-pip from the only place it is
+published. Hence `0.2.8.1` — digits and dots only, which passes through
+unchanged. `test_packaging.py` asserts the version contains no `+` and differs
+from upstream's `0.2.8`.
+
+> **Principle.** A version string is also a filename, and filenames pass through
+> systems that rewrite characters. Anything that has to survive that round trip
+> should stick to the least expressive form that works.
+
+### The sympy bug, and why it hid for months
+
+`setup.py` duplicates `install_requires` "for GitHub's dependency graph", and
+**setuptools uses setup.py's copy**, because a `setup()` keyword overrides
+`setup.cfg`. `sympy` was added only to `setup.cfg` when the plain-Python
+generator runtime landed. Every wheel this repo produced therefore shipped
+without it, and a clean install could scaffold a bank and then fail to generate
+a single exercise with `ModuleNotFoundError: No module named 'sympy'`.
+
+It was invisible here because the development environment is an *editable*
+install into a venv that already had sympy — nothing ever exercised the
+dependency list. It took building a wheel and installing it into a fresh venv
+to see it, which is not something anyone does by accident.
+
+This is the same shape as the duplicated stylesheets and the duplicated
+`PUBLIC_SEEDS`: one idea, two copies, no enforcement. `test_packaging.py` now
+asserts the two lists agree.
+
+### Cutting a release
+
+1. Bump `VERSION` in `dashboard/checkit/__init__.py` (digits and dots only).
+2. `cd dashboard && python -m build --wheel` — output lands in `dashboard/dist/`
+   (gitignored).
+3. Install that wheel into a throwaway venv and run `checkit new`,
+   `checkit generate`, `checkit viewer`. This is the only way the packaging
+   bugs above are visible.
+4. Commit and **push** — a release tags whatever `origin/main` is at publish
+   time, so an unpushed commit silently tags the wrong code.
+5. Create the release and upload the wheel. `gh release create` reported a
+   misleading "workflow scope may be required" here; the REST API works:
+
+```
+gh api repos/<owner>/checkit/releases --method POST \
+  -f tag_name=v<VERSION> -f target_commitish=main -f name=v<VERSION> -F draft=true -f body="..."
+gh api --method POST -H "Content-Type: application/octet-stream" \
+  "https://uploads.github.com/repos/<owner>/checkit/releases/<id>/assets?name=<wheel>" \
+  --input dashboard/dist/<wheel>
+```
+
+6. Check the **stored** asset name matches what was uploaded, then publish with
+   `gh api repos/<owner>/checkit/releases/<id> --method PATCH -F draft=false`.
+
+Creating it as a draft first is worth the extra step: a draft is invisible,
+creates no tag until published, and can be deleted without trace — which is how
+the `+` mangling was caught before anything went public.
+
+---
+
+## Tests
+
+There were none until 2026-08-21; `dashboard/tests/` had held an empty `.keep`
+since the initial import.
+
+```
+python -m unittest discover -s dashboard/tests -t dashboard/tests
+```
+
+| file | covers |
+|---|---|
+| `spatext_fixtures.py` | hand-written SpaTeXt covering the structural cases |
+| `test_subset.py` | `subset` filtering, the `Exercise` API, cross-language constants |
+| `test_precompute.py` | the precompute emitter and its declared coverage |
+| `test_packaging.py` | what actually ends up in an installed copy |
+| `browser_harness.py` | manual: re-runs the stylesheet checks in a real browser |
+
+Four choices worth knowing about:
+
+**Stdlib `unittest`, not pytest.** The repo had no test dependency and no
+runner. Adding one should not be the price of adding a first test.
+
+**Hermetic fixtures, not `demo-bank`.** A bank's `assets/**/generated` is
+gitignored, so a fresh clone has no `seeds.json`; a bank-backed test would need
+a full `checkit generate` before it could run. `test_precompute.py` does build a
+real `Bank`, but from temporary files it writes itself.
+
+**Tests compare two implementations rather than checking against golden files.**
+The central `subset` test performs the stylesheet's filtering *and* the viewer's
+class-removal filtering and asserts they match. That needs no stored snapshot
+and stays meaningful as the stylesheets change. Where two things must agree
+across a boundary nothing enforces — the two `PUBLIC_SEEDS` declarations, the
+two `install_requires` lists — there is a test asserting it.
+
+**Everything here is mutation-checked.** Each guard was verified by breaking the
+code it protects and confirming the suite goes red: changing the `subset`
+default, dropping the outtro guard, guarding the whole `xsl:choose`, leaving
+LaTeX beside the MathML, rendering display maths inline, skipping MathML
+conversion, dropping the missing-`remote` check, inlining every seed, starting
+the bundle at zero, adding pretext to it, dropping the coverage declaration,
+leaving stale bundles, and removing `sympy` again. A guard that cannot fail is
+decoration, and this codebase has been bitten enough times by silent success to
+be worth the extra step.
+
+The browser harness is the exception to all of this: it is run by hand, it needs
+a real browser, and it **expires**. It drives a real `XSLTProcessor`, which
+Chrome removes in 158 on 2026-11-17. Its value has already dropped now that the
+viewer does not transform anything — it only cross-checks the Python `subset`
+implementation against a real XSLT engine. It was never run in Firefox, which is
+the engine that has actually surprised this project before.
+
+---
 
 ## Browsers are removing XSLT (hard deadline, ~Nov 2026)
 
@@ -3026,9 +3212,47 @@ PNG and relied on the `.tikz` source.
   *(Assessed, not tested.)*
 
 
+## Where things stand (2026-08-21)
+
+| | |
+|---|---|
+| SageMath removed as a requirement | done |
+| TikZ image backend | done |
+| Browser XSLT migration (steps 1-3) | done — see "Browsers are removing XSLT" |
+| Viewer shows 50 versions, not 20 | done — `PUBLIC_SEEDS` |
+| First test suite | done — see "Tests" |
+| Fork versioned and released as a wheel | done — v0.2.8.1 |
+| Port the course banks off their Sage shims | **not started** |
+| Print tool as its own package | **not started** |
+
+Known open questions, none blocking:
+
+- **Is MathML the right target for Canvas at all?** Canvas renders `\(...\)`
+  LaTeX via MathJax, and `text2qti` defaults to LaTeX. Settling it needs a real
+  Canvas course to import into. The current implementation reproduces the
+  viewer's previous behaviour rather than redesigning on documentation.
+- **Firefox is unverified** for the `subset` stylesheet work; `browser_harness.py`
+  was only ever run in Chromium, and Firefox is the engine that surprised this
+  project before.
+- **The LMS export hardcodes 900 versions per outcome**, which is what makes the
+  published `docs/` 25 MB. Reducing it is an instructor-facing choice.
+
 ## Planned: porting the course banks, and a separate print tool
 
 Not started. Recorded so the reasoning survives.
+
+One thing that turned up while testing `latex2mathml` and makes the port easier
+than it looks: **the course banks' generators are already plain Python.** They
+import only `random`, `slye_math`, `fractions`, `math`, `re`, `inflect`,
+`datetime` and `decimal` — no Sage anywhere — so they can be run directly today.
+All 805 distinct LaTeX strings in the corpus were produced that way. Two
+incidental findings from doing so, worth knowing before the port:
+
+- `mat-106`'s `F3-E` raises `TypeError: Random.choice() takes 2 positional
+  arguments but 3 were given` under plain Python, so something there depends on
+  Sage's `choice`. It is the one generator that will not simply move across.
+- Four outcomes (`D4`, `F5`, `F5-E`, `R2`) need `inflect`, which is in the
+  banks' `requirements.txt` but is not a CheckIt dependency.
 
 ### Context
 
@@ -3095,7 +3319,8 @@ upstream merge doesn't silently revert them:
 
 - **TikZ image backend** — new wrapper/tikz.py; tikz_graphics() added to
   BaseGenerator in wrapper.sage; <tikz-image> rule added to all three XSLTs
-  (both the dashboard/checkit/static/ and viewer/src/spatext/xsl/ copies);
+  (at the time, both the dashboard/checkit/static/ and viewer/src/spatext/xsl/
+  copies; only the former exists now);
   image_amount cap in wrapper.sage. NOTE: the rule alone is not enough — the
   `parseDisplay` template in each stylesheet must also list `stx:tikz-image` in
   its `apply-templates select`, or the rule is dead code and the element renders
