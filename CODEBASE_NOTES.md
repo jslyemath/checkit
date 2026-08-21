@@ -2421,6 +2421,13 @@ Chrome's published schedule:
 | **158** | **2026-11-17** | **XSLT stops working on stable for everyone else** |
 | 176 | 2027-08-17 | Origin Trial + Enterprise Policy end; off for all |
 
+Re-verified against Chrome's deprecation page on 2026-08-20: all four dates
+above are current. Three earlier milestones are already past — 142
+(2025-10-28) added console warnings, 143 (2025-12-02) was the formal
+deprecation, and 145 disabled XSLT in Canary/Dev/Beta. Chrome puts remaining
+usage at ~0.02% of page loads, which is why no amount of objection is likely to
+move the date.
+
 ### What this breaks in CheckIt
 
 Everything that calls `XSLTProcessor` in `viewer/src/utils/index.ts` —
@@ -2437,36 +2444,208 @@ Everything that calls `XSLTProcessor` in `viewer/src/utils/index.ts` —
 exercises are unaffected. So does the whole Python/dashboard side, which
 transforms with `lxml` server-side and is entirely outside the browser.
 
+That containment is structural rather than incidental, which is worth knowing
+before anyone "tidies" `Exercise.svelte`. The XSLT calls sit inside
+`{:else if mode == "html"}` branches, so Svelte never evaluates them while
+`mode == "display"`; and the tabs that change `mode` render only under
+`{#if $instructorEnabled}`. A student cannot reach a throwing transform even by
+accident. Hoisting any of those calls into a `$:` statement or a shared variable
+would destroy that guarantee and take the student view down with it.
+
+### The two implementations are not equivalent (verified 2026-08-20)
+
+The three stylesheets are byte-identical across `dashboard/checkit/static/` and
+`viewer/src/spatext/xsl/` — `diff` is clean on all three, so the hand-sync
+discipline has held so far. The *calling code* is another matter, and it
+diverged without either copy of the `.xsl` ever changing.
+
+**`subset` and `consumer` are dead parameters.** `Exercise.html_ele()` and
+`Exercise.pretext_ele()` pass `subset` and `consumer` into `etree.XSLT(...)`,
+but no stylesheet declares an `xsl:param` and neither name appears anywhere in
+any `.xsl`. They are accepted and silently ignored — a textbook instance of
+the silent-failure pattern, sitting in the public API of `Exercise`.
+
+This is a **regression, not an unfinished idea**, and the history matters
+because it says the feature is recoverable rather than hypothetical:
+
+- `ccc9b09` (Jan 2022) added `<xsl:param name="subset"/>` and
+  `<xsl:param name="consumer"/>` to `html.xsl`, with `$subset` gating
+  statement/answer output and `$consumer='canvas'` branching for the LMS.
+- `fde75e8` (May 2022, "update spatext") rewrote all three stylesheets and
+  dropped the params — while leaving the Python call signatures behind.
+- `4b48149` ("housecleaning") deleted `xsl/canvas.xsl`, `xsl/brightspace.xsl`
+  and the LMS manifest templates.
+
+So parameterized, LMS-aware, server-side rendering **used to exist here**. The
+browser's JS filtering is a later re-implementation of a capability lost in a
+rewrite. The duplication is not a design decision anyone made; it is drift.
+
+**What the browser does that Python currently cannot.** `outcomeToHtml()` takes
+`mathMode` and `solutions` and applies both *after* the transform, by DOM
+surgery: stripping `[class~="stx-outtro"]` / `stx-intro` / `stx-content` for
+`hide` and `only`, and running KaTeX to MathML for `canvas`/`brightspace`.
+`Exercise.html()` has no equivalent for either and can only produce the
+`all`/`basic` form.
+
+The `latex2mathml` import in `exercise.py` is the other half of the same lost
+feature: `tex_to_mathml()` is defined, never called, and `latex2mathml` is still
+a hard install dependency. Commit `51507be` names the gap it was meant to fill.
+
+**Consequence for option 1 below:** "the Python layer already performs exactly
+these three transforms" is true of the *transform* and false of the *feature*.
+Precomputing requires restoring subset filtering and adding server-side MathML
+first. `ccc9b09` is a known-good reference for the first.
+
+### Measured sizes (2026-08-20)
+
+Rendering every demo outcome to all three formats and comparing against its data
+JSON:
+
+```
+per seed, all 10 outcomes:  data 1,883   html 8,636   latex 5,895   ptx 5,615 bytes
+three formats / data     =  10.7x
+```
+
+`docs/demo/assets/bank.json` is 1.49 MB (10 outcomes x 1000 seeds, data only).
+Inlining all three formats for every seed would take it to roughly **16 MB**,
+downloaded by every visitor on load. HTML alone is ~4.6x, still ~7 MB. A blanket
+inline is therefore out, as previously assumed — but the consumers do not all
+want the same seeds, and that asymmetry is the opening:
+
+| surface | formats | seeds | source |
+|---|---|---|---|
+| instructor tabs | html, latex, ptx | 0-19 | `Exercise.svelte` |
+| Copy for AI Chatbot | html | 0-19 | `outcomeToAiText` |
+| assessment builder | latex | 20-999 | `getRandomAssessmentFromSlugs` |
+| LMS export | html x2 (hide + only) | 100-999 | `Export.svelte` (`Array(900)`, `seed=i+100`) |
+
+Two things fall out. PreTeXt is **only ever needed for the 20 public seeds**.
+And inlining all three formats for seeds 0-19 costs about **400 KB on a 1.49 MB
+file** — a 27% increase, which is affordable. Only seeds 20+ are forced out
+into separate fetches.
+
+Also worth knowing: the LMS export calls `outcomeToHtml` twice per seed across
+900 seeds, so **1,800 transforms per outcome per export**, on the main thread.
+Precomputing that surface is a performance win regardless of the deprecation.
+
 ### Options
 
 1. **Precompute the derived formats at generate time (recommended).** The Python
-   layer already performs exactly these three transforms via `lxml`
-   (`Exercise.html()` / `.latex()` / `.pretext()`). Emit them per seed at build
-   time and have the viewer fetch rather than transform.
+   layer runs these same three transforms via `lxml` (`Exercise.html()` /
+   `.latex()` / `.pretext()`). Emit them at build time and have the viewer fetch
+   rather than transform. Requires first restoring the `subset` filtering and
+   server-side MathML described above — real work, not a rename.
 
-   The strong argument for this is not the deadline — it is that the transforms
-   currently exist **twice**, once in `lxml` and once in `XSLTProcessor`, which is
-   the reason the three stylesheets are duplicated across
-   `dashboard/checkit/static/` and `viewer/src/spatext/xsl/` and must be kept in
-   sync (see §5). It is also what produced the document-vs-element bug: the
-   browser path silently required a different source node type than the Python
-   path, and only Firefox ever said so. Precomputing collapses two
+   The strong argument is not the deadline. It is that the transforms exist
+   **twice**, which is why the three stylesheets are duplicated and must be kept
+   in sync by hand (§5), and which is what produced the document-vs-element
+   bug: the browser path silently required a different source node type than the
+   Python path, and only Firefox ever said so. Precomputing collapses two
    implementations into one.
 
-   Size is the design problem: 1000 seeds × 3 formats is far too much for
-   `bank.json`, which every visitor downloads on load. Emitting per-seed files
-   under `assets/<slug>/generated/<seed>/` and fetching on demand keeps the
-   initial payload unchanged. Note the consumers need different seed ranges —
-   viewer ~20, assessments 20+, LMS export 100–999 — so a partial precompute
-   reintroduces the same coverage trap as `--image-seeds` (§ image_seeds).
-
 2. **Replace browser XSLT with a JS/WASM implementation** (a libxslt WASM build,
-   SaxonJS, or hand-porting the stylesheets to TS). Keeps transforms client-side,
-   but adds a dependency and *preserves* the dual-implementation problem that
-   caused this bug in the first place.
+   SaxonJS, or hand-porting the stylesheets to TS). Keeps transforms
+   client-side, so no payload or seed-range design is needed, and it is the
+   smallest behavioral change. But it adds a dependency and *preserves* the
+   dual-implementation problem that caused the bug — it buys time without
+   buying simplification.
 
 3. **Drop derived formats from the browser entirely**, moving export to the CLI.
    Smallest amount of code, largest loss of function for instructors.
+
+### Recommendation
+
+**Option 1, staged, with a two-tier payload. Not a hybrid with option 3.**
+
+The temptation is to send the heavy surfaces (assessment builder, LMS export) to
+the CLI and precompute only the cheap ones. Resist it. Those browser surfaces
+are what the platform is *for* from an instructor's point of view, and a
+CLI-only export is a real downgrade for the audience least likely to want a
+terminal. The reframe that makes this tractable: **"in the browser" is a claim
+about the instructor's experience, not about where the transform executes.** The
+button stays, the download stays, the copy-to-clipboard stays. Only the compute
+moves to build time. Nothing an instructor can do today is lost.
+
+Sequence, in dependency order:
+
+1. **Restore server-side parity first, while browser XSLT still works.** Port
+   `$subset` back into the three stylesheets from `ccc9b09`, and wire
+   `tex_to_mathml()` in for the `canvas`/`brightspace` consumer. Do this
+   *before* touching the viewer, because until 2026-11-17 you can render the
+   same seed both ways and diff them — the browser is a free oracle for
+   verifying the Python output. **That verification window closes on the removal
+   date**, and afterwards there is nothing left to check the port against. This
+   is the step with a real deadline; the rest is ordinary work that can happen
+   whenever.
+
+2. **Emit precomputed formats at generate time, in two tiers.** Inline seeds
+   0-19 (all three formats) into `bank.json` at ~27% growth — that alone
+   fixes the instructor tabs and the AI button with no new fetch machinery. Emit
+   the heavy ranges as per-outcome bundles under `assets/<slug>/generated/`,
+   fetched lazily only when an instructor actually clicks Assessment or Export.
+   The ranges differ per surface, so a partial precompute reintroduces the
+   coverage trap from `--image-seeds` (§ image_seeds): decide the range
+   policy *before* writing the emitter, and make a missing range fail loudly
+   rather than render blank.
+
+3. **Switch the viewer to read, then delete.** Replace the three
+   `XSLTProcessor` calls in `utils/index.ts` with lookups, then delete
+   `viewer/src/spatext/xsl/` outright. One implementation of the transforms
+   remains, in `lxml`, and §5's hand-sync requirement disappears with it.
+
+Two things to design rather than default:
+
+- `bank.json` becomes a compatibility surface. A bank generated by an older
+  CheckIt will not carry the precomputed keys, and the viewer must say so rather
+  than render an empty tab — the same concern recorded for `<ai-prompt>` and
+  for the bank-declared LaTeX preamble.
+- Build time grows by 1000 seeds x 3 transforms per outcome. Expect the same
+  staleness pressure `compile_tikz_for_outcome` already has, and plan to skip
+  unchanged outcomes rather than discovering the cost after the first full run.
+
+What this does *not* solve: the assessment `.tex` template is still baked into
+the bundle at build time (see "Letting a bank declare its own LaTeX preamble"),
+and that remains an independent problem.
+
+### Status
+
+**Step 1 is half done as of 2026-08-21.** `subset` is restored in `html.xsl`
+and the plumbing in `Exercise.html_ele()` works; the MathML half of step 1 is
+not started, so `consumer` is still browser-only.
+
+What landed:
+
+- `<xsl:param name="subset" select="'all'"/>` in `html.xsl`, with the three
+  `apply-templates` calls in the `stx:knowl` template guarded. Nested knowls
+  re-enter that template, so one guard filters every depth, matching the
+  viewer's global `querySelectorAll` removal.
+- `consumer` was deliberately **not** declared. Declaring a parameter nothing
+  reads is exactly what produced the original four-year-old bug. It arrives
+  with the MathML work.
+- `Exercise.html_ele()` validates `subset` and raises on any `consumer` other
+  than `'basic'`. `Exercise.pretext_ele()` raises on either non-default value
+  instead of accepting and discarding them: nothing asks PreTeXt for a subset
+  (`outcomeToPtx()` takes none), and dropping `<statement>` from a PreTeXt
+  `<exercise>` would emit structurally invalid PreTeXt, so that wants designing
+  against a real consumer rather than guessing.
+- `latex.xsl` is untouched. `Exercise.latex()` accepts no `subset` and
+  `outcomeToLatex()` does not filter, so there is nothing to reach parity with.
+
+Verification, and the first tests this repo has ever had, in `dashboard/tests/`
+(stdlib `unittest`, hermetic SpaTeXt fixtures, no bank or generated data
+needed). The core test asserts the two implementations agree rather than
+comparing against a golden file. Also confirmed: `subset='all'` output is
+byte-identical to the pre-change stylesheet across the demo bank, and a real
+Chromium `XSLTProcessor` agrees with `lxml` on every fixture and subset
+(`browser_harness.py`). The suite is mutation-checked.
+
+Two things this does **not** cover. Firefox was not exercised — the
+document-vs-element bug was Chromium-invisible, so `browser_harness.py` should
+be run there too before the viewer is rebuilt. And `static/viewer.zip` is still
+the pre-change build, so the browser-facing edit is inert until
+`update_viewer.py` runs; that also means there are effectively *three* copies
+of each stylesheet, the third being the one Vite inlined into the bundle.
+
 
 Sources: whatwg/html#11523, mozilla/standards-positions#1287,
 https://developer.chrome.com/docs/web-platform/deprecating-xslt

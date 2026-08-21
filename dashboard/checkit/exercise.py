@@ -31,12 +31,26 @@ class Exercise:
             encoding="UTF-8"
         )
 
+    SUBSETS = ("all", "statement", "answer")
+
     def html_ele(self,subset='all',consumer='basic'):
+        if subset not in self.SUBSETS:
+            raise ValueError(
+                f"subset must be one of {self.SUBSETS}, not {subset!r}"
+            )
+        if consumer != 'basic':
+            # html.xsl has no consumer parameter yet; the LMS math conversion
+            # still happens in the browser. Refuse rather than return basic
+            # output under an LMS label -- that is the failure mode that hid
+            # the dead parameters for four years.
+            raise NotImplementedError(
+                f"consumer={consumer!r} is not implemented server-side yet; "
+                "only 'basic'. LMS MathML conversion currently runs in the viewer."
+            )
         transform = etree.XSLT(etree.fromstring(read_resource("html.xsl")))
         ele = transform(
             self.spatext_ele(),
             subset=f"'{subset}'",
-            consumer=f"'{consumer}'",
             ).getroot()
         return ele
 
@@ -47,12 +61,23 @@ class Exercise:
             ),pretty_print=True), 'utf-8')
 
     def pretext_ele(self,subset='all',consumer='basic'):
+        # pretext.xsl implements neither parameter, and nothing asks it to: the
+        # viewer's outcomeToPtx() takes no subset either. Rather than keep
+        # accepting values that are silently discarded, refuse them. Dropping
+        # <statement> from a PreTeXt <exercise> would also emit structurally
+        # invalid PreTeXt, so this is not merely unimplemented -- it needs
+        # designing before it is built, and has no consumer to design against.
+        if subset != 'all':
+            raise NotImplementedError(
+                f"pretext output does not support subset={subset!r}, only 'all'. "
+                "Subset filtering is implemented in html.xsl only."
+            )
+        if consumer != 'basic':
+            raise NotImplementedError(
+                f"pretext output does not support consumer={consumer!r}, only 'basic'."
+            )
         transform = etree.XSLT(etree.fromstring(read_resource("pretext.xsl")))
-        ele = transform(
-            self.spatext_ele(),
-            subset=f"'{subset}'",
-            consumer=f"'{consumer}'",
-            ).getroot()
+        ele = transform(self.spatext_ele()).getroot()
         return ele
 
     def pretext(self,subset='all',consumer='basic'):
