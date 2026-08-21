@@ -45,8 +45,32 @@ def new(directory):
     with open(os.path.join(directory,".gitignore"),"w") as f:
         f.write(static.read_resource("gitignore.txt"))
     # generate requirements.txt
+    #
+    # Deliberately NOT `checkit-dashboard == {VERSION}`. That would resolve on
+    # PyPI, where checkit-dashboard is Steven Clontz's upstream package -- so a
+    # bank made with this fork would silently install different code that merely
+    # shares a version number. Point at the fork's own release wheel instead.
+    #
+    # A wheel is used rather than a git URL because viewer.zip, the compiled
+    # browser app, is a build artifact that is not committed: pip installing
+    # from git would produce a package with no viewer in it.
+    wheel = f"checkit_dashboard-{VERSION}-py3-none-any.whl"
+    release_url = (
+        "https://github.com/jslyemath/checkit/releases/download/"
+        f"v{VERSION}/{wheel}"
+    )
     with open(os.path.join(directory,"requirements.txt"),"w") as f:
-        f.write(f"checkit-dashboard == {VERSION}")
+        f.write(
+            "# The CheckIt platform, from the jslyemath fork.\n"
+            "#\n"
+            "# Not `checkit-dashboard == <version>`: that name on PyPI is the\n"
+            "# upstream project, which is different code.\n"
+            "#\n"
+            "# Working on the platform itself? Install it editable instead, so\n"
+            "# your edits take effect without rebuilding a wheel:\n"
+            "#     pip install -e /path/to/checkit/dashboard\n"
+            f"checkit-dashboard @ {release_url}\n"
+        )
     print(f"Successfully created new CheckIt bank in `{directory}`")
 
 

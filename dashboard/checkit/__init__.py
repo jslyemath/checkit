@@ -1,4 +1,12 @@
-VERSION = '0.2.8'
+# Upstream 0.2.8 plus this fork's changes. The "+slye.N" part is a PEP 440
+# *local version*, which is exactly what it is for: the same upstream release
+# with local modifications on top.
+#
+# It matters because checkit-dashboard 0.2.8 also exists on PyPI, published by
+# Steven Clontz on 2026-08-01, and it is different code. Without a distinct
+# version, `pip show checkit-dashboard` could not tell you which one you have.
+# Bump the trailing number whenever a wheel is cut for someone else to install.
+VERSION = '0.2.8+slye.1'
 
 # How many exercise versions the viewer exposes to students, and therefore the
 # range everything else measures itself against: `checkit preview` generates
