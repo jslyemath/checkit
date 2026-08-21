@@ -77,7 +77,10 @@ class Outcome():
             exs = self.preview_exercises()
         html = "<h2>Preview:</h2>\n"
         for ex in exs:
-            html += ex.html()
+            # remote='' keeps this preview's root-relative <img src> values,
+            # which is what it has always produced. An absolute URL would point
+            # at the published site rather than the bank being previewed.
+            html += ex.html(remote='')
             html += "\n"
             html += "<h3>Data</h3>"
             html += "<pre>\n"
@@ -91,7 +94,7 @@ class Outcome():
             html += "\n"
             html += "<h3>HTML</h3>"
             html += "<pre>\n"
-            html += escape_html(ex.html())
+            html += escape_html(ex.html(remote=''))
             html += "</pre>\n"
             html += "<h3>LaTeX</h3>"
             html += "<pre>\n"

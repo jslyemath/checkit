@@ -2609,9 +2609,9 @@ and that remains an independent problem.
 
 ### Status
 
-**Step 1 is half done as of 2026-08-21.** `subset` is restored in `html.xsl`
-and the plumbing in `Exercise.html_ele()` works; the MathML half of step 1 is
-not started, so `consumer` is still browser-only.
+**Step 1 is complete as of 2026-08-21.** `Exercise` can now produce everything
+the viewer produces: filtered subsets, MathML for the LMS, and absolute image
+URLs. Step 2 (emitting the precomputed formats) is not started.
 
 What landed:
 
@@ -2630,6 +2630,73 @@ What landed:
   against a real consumer rather than guessing.
 - `latex.xsl` is untouched. `Exercise.latex()` accepts no `subset` and
   `outcomeToLatex()` does not filter, so there is nothing to reach parity with.
+
+Then the other two halves:
+
+- **The MathML consumer.** `consumer='canvas'` or `'brightspace'` converts every
+  math span's contents to MathML, mirroring what the viewer does with KaTeX
+  after its transform. Done as a **Python pass over the result tree, not an
+  `xsl:param`** — an XSLT extension function would make `html.xsl` unable to run
+  standalone in a browser, permanently forking the two copies in order to fix a
+  duplication problem. `consumer` therefore never reaches the stylesheet, and
+  `subset` remains the only XSLT parameter.
+
+  One deliberate difference from the viewer: KaTeX wraps its output in
+  `<span class="katex">`, a hook for KaTeX's own stylesheet, which is absent
+  from an exported quiz. That wrapper is not reproduced.
+
+- **The `remote` base URL.** `html.xsl` builds `<img src>` as `@remote` + `/` +
+  `@source`, and nothing in Python had ever set `@remote` — so every image came
+  out root-relative and would have 404'd inside an LMS. `spatext_ele(remote=…)`
+  now stamps it, and `html_ele()` **raises** when an exercise contains images
+  and no `remote` was given.
+
+  It is deliberately not defaulted from `bank.xml`'s `<url>`. That element names
+  the bank's home page, which need not be the directory containing `assets/` —
+  the demo bank declares `https://checkit.clontz.org` but publishes under
+  `/demo/`, so defaulting to it would emit dead links that nothing detects until
+  a student meets one. `Outcome.html_preview()` passes `remote=''` explicitly to
+  keep its existing relative behaviour.
+
+### Is latex2mathml good enough? (measured, 2026-08-21)
+
+Yes, and this was worth measuring rather than assuming, because the course
+banks' generators turned out to be **plain Python** — the `.sage` file is only a
+shim — so they can be run directly to see what LaTeX they really emit.
+
+Across **805 distinct LaTeX strings** from `mat-106` and `mat-206`, plus 50 more
+from the demo bank:
+
+- `latex2mathml` hard failures: **0**
+- exact agreement with KaTeX on visible content: **767/805 (95.3%)**
+- the 38 disagreements are **two glyph choices only**: `\Box` renders as U+25FB
+  rather than U+25A1, and `\overline` as U+2015 rather than U+203E
+- structure matches KaTeX on all 150 examples of `\frac`, `\overline`, `^`
+  and `_`, and the augmented-matrix rule survives as
+  `columnlines="none none solid"`
+
+### Is MathML even the right target for Canvas? (open)
+
+Unresolved, and worth revisiting before anyone extends this. Canvas renders
+`\(…\)` LaTeX directly via MathJax, and `text2qti` — the most mature tool
+doing this same job — **defaults to LaTeX**, offering MathML only behind a flag
+and stating no preference. Canvas QTI import also has a documented issue where
+"MathML occasionally will not render correctly".
+
+Against that: `51507be` ("export actual question/answers except for math (need
+tex to mathml conversion)") says Steven hit something concrete that pushed him
+to MathML for Canvas specifically, while Brightspace and Moodle still pass
+`"default"` and receive raw LaTeX.
+
+No evidence was found that Canvas reads MathML's
+`<annotation encoding="application/x-tex">`; its own round-trip uses an image
+with the LaTeX in alt text. So omitting the annotation, as latex2mathml does,
+looks harmless.
+
+The implementation therefore **reproduces current behaviour** rather than
+redesigning it. Deciding whether LaTeX would do — which would delete the
+consumer concept entirely — needs a real Canvas course to import into, not
+documentation.
 
 Verification, and the first tests this repo has ever had, in `dashboard/tests/`
 (stdlib `unittest`, hermetic SpaTeXt fixtures, no bank or generated data

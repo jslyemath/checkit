@@ -178,11 +178,11 @@ class ExerciseApi(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.ex.html_ele(subset="statements")  # plausible typo
 
-    def test_unimplemented_consumer_raises(self):
+    def test_unknown_consumer_raises(self):
         """Returning basic output under an LMS label is the failure mode that
         hid the dead parameters for four years."""
-        with self.assertRaises(NotImplementedError):
-            self.ex.html_ele(consumer="canvas")
+        with self.assertRaises(ValueError):
+            self.ex.html_ele(consumer="blackboard")
 
     def test_pretext_refuses_what_it_cannot_do(self):
         for kwargs in ({"subset": "answer"}, {"consumer": "canvas"}):
@@ -193,6 +193,123 @@ class ExerciseApi(unittest.TestCase):
     def test_pretext_and_latex_defaults_still_work(self):
         self.assertIn("<exercise", self.ex.pretext())
         self.assertIn("stxKnowl", self.ex.latex())
+
+
+def _exercise_from(spatext, tmpdir):
+    path = os.path.join(tmpdir, "template.xml")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(spatext)
+    return Exercise(data={}, seed=0, outcome=_StubOutcome(path))
+
+
+class MathmlConsumer(unittest.TestCase):
+    """An LMS renders imported HTML without CheckIt's JavaScript, so LaTeX
+    delimiters would reach the student as literal backslashes."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.ex = _exercise_from(fx.MATH, self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_basic_consumer_keeps_latex_delimiters(self):
+        html = self.ex.html(consumer="basic", remote="")
+        self.assertIn(r"\(", html)
+        self.assertNotIn("<math", html)
+
+    def test_canvas_consumer_emits_mathml(self):
+        html = self.ex.html(consumer="canvas", remote="")
+        self.assertIn("<math", html)
+        self.assertIn("http://www.w3.org/1998/Math/MathML", html)
+        self.assertNotIn(r"\(", html)
+
+    def test_brightspace_behaves_like_canvas(self):
+        self.assertEqual(
+            canon(self.ex.html(consumer="canvas", remote="")),
+            canon(self.ex.html(consumer="brightspace", remote="")),
+        )
+
+    def test_fraction_becomes_mfrac_not_flattened_text(self):
+        """Matching characters is not matching maths: 1/3 written inline would
+        contain the same digits as a stacked fraction."""
+        html = self.ex.html(consumer="canvas", remote="")
+        self.assertIn("<mfrac", html)
+
+    def test_display_and_inline_are_distinguished(self):
+        html = self.ex.html(consumer="canvas", remote="")
+        self.assertIn('display="block"', html)
+        self.assertIn('display="inline"', html)
+
+    def test_every_math_span_is_converted(self):
+        ele = self.ex.html_ele(consumer="canvas", remote="")
+        spans = [
+            el for el in ele.iter()
+            if "math" in (el.get("class") or "").split()
+            and el.get("data-latex") is not None
+        ]
+        self.assertEqual(len(spans), 3)  # inline, display, and the <me> answer
+        for span in spans:
+            kids = list(span)
+            self.assertEqual(len(kids), 1, "span should hold exactly the <math>")
+            self.assertTrue(kids[0].tag.endswith("}math"))
+            self.assertIsNone(span.text, "LaTeX text should be gone")
+
+    def test_data_latex_survives_so_the_source_is_recoverable(self):
+        ele = self.ex.html_ele(consumer="canvas", remote="")
+        found = [el.get("data-latex") for el in ele.iter()
+                 if el.get("data-latex") is not None]
+        self.assertIn(r"\frac{1}{3}", found)
+
+
+class RemoteBaseUrl(unittest.TestCase):
+    """html.xsl builds <img src> as @remote + "/" + @source. The viewer fills
+    @remote from location.href; a build has no page to read, so it must be
+    supplied or the URLs silently point nowhere."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.with_image = _exercise_from(fx.IMAGE, self.tmp.name)
+        self.tmp2 = tempfile.TemporaryDirectory()
+        self.no_image = _exercise_from(fx.SIMPLE, self.tmp2.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+        self.tmp2.cleanup()
+
+    def test_images_without_remote_raise(self):
+        """A dead <img src> is invisible until a student meets it, so this must
+        fail at build time rather than export quietly."""
+        with self.assertRaises(ValueError) as cm:
+            self.with_image.html_ele()
+        self.assertIn("remote", str(cm.exception))
+
+    def test_no_images_means_remote_is_irrelevant(self):
+        self.no_image.html_ele()  # must not raise
+
+    def test_remote_is_prepended_to_source(self):
+        html = self.with_image.html(remote="https://checkit.clontz.org/demo")
+        self.assertIn(
+            'src="https://checkit.clontz.org/demo/assets/IMG2/2.png"', html
+        )
+
+    def test_trailing_slashes_do_not_double_up(self):
+        html = self.with_image.html(remote="https://example.org/bank//")
+        self.assertIn('src="https://example.org/bank/assets/IMG2/2.png"', html)
+
+    def test_empty_remote_keeps_the_old_relative_behaviour(self):
+        html = self.with_image.html(remote="")
+        self.assertIn('src="/assets/IMG2/2.png"', html)
+
+    def test_remote_applies_under_every_subset_and_consumer(self):
+        for subset in ("all", "statement"):
+            for consumer in ("basic", "canvas"):
+                with self.subTest(subset=subset, consumer=consumer):
+                    html = self.with_image.html(
+                        subset=subset, consumer=consumer,
+                        remote="https://example.org/b",
+                    )
+                    self.assertIn('src="https://example.org/b/assets/', html)
 
 
 class StylesheetCopies(unittest.TestCase):
