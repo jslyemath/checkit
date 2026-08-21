@@ -1,12 +1,17 @@
-# Upstream 0.2.8 plus this fork's changes. The "+slye.N" part is a PEP 440
-# *local version*, which is exactly what it is for: the same upstream release
-# with local modifications on top.
+# Upstream 0.2.8, fork revision 1. Bump the last number whenever a wheel is cut
+# for someone else to install.
 #
-# It matters because checkit-dashboard 0.2.8 also exists on PyPI, published by
-# Steven Clontz on 2026-08-01, and it is different code. Without a distinct
-# version, `pip show checkit-dashboard` could not tell you which one you have.
-# Bump the trailing number whenever a wheel is cut for someone else to install.
-VERSION = '0.2.8+slye.1'
+# A distinct version matters because checkit-dashboard 0.2.8 also exists on
+# PyPI, published by Steven Clontz on 2026-08-01, and it is different code.
+# Without this, `pip show checkit-dashboard` could not tell you which you have.
+#
+# NOT a PEP 440 local version like '0.2.8+slye.1', which is what this means
+# semantically and was tried first. GitHub Releases rewrites '+' to '.' in an
+# uploaded asset's filename, turning the wheel into
+# checkit_dashboard-0.2.8.slye.1-py3-none-any.whl -- which pip then refuses
+# outright with "Invalid wheel filename (invalid version)". Anything that has
+# to survive a release asset name must stick to digits and dots.
+VERSION = '0.2.8.1'
 
 # How many exercise versions the viewer exposes to students, and therefore the
 # range everything else measures itself against: `checkit preview` generates

@@ -68,6 +68,29 @@ class InstallRequires(unittest.TestCase):
         self.assertNotIn("matplotlib", cfg_requires())
 
 
+class VersionString(unittest.TestCase):
+    """The version has to survive being a GitHub release asset's filename.
+
+    '0.2.8+slye.1' is what this fork means semantically -- a PEP 440 local
+    version -- but GitHub rewrites '+' to '.' on upload, producing
+    checkit_dashboard-0.2.8.slye.1-py3-none-any.whl, which pip rejects with
+    "Invalid wheel filename (invalid version)". Measured, not assumed.
+    """
+
+    def test_version_is_safe_in_a_wheel_filename(self):
+        from checkit import VERSION
+
+        self.assertNotIn("+", VERSION, "GitHub Releases rewrites '+' to '.'")
+        self.assertRegex(VERSION, r"^\d+(\.\d+)*$")
+
+    def test_version_differs_from_upstream(self):
+        """checkit-dashboard 0.2.8 on PyPI is Steven Clontz's package and is
+        different code; sharing its version makes them indistinguishable."""
+        from checkit import VERSION
+
+        self.assertNotEqual(VERSION, "0.2.8")
+
+
 class PackagedFiles(unittest.TestCase):
     def test_static_resources_the_runtime_reads_are_declared(self):
         """package_data must cover static/ and wrapper/, or an installed copy
