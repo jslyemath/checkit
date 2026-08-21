@@ -48,6 +48,11 @@
     // button must never do is appear to work while doing nothing.
     let copyState:'idle'|'copied'|'failed' = 'idle'
     let manualText = ''
+    // Distinct from copyState 'failed', which means the clipboard refused. This
+    // means the payload could not be built at all -- a different problem with a
+    // different fix, so it gets its own message rather than the "press Ctrl+C"
+    // textarea, which would have nothing useful in it.
+    let copyError = ''
     let copyTimer:ReturnType<typeof setTimeout>
 
     // Focus and select the fallback textarea as soon as it appears, so the
@@ -58,7 +63,15 @@
     }
 
     const copyForAi = () => {
-        const text = outcomeToAiText($bank,outcome,seed)
+        let text:string
+        try {
+            text = outcomeToAiText($bank,outcome,seed)
+        } catch (e) {
+            copyError = e instanceof Error ? e.message : String(e)
+            copyState = 'idle'
+            return
+        }
+        copyError = ''
         clearTimeout(copyTimer)
 
         // Show the confirmation immediately rather than awaiting writeText().
@@ -185,6 +198,13 @@
         {/if}
     </Row>
     
+    {#if copyError}
+        <Row>
+            <Col>
+                <div class="alert alert-danger" style="white-space:pre-wrap">{copyError}</div>
+            </Col>
+        </Row>
+    {/if}
     {#if copyState=="failed"}
         <Row>
             <Col>

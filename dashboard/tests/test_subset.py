@@ -334,24 +334,30 @@ class CrossLanguageConstants(unittest.TestCase):
         )
 
 
-class StylesheetCopies(unittest.TestCase):
-    def test_dashboard_and_viewer_copies_are_identical(self):
-        """The two copies must be edited together; nothing else enforces it.
+class StylesheetsExistOnlyOnce(unittest.TestCase):
+    """The three stylesheets used to exist twice, once for lxml and once for the
+    browser, kept in sync by hand across six files. That duplication caused the
+    document-vs-element bug and forced every SpaTeXt element to be added in six
+    places. The viewer no longer transforms anything, so the browser copy is
+    gone -- this guards against it coming back."""
 
-        Note there is a third, frozen copy inside static/viewer.zip, baked in at
-        Vite build time -- it only updates when update_viewer.py runs.
-        """
+    def test_the_viewer_has_no_stylesheets(self):
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        viewer = os.path.join(root, "viewer", "src")
+        found = [
+            os.path.relpath(os.path.join(dirpath, name), root)
+            for dirpath, _, names in os.walk(viewer)
+            for name in names
+            if name.endswith(".xsl")
+        ]
+        self.assertEqual(found, [], "the browser-side stylesheets are back")
+
+    def test_the_dashboard_still_has_all_three(self):
         root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         for name in ("html.xsl", "latex.xsl", "pretext.xsl"):
             with self.subTest(stylesheet=name):
-                a = os.path.join(root, "dashboard", "checkit", "static", name)
-                b = os.path.join(root, "viewer", "src", "spatext", "xsl", name)
-                with open(a, "rb") as f1, open(b, "rb") as f2:
-                    self.assertEqual(
-                        f1.read(),
-                        f2.read(),
-                        f"{name} differs between dashboard/ and viewer/",
-                    )
+                self.assertTrue(os.path.isfile(
+                    os.path.join(root, "dashboard", "checkit", "static", name)))
 
 
 if __name__ == "__main__":

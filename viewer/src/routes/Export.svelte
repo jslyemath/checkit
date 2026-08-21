@@ -12,7 +12,7 @@
     import { bank } from '../stores/banks';
     import Mustache from 'mustache';
 
-    import {outcomeToHtml} from '../utils/index'
+    import {outcomeToHtml, ensureDerivedForSlugs} from '../utils/index'
 
     // @ts-ignore
     import canvasManifest from '../templates/canvasManifest.xml?raw'
@@ -127,9 +127,21 @@
         return Mustache.render(moodleBank, ctx)
     }
     let working = false
-    function exportToLms() {
+    let exportError = ""
+    async function exportToLms() {
         id = Date.now()
         working = true
+        exportError = ""
+        // LMS export uses seeds 100-999, which are not inlined in bank.json, so
+        // their precomputed HTML has to be fetched before any of the builders
+        // below run. One await here keeps them all synchronous.
+        try {
+            await ensureDerivedForSlugs($bank, selectedOutcomeSlugs)
+        } catch (e) {
+            working = false
+            exportError = e instanceof Error ? e.message : String(e)
+            return
+        }
         // hax to update DOM before locking browser for build
         setTimeout(()=>{
             if (lms=="canvas") {
@@ -235,6 +247,12 @@ outcomes at a time is advised.
                         Export
                     {/if}
                 </Button>
+                {#if exportError}
+                    <!-- Shown rather than logged: a bank that was never
+                         regenerated cannot be fixed from the browser, and the
+                         instructor is the one who can fix it. -->
+                    <div class="alert alert-danger mt-3" style="white-space:pre-wrap">{exportError}</div>
+                {/if}
             </Col>
         </Row>
     </Container>

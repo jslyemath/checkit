@@ -65,7 +65,9 @@ and stays meaningful as the stylesheets change.
 
 **Both copies**
 
-- the dashboard and viewer copies of all three stylesheets are byte-identical
+- the stylesheets exist only in `dashboard/checkit/static/` — the browser
+  copy was deleted when the viewer stopped transforming, and this guards
+  against it coming back
 - `PUBLIC_SEEDS` has the same value in `checkit/__init__.py` and in
   `viewer/src/utils/index.ts` — it has to exist twice because the browser
   cannot import from Python, and a drift would be quiet: the version picker
