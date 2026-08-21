@@ -1,7 +1,7 @@
 from .exercise import Exercise
 import os, json, random
 from html import escape as escape_html
-from . import PUBLIC_SEEDS
+from . import PUBLIC_SEEDS, INLINE_FORMATS, BUNDLE_FORMATS, BUNDLE_FILENAME
 from .wrapper import run_generator
 from .wrapper.tikz import compile_tikz_for_outcome
 
@@ -48,17 +48,60 @@ class Outcome():
         # raised downstream names a real, expected location.
         return os.path.join(self.abspath(), self.GENERATOR_FILENAMES[0])
 
-    def to_dict(self,regenerate=False):
+    def to_dict(self,regenerate=False,remote=None,precompute=True):
         self.generate_exercises(regenerate)
         exs = self.exercises()
+        exercises = []
+        for e in exs:
+            d = e.to_dict()
+            # Only the public seeds are inlined; the rest live in the bundle, so
+            # bank.json does not grow by a factor of ten for data no student
+            # will ever request.
+            if precompute and e.seed < PUBLIC_SEEDS:
+                d.update(e.derived(remote=remote, formats=INLINE_FORMATS))
+            exercises.append(d)
         return {
             "title": self.title,
             "slug": self.slug,
             "description": self.description,
             "ai_prompt": self.ai_prompt,
             "template": self.template(),
-            "exercises": [e.to_dict() for e in exs],
+            "exercises": exercises,
         }
+
+    def has_images(self):
+        """Whether this outcome's exercises reference images at all.
+
+        Used to decide whether a missing `remote` is fatal: a bank with no
+        figures can precompute HTML perfectly well without one.
+        """
+        exs = self.exercises()
+        if not exs:
+            return False
+        from .exercise import _has_images
+        return _has_images(exs[0].spatext_ele())
+
+    def write_derived_bundle(self,remote=None):
+        """The non-public seeds, pre-rendered, as one file per outcome.
+
+        Fetched only when an instructor builds an assessment or exports to an
+        LMS. About 1.4 MB raw per outcome for a 1000-seed bank, which is ~51 KB
+        over the wire -- this content compresses roughly 28x.
+        """
+        exs = [e for e in self.exercises() if e.seed >= PUBLIC_SEEDS]
+        payload = {
+            "slug": self.slug,
+            "first_seed": PUBLIC_SEEDS,
+            "formats": list(BUNDLE_FORMATS),
+            "seeds": {
+                str(e.seed): e.derived(remote=remote, formats=BUNDLE_FORMATS)
+                for e in exs
+            },
+        }
+        path = os.path.join(self.build_path(), BUNDLE_FILENAME)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+        return path
 
     def preview_exercises(self):
         preview_json = os.path.join(self.build_path(),"preview.json")

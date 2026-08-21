@@ -2738,6 +2738,67 @@ redesigning it. Deciding whether LaTeX would do — which would delete the
 consumer concept entirely — needs a real Canvas course to import into, not
 documentation.
 
+### Step 2, the emitter (done 2026-08-21; the viewer half is not)
+
+**Only `XSLTProcessor` disappears.** This is the realisation that shrank step 2,
+and it is worth stating plainly because it is easy to assume the whole of
+`outcomeToHtml()` is at risk. It is not: `DOMParser`, `querySelector`,
+`katex.render` and the class-based node removal all survive the deprecation
+untouched. The viewer therefore needs only the **base** rendering precomputed
+— `subset='all'`, `consumer='basic'` — and can keep applying its own
+`solutions` filtering and LMS MathML on top of it.
+
+Emitting every `subset` x `consumer` combination instead would have multiplied
+the payload roughly fourfold to replace code that still runs. It would also have
+been slower to build and no safer.
+
+That leaves the server-side `subset` and `consumer` support from step 1 off the
+critical path for the viewer migration. They are not wasted — they are what a
+CLI export would use, and building them is what produced the tested oracle
+proving the two filtering implementations agree — but the honest description
+is that step 1 was scoped slightly wider than the migration strictly required.
+
+**The coverage policy, decided before the emitter was written.** The ranges are
+unequal, and unequal coverage is exactly the trap `--image-seeds` set once:
+
+| tier | formats | seeds | where |
+|---|---|---|---|
+| inline | html, latex, pretext | 0 to `PUBLIC_SEEDS`-1 | inside `bank.json` |
+| bundle | html, latex | `PUBLIC_SEEDS` to end | `assets/<slug>/generated/derived.json` |
+
+PreTeXt is absent from the bundle deliberately: its only consumer is the
+instructor tab, and the version picker cannot reach past `PUBLIC_SEEDS`, so it
+would be dead weight for 950 seeds per outcome.
+
+The policy is **declared in `bank.json`** under a `precomputed` key rather than
+left implicit, so a consumer can ask "was this emitted?" instead of inferring a
+hole from rendering nothing. A bank generated before this exists has no such
+key at all, which is how the viewer will tell "not precomputed" from
+"precomputed but missing this seed".
+
+**Measured cost** (published demo bank, 8 outcomes x 1000 seeds):
+
+- inline tier: `bank.json` 1.42 MB -> 2.33 MB raw, but 149 KB -> 180 KB over
+  the wire, because it compresses about tenfold
+- bundle tier: ~1.4 MB raw per outcome, ~51 KB over the wire (this content
+  compresses about 28x), fetched only when an instructor acts
+- on disk a 31-outcome course bank grows by ~44 MB of generated files. Banks
+  gitignore `assets/**/generated`, so that lands in the repo only once
+  published under `docs/**`, where git's own compression absorbs most of it.
+
+**`--remote` is now required when a bank has images.** Precomputed HTML has to
+carry absolute `<img src>` values, and the check runs *before* anything is
+written so a build fails at once rather than several minutes in, and names the
+offending outcomes. `--no-precompute` skips the whole thing and also deletes any
+stale bundles, so `bank.json` never says "not precomputed" while old bundles sit
+beside it.
+
+**Still to do:** the viewer half. `utils/index.ts` must read the precomputed
+formats instead of calling `XSLTProcessor`, lazily fetch a bundle when an
+instructor builds an assessment or exports to an LMS, and fail loudly when it
+asks for a seed the declaration says was never emitted. Then step 3: delete
+`viewer/src/spatext/xsl/` and the duplication with it.
+
 Verification, and the first tests this repo has ever had, in `dashboard/tests/`
 (stdlib `unittest`, hermetic SpaTeXt fixtures, no bank or generated data
 needed). The core test asserts the two implementations agree rather than
