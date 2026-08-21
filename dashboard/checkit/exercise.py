@@ -1,6 +1,7 @@
 from lxml import etree
 from latex2mathml.converter import convert
 import pystache
+from . import INLINE_FORMATS
 from .static import read_resource
 
 STX_NS = "{https://spatext.clontz.org}"
@@ -182,6 +183,29 @@ class Exercise:
     def latex(self):
         transform = etree.XSLT(etree.fromstring(read_resource("latex.xsl")))
         return str(transform(self.spatext_ele()))
+
+    def derived(self, remote=None, formats=INLINE_FORMATS):
+        """This exercise pre-rendered into the formats the viewer used to build
+        for itself with XSLTProcessor.
+
+        Only the base form is emitted: html at subset='all', consumer='basic'.
+        The viewer's own filtering (`solutions`) and LMS MathML (`mathMode`) are
+        plain DOM work and KaTeX, neither of which the XSLT removal touches, so
+        it keeps doing those on top of this. Emitting every subset x consumer
+        combination instead would multiply the payload four-fold to replace code
+        that still runs.
+        """
+        out = {}
+        for fmt in formats:
+            if fmt == "html":
+                out["html"] = self.html(remote=remote)
+            elif fmt == "latex":
+                out["latex"] = self.latex()
+            elif fmt == "pretext":
+                out["pretext"] = self.pretext()
+            else:
+                raise ValueError(f"unknown derived format {fmt!r}")
+        return out
 
     def to_dict(self):
         return {

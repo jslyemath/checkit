@@ -4,6 +4,7 @@ from pathlib import Path
 from . import static
 from .outcome import Outcome
 from .xml import CHECKIT_NS, optional_text
+from . import PUBLIC_SEEDS, INLINE_FORMATS, BUNDLE_FORMATS, BUNDLE_FILENAME
 
 class Bank():
     def __init__(self, path="."):
@@ -49,9 +50,12 @@ class Bank():
         os.makedirs(p, exist_ok=True)
         return p
 
-    def to_dict(self,regenerate=False):
-        olist = [o.to_dict(regenerate=regenerate) for o in self.outcomes()]
-        return {
+    def to_dict(self,regenerate=False,remote=None,precompute=True):
+        olist = [
+            o.to_dict(regenerate=regenerate,remote=remote,precompute=precompute)
+            for o in self.outcomes()
+        ]
+        d = {
             "title": self.title,
             "slug": self.slug,
             "url": self.url,
@@ -59,11 +63,48 @@ class Bank():
             "generated_on": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "outcomes": olist,
         }
+        if precompute:
+            # Declared, not implied. A consumer can ask "was this seed/format
+            # emitted?" and get an answer, instead of discovering a hole by
+            # rendering nothing. An older bank simply has no such key, which is
+            # how the viewer tells "not precomputed" from "precomputed and
+            # missing".
+            d["precomputed"] = {
+                "inline_formats": list(INLINE_FORMATS),
+                "inline_below": PUBLIC_SEEDS,
+                "bundle_formats": list(BUNDLE_FORMATS),
+                "bundle_from": PUBLIC_SEEDS,
+                "bundle_path": "assets/{slug}/generated/" + BUNDLE_FILENAME,
+            }
+        return d
 
-    def write_json(self,regenerate=False):
+    def write_json(self,regenerate=False,remote=None,precompute=True):
+        if precompute and remote is None:
+            # Checked before any rendering so the failure is immediate rather
+            # than arriving several minutes into a build.
+            with_images = [o.slug for o in self.outcomes() if o.has_images()]
+            if with_images:
+                raise ValueError(
+                    "Precomputing HTML needs an absolute base URL for images, "
+                    f"and these outcomes have images: {', '.join(with_images)}. "
+                    "Pass --remote with the URL of the directory containing "
+                    "assets/, e.g. --remote https://checkit.clontz.org/demo . "
+                    "Use --no-precompute to skip precomputation entirely."
+                )
         build_path = os.path.join(self.build_path(),f"bank.json")
         with open(build_path,'w') as f:
-            json.dump(self.to_dict(regenerate=regenerate),f)
+            json.dump(self.to_dict(regenerate=regenerate,remote=remote,
+                                   precompute=precompute),f)
+        for o in self.outcomes():
+            if precompute:
+                o.write_derived_bundle(remote=remote)
+            else:
+                # Leaving a stale bundle beside a bank.json that says
+                # "not precomputed" is a trap for anything that looks for the
+                # file instead of reading the declaration.
+                stale = os.path.join(o.build_path(), BUNDLE_FILENAME)
+                if os.path.exists(stale):
+                    os.remove(stale)
 
     def build_viewer(self):
         docs_path = Path(self.abspath()) / "docs"

@@ -15,6 +15,7 @@ python -m unittest discover -s dashboard/tests -t dashboard/tests
 |---|---|
 | `spatext_fixtures.py` | hand-written SpaTeXt covering the structural cases |
 | `test_subset.py` | the automated suite (15 tests, ~0.2s) |
+| `test_precompute.py` | the precomputed-format emitter and its coverage policy |
 | `browser_harness.py` | generates a page that re-runs the checks in a real browser |
 
 ## Three choices worth knowing about

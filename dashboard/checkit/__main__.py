@@ -89,12 +89,26 @@ def new(directory):
     default="ALL",
     help="Outcome to generate. \"ALL\" generates all outcomes",
 )
-def generate(amount,regenerate,images,image_seeds,outcome):
+@click.option(
+    "--remote",
+    default=None,
+    help="Absolute URL of the directory containing assets/, e.g. "
+         "https://example.org/my-bank . Used to build <img src> in precomputed "
+         "HTML. Required when the bank has images, because a root-relative src "
+         "would 404 wherever the HTML is displayed (an LMS, a chatbot).",
+)
+@click.option(
+    "--no-precompute",
+    is_flag=True,
+    help="Skip precomputing HTML/LaTeX/PreTeXt. Faster, but the viewer needs "
+         "them once browsers drop XSLT (Chrome 158, 2026-11-17).",
+)
+def generate(amount,regenerate,images,image_seeds,outcome,remote,no_precompute):
     b = bank.Bank()
     if outcome != "ALL":
         b._outcomes = [o for o in b._outcomes if o.slug.lower() == outcome.lower()]
     b.generate_exercises(regenerate=regenerate,images=images,amount=amount,image_seeds=image_seeds)
-    b.write_json()
+    b.write_json(remote=remote,precompute=not no_precompute)
 
 # checkit viewer
 @main.command(
