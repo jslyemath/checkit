@@ -2692,10 +2692,11 @@ Then the other two halves:
   and no `remote` was given.
 
   It is deliberately not defaulted from `bank.xml`'s `<url>`. That element names
-  the bank's home page, which need not be the directory containing `assets/` —
-  the demo bank declares `https://checkit.clontz.org` but publishes under
-  `/demo/`, so defaulting to it would emit dead links that nothing detects until
-  a student meets one. `Outcome.html_preview()` passes `remote=''` explicitly to
+  the bank's home page, which need not be the directory containing `assets/`, so
+  defaulting to it would emit dead links that nothing detects until a student
+  meets one. The demo bank's `<url>` does happen to point at its published
+  directory, which is why `update_viewer.py` can safely take `--remote` from it
+  — that is a property of this one bank, not a rule. `Outcome.html_preview()` passes `remote=''` explicitly to
   keep its existing relative behaviour.
 
 ### Is latex2mathml good enough? (measured, 2026-08-21)
