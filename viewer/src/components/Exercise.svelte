@@ -19,6 +19,27 @@
         e.preventDefault();
         mode = m;
     }
+    // The derived formats are read from the bank rather than transformed here,
+    // and reading can fail for reasons an instructor can act on -- most often a
+    // bank generated before precomputation existed. Rendering the message beats
+    // throwing: an exception in markup leaves the tab simply blank, which is
+    // indistinguishable from an exercise that happens to be empty.
+    type Rendered = { text:string|null, error:string|null }
+    const render = (m:string, o:Outcome, s:number):Rendered => {
+        try {
+            if (m == "html")    return { text: outcomeToHtml(o,s),  error: null }
+            if (m == "latex")   return { text: outcomeToLatex(o,s), error: null }
+            if (m == "pretext") return { text: outcomeToPtx(o,s),   error: null }
+            return { text: null, error: null }
+        } catch (e) {
+            return { text: null, error: e instanceof Error ? e.message : String(e) }
+        }
+    }
+    // outcome and seed are named here so Svelte tracks them: a reactive
+    // statement depends on what the statement mentions, not on what the
+    // function it calls happens to read.
+    $: rendered = render(mode, outcome, seed)
+
     let embed:string
     $: embed = `<iframe title="Iframe CheckIt Outcome"
     width="800"
@@ -62,7 +83,11 @@
         </Col>
     </Row>
 {:else if mode == "html"}
-    <textarea readonly value={outcomeToHtml(outcome,seed)}/>
+    {#if rendered.error}
+        <div class="alert alert-danger" style="white-space:pre-wrap">{rendered.error}</div>
+    {:else}
+        <textarea readonly value={rendered.text}/>
+    {/if}
     <!-- <input type="checkbox" bind:checked={canvasMath}/>
     <select bind:value={canvasSolutions}>
         {#each ['show','hide','only'] as opt}
@@ -71,9 +96,17 @@
     </select>
     {@html outcomeToHtml(outcome,seed,canvasMath,canvasSolutions)} -->
 {:else if mode == "latex"}
-    <textarea readonly value={outcomeToLatex(outcome,seed)}/>
+    {#if rendered.error}
+        <div class="alert alert-danger" style="white-space:pre-wrap">{rendered.error}</div>
+    {:else}
+        <textarea readonly value={rendered.text}/>
+    {/if}
 {:else if mode == "pretext"}
-    <textarea readonly value={outcomeToPtx(outcome,seed)}/>
+    {#if rendered.error}
+        <div class="alert alert-danger" style="white-space:pre-wrap">{rendered.error}</div>
+    {:else}
+        <textarea readonly value={rendered.text}/>
+    {/if}
 {:else if mode == "embed"}
     <textarea readonly value={embed}/>
 {:else}

@@ -1,16 +1,12 @@
-import type {Bank, Assessment, Outcome} from '../types';
+import type {Bank, Assessment, Outcome, Precomputed, DerivedBundle} from '../types';
 
+import {get} from 'svelte/store';
+import {bank as bankStore} from '../stores/banks';
 import {isOpen as codeCellIsOpen} from '../stores/codecell';
 
 import katex from 'katex';
 
 import Mustache from 'mustache';
-// @ts-ignore
-import latexXsl from '../spatext/xsl/latex.xsl?raw'
-// @ts-ignore
-import htmlXsl from '../spatext/xsl/html.xsl?raw'
-// @ts-ignore
-import ptxXsl from '../spatext/xsl/pretext.xsl?raw'
 // @ts-ignore
 import assessmentTemplate from '../templates/assessmentTemplate.tex?raw'
 
@@ -74,50 +70,149 @@ export const outcomeToStxDocument = (o:Outcome,seed:number) => {
 export const outcomeToStx = (o:Outcome,seed:number) =>
     outcomeToStxDocument(o,seed).documentElement
 
-export const outcomeToLatex = (o:Outcome,seed:number) => {
-    const e = outcomeToStxDocument(o,seed)
-    const transform = new XSLTProcessor()
-    const xslDom = parser.parseFromString(latexXsl, "application/xml")
-    transform.importStylesheet(xslDom)
-    return transform.transformToDocument(e).querySelector(":scope").textContent.trim()
+/**
+ * The site's own address, without a trailing slash.
+ *
+ * The same expression @remote is built from at generate time, so a bundle URL
+ * and an <img src> resolve against the same base.
+ */
+const siteBase = () =>
+    `${location.protocol}//${location.host}${location.pathname.replace(/\/+$/, "")}`
+
+/**
+ * What the bank says it precomputed, or a message explaining how to fix it.
+ *
+ * Browsers removed XSLT, so the viewer can no longer build these formats for
+ * itself. A bank generated before that change simply has no `precomputed` key,
+ * and there is nothing this code can do about it -- so it says which command to
+ * run rather than failing in a way that looks like a viewer bug.
+ */
+const precomputedOrThrow = ():Precomputed => {
+    const b = get(bankStore)
+    if (!b || !b.precomputed) {
+        throw new Error(
+            "This bank has no precomputed exercise formats, so the instructor " +
+            "views cannot be rendered. Browsers have removed XSLT, which the " +
+            "viewer previously used to build HTML, LaTeX and PreTeXt in the " +
+            "page. Regenerate the bank with a current CheckIt and republish it:" +
+            "\n\n    python -m checkit generate -r --remote <the site's URL>\n"
+        )
+    }
+    return b.precomputed
 }
+
+// One entry per outcome, fetched at most once. Keyed by slug because that is
+// what bundle_path is parameterised by.
+const loadedBundles:Record<string,DerivedBundle> = {}
+const inflightBundles:Record<string,Promise<void>> = {}
+
+/**
+ * Fetch one outcome's non-public seeds, if they are not already in hand.
+ *
+ * Callers that touch seeds at or above `inline_below` -- the assessment builder
+ * and the LMS export -- must await this first. Everything a student sees, and
+ * every instructor tab, uses the inlined public seeds and needs no fetch.
+ */
+export const ensureDerived = (outcome:Outcome):Promise<void> => {
+    if (loadedBundles[outcome.slug]) return Promise.resolve()
+    if (!inflightBundles[outcome.slug]) {
+        const pre = precomputedOrThrow()
+        const url = `${siteBase()}/${pre.bundle_path.replace("{slug}", outcome.slug)}`
+        inflightBundles[outcome.slug] = fetch(url).then(async (response) => {
+            if (!response.ok) {
+                delete inflightBundles[outcome.slug]
+                throw new Error(
+                    `Could not fetch precomputed exercises for ${outcome.slug}: ` +
+                    `HTTP ${response.status} from ${url}. The bank may have been ` +
+                    `published without its assets/<slug>/generated/ files.`
+                )
+            }
+            loadedBundles[outcome.slug] = await response.json()
+        })
+    }
+    return inflightBundles[outcome.slug]
+}
+
+export const ensureDerivedForSlugs = (bank:Bank, slugs:string[]):Promise<void[]> =>
+    Promise.all(slugs.map((s)=>{
+        const o = getOutcomeFromSlug(bank,s)
+        return o ? ensureDerived(o) : Promise.resolve()
+    }))
+
+/**
+ * One precomputed format for one exercise.
+ *
+ * Every failure here is loud and specific, because the alternative -- returning
+ * undefined and letting Mustache render the word "undefined" into a LaTeX file
+ * -- is exactly the silent hole that capping --image-seeds once produced.
+ */
+const derived = (outcome:Outcome, seed:number, format:string):string => {
+    const pre = precomputedOrThrow()
+    const inline = seed < pre.inline_below
+
+    const available = inline ? pre.inline_formats : pre.bundle_formats
+    if (available.indexOf(format) < 0) {
+        throw new Error(
+            `${format} was not precomputed for ${outcome.slug} seed ${seed}. ` +
+            `The bank declares [${pre.inline_formats.join(", ")}] below seed ` +
+            `${pre.inline_below} and [${pre.bundle_formats.join(", ")}] from ` +
+            `seed ${pre.bundle_from} up.`
+        )
+    }
+
+    let value:string|undefined
+    if (inline) {
+        const exercise = outcome.exercises[seed]
+        value = exercise ? exercise[format] : undefined
+    } else {
+        const bundle = loadedBundles[outcome.slug]
+        if (!bundle) {
+            throw new Error(
+                `Precomputed exercises for ${outcome.slug} have not been ` +
+                `fetched. Await ensureDerived(outcome) before rendering seed ` +
+                `${seed}, which is outside the inlined range.`
+            )
+        }
+        const entry = bundle.seeds[String(seed)]
+        value = entry ? entry[format] : undefined
+    }
+
+    if (typeof value !== "string") {
+        throw new Error(
+            `${outcome.slug} seed ${seed} has no precomputed ${format}, though ` +
+            `the bank declares it should. Regenerate and republish the bank.`
+        )
+    }
+    return value
+}
+
+export const outcomeToLatex = (o:Outcome,seed:number) => derived(o,seed,"latex").trim()
+
+export const outcomeToPtx = (o:Outcome,seed:number) => derived(o,seed,"pretext").trim()
 
 export const outcomeToHtml = (
     o:Outcome,seed:number,
     mathMode:'default'|'canvas'|'brightspace'='default',
     solutions:'show'|'hide'|'only'='show'
 ) => {
-    const e = outcomeToStxDocument(o,seed)
-    const transform = new XSLTProcessor()
-    const xslDom = parser.parseFromString(htmlXsl, "application/xml")
-    transform.importStylesheet(xslDom)
-    const doc = transform.transformToDocument(e)
-    // `div[class~="stx"]` rather than `div.stx`: a plain attribute selector with
-    // the same semantics, but not subject to how a given engine treats `class`
-    // in a non-HTML document. Firefox returned null from the class-selector form
-    // here, so `.outerHTML` threw "can't access property outerHTML, l is null"
-    // and every caller of outcomeToHtml() died with it -- including the "Copy for
-    // AI Chatbot" button, which looked like a clipboard bug for several rounds.
-    //
-    // Note documentElement is NOT usable instead: Chrome honors
-    // <xsl:output method="html"/> and returns an HTML document, so its root is
-    // <html> and using it drags a <html><body> wrapper into the output.
-    //
-    // If this still throws, the message reports what the transform actually
-    // produced, since the alternative explanation is that it yielded nothing at
-    // all -- and that is the fact needed to tell the two cases apart.
+    // The base rendering only: subset='all', consumer='basic'. The filtering
+    // and MathML below are plain DOM work and KaTeX, neither of which the XSLT
+    // removal touches, so they stay here rather than multiplying the payload
+    // by emitting every subset x consumer combination.
+    const doc = parser.parseFromString(derived(o,seed,"html"), "text/html")
     let ele = doc.querySelector('div[class~="stx"]')
     if (!ele) {
-        const root = doc.documentElement
         throw new Error(
-            "html.xsl transform produced no div.stx wrapper. " +
-            `Root element: ${root ? root.nodeName : "(none)"}. ` +
-            `Output began: ${
-                root ? new XMLSerializer().serializeToString(root).slice(0,200) : "(empty document)"
-            }`
+            `Precomputed HTML for ${o.slug} seed ${seed} has no div.stx ` +
+            `wrapper. It began: ${derived(o,seed,"html").slice(0,200)}`
         )
     }
-    // Class selectors below are written as [class~="..."] for the same reason:
+    // Class selectors below are written as [class~="..."] for a historical
+    // reason worth keeping: when this HTML came from XSLTProcessor it lived in
+    // a non-HTML document, where ".foo" silently matched nothing in Firefox --
+    // so LMS math conversion and solution filtering did nothing at all rather
+    // than failing loudly. Parsing as "text/html" above makes ".foo" safe again,
+    // but the attribute form has identical semantics and costs nothing.
     // ".foo" only matches in HTML documents, so in Firefox these silently
     // matched nothing -- meaning LMS math conversion and solution filtering did
     // nothing at all rather than failing loudly. [class~="foo"] is a plain
@@ -148,14 +243,6 @@ export const outcomeToHtml = (
         })
     }
     return ele.outerHTML.trim()
-}
-
-export const outcomeToPtx = (o:Outcome,seed:number) => {
-    const e = outcomeToStxDocument(o,seed)
-    const transform = new XSLTProcessor()
-    const xslDom = parser.parseFromString(ptxXsl, "application/xml")
-    transform.importStylesheet(xslDom)
-    return transform.transformToDocument(e).querySelector(':scope').outerHTML.trim()
 }
 
 // Used when neither the outcome nor the bank supplies an <ai-prompt>. Kept

@@ -13,7 +13,7 @@
     import Sorter from '../components/Sorter.svelte';
     import { assessmentOutcomeSlugs, instructorEnabled, assessmentTemplate, defaultAssessmentTemplate } from '../stores/instructor';
     import { bank } from '../stores/banks';
-    import { getOutcomeFromSlug, getRandomAssessmentFromSlugs } from '../utils';
+    import { getOutcomeFromSlug, getRandomAssessmentFromSlugs, ensureDerivedForSlugs } from '../utils';
     import type { Assessment } from '../types';
     import Exercise from '../components/Exercise.svelte'
 
@@ -24,7 +24,19 @@
         return `${slug} — ${o.title}`
     };
     let generatedAssessment: Assessment | undefined = undefined
-    const generate = () => generatedAssessment = getRandomAssessmentFromSlugs($bank,$assessmentOutcomeSlugs,$assessmentTemplate)
+    let generateError:string = ""
+    // Assessments draw from seeds above the publicly visible ones, which are not
+    // inlined in bank.json -- so their precomputed LaTeX has to be fetched first.
+    const generate = async () => {
+        generateError = ""
+        try {
+            await ensureDerivedForSlugs($bank,$assessmentOutcomeSlugs)
+            generatedAssessment = getRandomAssessmentFromSlugs($bank,$assessmentOutcomeSlugs,$assessmentTemplate)
+        } catch (e) {
+            generatedAssessment = undefined
+            generateError = e instanceof Error ? e.message : String(e)
+        }
+    }
 
     const copyToClipboard = (text:string) => () => {
         navigator.clipboard.writeText(text)
@@ -111,6 +123,12 @@
                                 Generate
                             {/if}
                         </Button>
+                        {#if generateError}
+                            <!-- Shown rather than logged: a bank that was never
+                                 regenerated cannot be fixed from the browser,
+                                 and the instructor is the one who can fix it. -->
+                            <div class="alert alert-danger mt-3" style="white-space:pre-wrap">{generateError}</div>
+                        {/if}
                     </Col>  
                     <Col xs="auto" class="mr-auto">
                         {#if generatedAssessment}

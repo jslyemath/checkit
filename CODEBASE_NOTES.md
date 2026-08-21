@@ -24,7 +24,7 @@ There are three major components:
 
 3. **A Bank** (a directory the instructor creates, example in `demo-bank/`): Contains a `bank.xml` manifest, an `outcomes/` directory tree, and for each outcome a `generator.py` file (plain Python; `generator.sage` selects the optional SageMath runtime instead) plus a `template.xml` file (SpaTeXt XML with Mustache placeholders). A bank may also hold `bank_helpers.py` at its root, importable from every generator.
 
-The intermediate representation between Python generation and browser display is called **SpaTeXt** (Spatial Text) — a small, well-defined XML vocabulary rooted in a `<knowl>` element, using the namespace `https://spatext.clontz.org`. Three XSLT stylesheets transform SpaTeXt into HTML, LaTeX, and PreTeXt. These stylesheets exist in two identical copies: one bundled inside the Python package (`dashboard/checkit/static/`) for server-side rendering, and one compiled into the browser viewer (`viewer/src/spatext/xsl/`) for client-side rendering.
+The intermediate representation between Python generation and browser display is called **SpaTeXt** (Spatial Text) — a small, well-defined XML vocabulary rooted in a `<knowl>` element, using the namespace `https://spatext.clontz.org`. Three XSLT stylesheets transform SpaTeXt into HTML, LaTeX, and PreTeXt. These stylesheets exist **once**, in `dashboard/checkit/static/`. They used to exist twice, with a second copy compiled into the browser viewer, kept in sync by hand across six files; the viewer stopped transforming SpaTeXt in August 2026 and that copy was deleted. See "Browsers are removing XSLT".
 
 ### High-level data flow
 
@@ -2794,11 +2794,43 @@ offending outcomes. `--no-precompute` skips the whole thing and also deletes any
 stale bundles, so `bank.json` never says "not precomputed" while old bundles sit
 beside it.
 
-**Still to do:** the viewer half. `utils/index.ts` must read the precomputed
-formats instead of calling `XSLTProcessor`, lazily fetch a bundle when an
-instructor builds an assessment or exports to an LMS, and fail loudly when it
-asks for a seed the declaration says was never emitted. Then step 3: delete
-`viewer/src/spatext/xsl/` and the duplication with it.
+### Steps 2 and 3, the viewer (done 2026-08-21)
+
+`utils/index.ts` no longer contains the word `XSLTProcessor`, and
+`viewer/src/spatext/xsl/` is gone. **The three stylesheets now exist once**, in
+`dashboard/checkit/static/`, and §5's hand-sync requirement is retired. The
+bundle shrank 603.6 KiB → 588.3 KiB, which is the inlined stylesheets leaving.
+
+How it reads:
+
+- `outcomeToLatex` and `outcomeToPtx` return the stored string directly.
+- `outcomeToHtml` parses the stored base HTML with `DOMParser` as `text/html`,
+  then applies its existing `solutions` filtering and LMS MathML. Those were
+  never XSLT and did not need replacing.
+- Seeds at or above `inline_below` need their outcome's bundle, so the
+  assessment builder and the LMS export `await ensureDerivedForSlugs(...)`
+  before rendering. One await at the top of each keeps every builder below it
+  synchronous. Bundles are fetched at most once per outcome and cached.
+
+**An old bank refuses rather than falling back.** A bank with no `precomputed`
+key gets a message naming the command to run. The alternative — keeping
+`XSLTProcessor` as a fallback — works only until Chrome 158 and would have kept
+the browser stylesheets alive forever, which is the duplication this whole
+migration exists to remove.
+
+**Every read failure renders.** This needed a second pass: the first version
+threw from inside markup, and Svelte's response to that is to leave the tab
+*blank*. An instructor clicking "Raw HTML" saw nothing at all, with the
+explanation only in the console — a silent failure introduced by the very code
+meant to prevent one. `Exercise.svelte` now renders the message, and the AI copy
+button distinguishes "could not build the payload" from "the clipboard refused",
+which are different problems with different fixes.
+
+Verified in a browser against two real banks: the current demo (student view,
+all three instructor tabs, the AI button, and an assessment that fetched two
+bundles and produced 2.8 KB of LaTeX with no `undefined` in it), and a
+deliberately stripped copy with no `precomputed` key, which shows the
+regenerate-me message in the tabs and in the assessment builder.
 
 Verification, and the first tests this repo has ever had, in `dashboard/tests/`
 (stdlib `unittest`, hermetic SpaTeXt fixtures, no bank or generated data
