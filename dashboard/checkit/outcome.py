@@ -1,6 +1,7 @@
 from .exercise import Exercise
 import os, json, random
 from html import escape as escape_html
+from . import PUBLIC_SEEDS
 from .wrapper import run_generator
 from .wrapper.tikz import compile_tikz_for_outcome
 
@@ -62,10 +63,10 @@ class Outcome():
     def preview_exercises(self):
         preview_json = os.path.join(self.build_path(),"preview.json")
         run_generator(self,preview_json,preview=True,images=True)
-        # preview mode generates 20 seeds (see wrapper.sage's amount_s), so cap
-        # compilation to match -- otherwise a preview taken after a full build
-        # would recompile every seed in the outcome.
-        compile_tikz_for_outcome(self,image_seeds=20)
+        # preview mode generates PUBLIC_SEEDS seeds (see run_generator's
+        # amount_s), so cap compilation to match -- otherwise a preview taken
+        # after a full build would recompile every seed in the outcome.
+        compile_tikz_for_outcome(self,image_seeds=PUBLIC_SEEDS)
         with open(os.path.join(preview_json)) as f:
             data = json.load(f)['seeds']
         return [Exercise(d["data"],d["seed"],self) for d in data]

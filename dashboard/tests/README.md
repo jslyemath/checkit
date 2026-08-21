@@ -65,6 +65,11 @@ and stays meaningful as the stylesheets change.
 **Both copies**
 
 - the dashboard and viewer copies of all three stylesheets are byte-identical
+- `PUBLIC_SEEDS` has the same value in `checkit/__init__.py` and in
+  `viewer/src/utils/index.ts` — it has to exist twice because the browser
+  cannot import from Python, and a drift would be quiet: the version picker
+  would offer versions the preview never generated, or assessments would draw
+  from seeds a student can open in the viewer
 - `Exercise` refuses parameters it cannot honour rather than ignoring them
 
 The suite is mutation-checked. Each of these was introduced and confirmed to

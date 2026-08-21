@@ -458,7 +458,7 @@ class BaseGenerator:
         self.__seed = None
         # Both are read by data(). `seed` lets a generator branch on *which*
         # version it is -- e.g. serving a fixed, hand-written problem for each
-        # of the ~20 seeds the viewer exposes and drawing randomly above that.
+        # of the seeds the viewer exposes and drawing randomly above that.
         # Without it a generator can only see the seed after data() has already
         # run, via get_data()'s __seed__ key, which is too late to use.
         self.seed = None

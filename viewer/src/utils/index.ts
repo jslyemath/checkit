@@ -14,6 +14,19 @@ import ptxXsl from '../spatext/xsl/pretext.xsl?raw'
 // @ts-ignore
 import assessmentTemplate from '../templates/assessmentTemplate.tex?raw'
 
+/**
+ * How many exercise versions the viewer exposes to students.
+ *
+ * Used for the version picker, its prev/next clamp, and as the floor for
+ * assessment seeds -- printed assessments draw from seeds at or above this, so
+ * a student cannot look up the printed version in the viewer.
+ *
+ * THIS VALUE IS DUPLICATED IN PYTHON as PUBLIC_SEEDS in checkit/__init__.py,
+ * because the browser cannot import from it. The two must match;
+ * dashboard/tests/test_subset.py asserts that they do.
+ */
+export const PUBLIC_SEEDS = 50
+
 const parser = new DOMParser()
 
 const errorStx = (message:string) =>
@@ -229,8 +242,10 @@ export const getRandomAssessmentFromSlugs = (bank:Bank,slugs:string[],template:s
     slugs.forEach( (slug) => {
         let o = getOutcomeFromSlug(bank,slug)
         if (o) {
-            // pull random seed besides first public 20
-            let seed = Math.floor(Math.random() * (o.exercises.length-20))+20;
+            // pull a random seed from above the publicly visible ones
+            let seed = Math.floor(
+                Math.random() * (o.exercises.length-PUBLIC_SEEDS)
+            )+PUBLIC_SEEDS;
             assessment.latex = assessment.latex + "\n\n" + outcomeToLatex(o,seed)
             assessment.latex = assessment.latex + "\n\n\\newpage\n\n"
             assessment.exercises = [...assessment.exercises, {outcome:o,seed:seed}]

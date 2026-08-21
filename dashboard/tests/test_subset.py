@@ -312,6 +312,28 @@ class RemoteBaseUrl(unittest.TestCase):
                     self.assertIn('src="https://example.org/b/assets/', html)
 
 
+class CrossLanguageConstants(unittest.TestCase):
+    """PUBLIC_SEEDS exists twice, once per language, because the browser cannot
+    import from Python. Nothing but this test stops them drifting -- and a drift
+    would be quiet: the picker would offer versions the preview never generated,
+    or assessments would draw from seeds a student can open in the viewer."""
+
+    def test_python_and_viewer_agree(self):
+        from checkit import PUBLIC_SEEDS
+
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        ts = os.path.join(root, "viewer", "src", "utils", "index.ts")
+        with open(ts, encoding="utf-8") as f:
+            source = f.read()
+        found = re.search(r"export const PUBLIC_SEEDS\s*=\s*(\d+)", source)
+        self.assertIsNotNone(found, "PUBLIC_SEEDS not declared in utils/index.ts")
+        self.assertEqual(
+            int(found.group(1)),
+            PUBLIC_SEEDS,
+            "viewer PUBLIC_SEEDS and checkit.PUBLIC_SEEDS disagree",
+        )
+
+
 class StylesheetCopies(unittest.TestCase):
     def test_dashboard_and_viewer_copies_are_identical(self):
         """The two copies must be edited together; nothing else enforces it.

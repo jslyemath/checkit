@@ -1,7 +1,7 @@
 import click
 from trogon import tui
 import os
-from . import static, VERSION, bank
+from . import static, VERSION, bank, PUBLIC_SEEDS
 
 @tui()
 @click.group(
@@ -79,7 +79,8 @@ def new(directory):
     help="Rasterize images for only the first N seeds (default: all). "
          "Applies to PNGs only -- TikZ .tikz source is written for every seed, "
          "so LaTeX/print output is unaffected by this cap. "
-         "The HTML viewer shows ~20 seeds and LMS export uses seeds 100-999, "
+         f"The HTML viewer shows {PUBLIC_SEEDS} seeds and LMS export uses seeds "
+         "100-999, "
          "so a low value produces broken images for those endusers.",
 )
 @click.option(
