@@ -128,6 +128,19 @@ def new(directory):
          "them once browsers drop XSLT (Chrome 158, 2026-11-17).",
 )
 def generate(amount,regenerate,images,image_seeds,outcome,remote,no_precompute):
+    if amount < PUBLIC_SEEDS:
+        # The viewer's version picker always offers PUBLIC_SEEDS versions, and
+        # the assessment builder draws from seeds at or above it -- with fewer
+        # than that generated, the picker offers versions that do not exist and
+        # `Math.random() * (exercises.length - PUBLIC_SEEDS)` goes negative.
+        # Neither fails loudly in the browser, so refuse here instead.
+        raise click.BadParameter(
+            f"--amount must be at least PUBLIC_SEEDS ({PUBLIC_SEEDS}), not {amount}. "
+            f"The viewer exposes {PUBLIC_SEEDS} versions of every exercise, so a "
+            "smaller bank leaves the version picker pointing at seeds that were "
+            "never generated. Use 1000 for a real build.",
+            param_hint="--amount",
+        )
     b = bank.Bank()
     if outcome != "ALL":
         b._outcomes = [o for o in b._outcomes if o.slug.lower() == outcome.lower()]

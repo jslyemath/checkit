@@ -91,6 +91,25 @@ class VersionString(unittest.TestCase):
         self.assertNotEqual(VERSION, "0.2.8")
 
 
+class GenerateAmountGuard(unittest.TestCase):
+    """`checkit generate -a N` with N below PUBLIC_SEEDS produces a bank the
+    viewer mishandles in two ways that are both silent in the browser: the
+    version picker offers versions that were never generated, and the assessment
+    builder computes a negative seed range. The CLI refuses instead."""
+
+    def test_amount_below_public_seeds_is_refused(self):
+        import click
+        from click.testing import CliRunner
+
+        from checkit import PUBLIC_SEEDS
+        from checkit.__main__ import generate
+
+        result = CliRunner().invoke(generate, ["--amount", str(PUBLIC_SEEDS - 1)])
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("--amount", result.output)
+        self.assertIn(str(PUBLIC_SEEDS), result.output)
+
+
 class PackagedFiles(unittest.TestCase):
     def test_static_resources_the_runtime_reads_are_declared(self):
         """package_data must cover static/ and wrapper/, or an installed copy
