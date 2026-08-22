@@ -4,16 +4,9 @@
         <p>Compute the following sum of monomials:</p>
         <p><m>{{exercise}}</m></p>
     </content>
-    <outtro>
-        <p><m>{{correct}}</m></p>
+    <!-- {{#choices}} -->
+    <outtro{{^correct}} distractor="true"{{/correct}}>
+        <p><m>{{item}}</m></p>
     </outtro>
-    <outtro distractor="true">
-        <p><m>{{distractorA}}</m></p>
-    </outtro>
-    <outtro distractor="true">
-        <p><m>{{distractorB}}</m></p>
-    </outtro>
-    <outtro distractor="true">
-        <p><m>{{distractorC}}</m></p>
-    </outtro>
+    <!-- {{/choices}} -->
 </knowl>
