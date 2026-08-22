@@ -318,20 +318,32 @@ class CrossLanguageConstants(unittest.TestCase):
     would be quiet: the picker would offer versions the preview never generated,
     or assessments would draw from seeds a student can open in the viewer."""
 
-    def test_python_and_viewer_agree(self):
-        from checkit import PUBLIC_SEEDS
-
+    def _viewer_constant(self, name):
         root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         ts = os.path.join(root, "viewer", "src", "utils", "index.ts")
         with open(ts, encoding="utf-8") as f:
             source = f.read()
-        found = re.search(r"export const PUBLIC_SEEDS\s*=\s*(\d+)", source)
-        self.assertIsNotNone(found, "PUBLIC_SEEDS not declared in utils/index.ts")
-        self.assertEqual(
-            int(found.group(1)),
-            PUBLIC_SEEDS,
-            "viewer PUBLIC_SEEDS and checkit.PUBLIC_SEEDS disagree",
-        )
+        found = re.search(r"export const %s\s*=\s*(\d+)" % name, source)
+        self.assertIsNotNone(found, "%s not declared in utils/index.ts" % name)
+        return int(found.group(1))
+
+    def test_python_and_viewer_agree(self):
+        import checkit
+
+        for name in ("PUBLIC_SEEDS", "BUNDLE_UNTIL"):
+            with self.subTest(constant=name):
+                self.assertEqual(
+                    self._viewer_constant(name),
+                    getattr(checkit, name),
+                    "viewer %s and checkit.%s disagree" % (name, name),
+                )
+
+    def test_the_browser_range_is_above_the_public_one(self):
+        """An empty or inverted instructor range would make the assessment
+        builder compute a negative seed span, silently."""
+        import checkit
+
+        self.assertGreater(checkit.BUNDLE_UNTIL, checkit.PUBLIC_SEEDS)
 
 
 class StylesheetsExistOnlyOnce(unittest.TestCase):
