@@ -12,7 +12,13 @@
     import { bank } from '../stores/banks';
     import Mustache from 'mustache';
 
-    import {outcomeToHtml, ensureDerivedForSlugs} from '../utils/index'
+    import {outcomeToHtml, ensureDerivedForSlugs, BUNDLE_UNTIL} from '../utils/index'
+
+    // The LMS bank starts above the versions students can browse and stops
+    // where precomputation stops. It used to run to 999, which is now past the
+    // published range.
+    const LMS_FIRST_SEED = 100
+    const LMS_SEED_COUNT = BUNDLE_UNTIL - LMS_FIRST_SEED
 
     // @ts-ignore
     import canvasManifest from '../templates/canvasManifest.xml?raw'
@@ -50,8 +56,8 @@
             "title": o.title,
             "questionType": questionType,
             "id": id,
-            "exercises": Array.from(Array(900)).map((_, i) => {
-                let seed=i+100
+            "exercises": Array.from(Array(LMS_SEED_COUNT)).map((_, i) => {
+                let seed=i+LMS_FIRST_SEED
                 return {
                     "seed": seed,
                     "generated_on": new Date(Date.now()).toISOString(),
@@ -87,8 +93,8 @@
                 return {
                     "slug": o.slug,
                     "title": o.title,
-                    "exercises": Array.from(Array(900)).map((_, i) => {
-                        let seed = i+100
+                    "exercises": Array.from(Array(LMS_SEED_COUNT)).map((_, i) => {
+                        let seed = i+LMS_FIRST_SEED
                         return {
                             "seed": seed,
                             "generated_on": new Date(Date.now()).toISOString(),
@@ -112,10 +118,10 @@
                 return {
                     "slug": o.slug,
                     "title": o.title,
-                    "exercises": Array.from(Array(900)).map((_, i) => {
-                        let seed=i+100
+                    "exercises": Array.from(Array(LMS_SEED_COUNT)).map((_, i) => {
+                        let seed=i+LMS_FIRST_SEED
                         return {
-                            "seed": i+100,
+                            "seed": seed,
                             "generated_on": new Date(Date.now()).toISOString(),
                             "question": outcomeToHtml(o,seed,"default","hide"),
                             "answer": outcomeToHtml(o,seed,"default","only"),

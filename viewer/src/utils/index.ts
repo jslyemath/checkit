@@ -23,6 +23,18 @@ import assessmentTemplate from '../templates/assessmentTemplate.tex?raw'
  */
 export const PUBLIC_SEEDS = 50
 
+/**
+ * One past the last seed precomputed for the browser.
+ *
+ * Seeds from here up exist in the bank's seeds.json for the print tool, but
+ * nothing is precomputed for them and nothing is published, so no instructor
+ * feature may ask for one.
+ *
+ * DUPLICATED IN PYTHON as BUNDLE_UNTIL in checkit/__init__.py, for the same
+ * reason as PUBLIC_SEEDS; dashboard/tests/test_subset.py asserts they match.
+ */
+export const BUNDLE_UNTIL = 400
+
 const parser = new DOMParser()
 
 const errorStx = (message:string) =>
@@ -329,9 +341,12 @@ export const getRandomAssessmentFromSlugs = (bank:Bank,slugs:string[],template:s
     slugs.forEach( (slug) => {
         let o = getOutcomeFromSlug(bank,slug)
         if (o) {
-            // pull a random seed from above the publicly visible ones
+            // A seed above the publicly visible ones, but still inside the
+            // range that was precomputed -- past BUNDLE_UNTIL nothing is
+            // published for the browser to read.
+            const top = Math.min(o.exercises.length, BUNDLE_UNTIL)
             let seed = Math.floor(
-                Math.random() * (o.exercises.length-PUBLIC_SEEDS)
+                Math.random() * (top-PUBLIC_SEEDS)
             )+PUBLIC_SEEDS;
             assessment.latex = assessment.latex + "\n\n" + outcomeToLatex(o,seed)
             assessment.latex = assessment.latex + "\n\n\\newpage\n\n"

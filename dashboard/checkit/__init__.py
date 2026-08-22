@@ -43,3 +43,18 @@ INLINE_FORMATS = ("html", "latex", "pretext")
 # weight for 950 seeds per outcome.
 BUNDLE_FORMATS = ("html", "latex")
 BUNDLE_FILENAME = "derived.json"
+
+# Seeds are split by who consumes them:
+#
+#   0 .. PUBLIC_SEEDS-1     students; inlined in bank.json
+#   PUBLIC_SEEDS .. BUNDLE_UNTIL-1   instructors; in the per-outcome bundles
+#   BUNDLE_UNTIL .. end     print only; data exists in seeds.json, nothing is
+#                           precomputed, nothing is published
+#
+# The last range is why this bound exists. Precomputing every seed for the
+# browser meant ~83 MB of bundles for a 28-outcome bank, all of it committed to
+# a repo that republishes regularly -- to serve seeds no browser ever asks for,
+# because the print tool reads seeds.json directly and never touches the
+# bundles. Bounding the browser's range keeps a large seed pool for print
+# without paying to publish it.
+BUNDLE_UNTIL = 400

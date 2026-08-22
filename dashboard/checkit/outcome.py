@@ -1,7 +1,8 @@
 from .exercise import Exercise
 import os, json, random
 from html import escape as escape_html
-from . import PUBLIC_SEEDS, INLINE_FORMATS, BUNDLE_FORMATS, BUNDLE_FILENAME
+from . import (PUBLIC_SEEDS, BUNDLE_UNTIL, INLINE_FORMATS, BUNDLE_FORMATS,
+               BUNDLE_FILENAME)
 from .wrapper import run_generator
 from .wrapper.tikz import compile_tikz_for_outcome
 
@@ -88,10 +89,14 @@ class Outcome():
         LMS. About 1.4 MB raw per outcome for a 1000-seed bank, which is ~51 KB
         over the wire -- this content compresses roughly 28x.
         """
-        exs = [e for e in self.exercises() if e.seed >= PUBLIC_SEEDS]
+        exs = [
+            e for e in self.exercises()
+            if PUBLIC_SEEDS <= e.seed < BUNDLE_UNTIL
+        ]
         payload = {
             "slug": self.slug,
             "first_seed": PUBLIC_SEEDS,
+            "last_seed": BUNDLE_UNTIL - 1,
             "formats": list(BUNDLE_FORMATS),
             "seeds": {
                 str(e.seed): e.derived(remote=remote, formats=BUNDLE_FORMATS)

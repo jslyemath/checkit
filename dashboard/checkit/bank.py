@@ -4,7 +4,8 @@ from pathlib import Path
 from . import static
 from .outcome import Outcome
 from .xml import CHECKIT_NS, optional_text
-from . import PUBLIC_SEEDS, INLINE_FORMATS, BUNDLE_FORMATS, BUNDLE_FILENAME
+from . import (PUBLIC_SEEDS, BUNDLE_UNTIL, INLINE_FORMATS, BUNDLE_FORMATS,
+               BUNDLE_FILENAME)
 
 class Bank():
     def __init__(self, path="."):
@@ -74,6 +75,7 @@ class Bank():
                 "inline_below": PUBLIC_SEEDS,
                 "bundle_formats": list(BUNDLE_FORMATS),
                 "bundle_from": PUBLIC_SEEDS,
+                "bundle_until": BUNDLE_UNTIL,
                 "bundle_path": "assets/{slug}/generated/" + BUNDLE_FILENAME,
             }
         return d
@@ -113,8 +115,18 @@ class Bank():
         docs_path.mkdir()
         archive = zipfile.ZipFile(static.open_resource("viewer.zip"))
         archive.extractall(docs_path)
-        # copy assets
-        shutil.copytree(self.build_path(), docs_path / "assets", dirs_exist_ok=True)
+        # Copy the assets the site actually serves. seeds.json and .tikz are
+        # build inputs: the viewer fetches only assets/bank.json and the
+        # per-outcome bundles, and the print tool reads seeds.json from the
+        # bank's own assets/ rather than from docs/. Publishing them duplicated
+        # every exercise's data into the repo a second time -- 23 MB of a
+        # 28-outcome bank, changing wholesale on every rebuild.
+        shutil.copytree(
+            self.build_path(),
+            docs_path / "assets",
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns("seeds.json", "*.tikz"),
+        )
 
     def generated_on(self):
         try:
