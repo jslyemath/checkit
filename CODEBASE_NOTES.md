@@ -1705,6 +1705,26 @@ Running `python -m checkit viewer` calls `bank.Bank().build_viewer()`:
 
 The user can now open `docs/index.html` locally, or serve `docs/` as a static website.
 
+**`docs/` is a committed build artifact, and nothing regenerates it at deploy
+time.** Publishing is therefore two commands, and forgetting the second is
+silent — `generate` writes `assets/`, only `viewer` copies it into `docs/`.
+
+**"Generated on" in the viewer is trustworthy; trust it.** `Bank.svelte` renders
+`bank.json`'s `generated_on`, stamped by `to_dict()` at `write_json()` time. If
+the published site shows an old date, the published site *is* old — it is not a
+stamping bug. In August 2026 the date read five days stale because commit
+`602d5a9` had committed an already-built tree rather than rebuilding: `git show
+--stat` showed it as pure renames (`docs/assets/G1/*` → `R1/*`, `Bin` with no
+byte changes) plus files whose mtimes predated the commit by five days. The
+commit date is not the content date.
+
+Cheap way to tell them apart before rebuilding anything:
+
+```
+git log -1 --format=%cd -- docs/assets/bank.json   # when it was committed
+python -c "import json;print(json.load(open('docs/assets/bank.json'))['generated_on'])"
+```
+
 ---
 
 ## 8. The Bank Format
@@ -3396,6 +3416,80 @@ than at the data: a field wrapped in `<m>` by its template silently swallows any
 element inside it, because `html.xsl`'s rule for `<m>` reads only text nodes;
 and a LaTeX spacing command that was harmless inside a maths field becomes
 literal text once the content is no longer inside one.
+
+### The second trap generalises, and it was live (found 2026-08-27)
+
+That last trap is not a detail of one generator. The first real rebuild after
+the port found **five** places emitting LaTeX into fields that are not maths,
+across 232 exercise versions. Two were already published and being read by
+students; three were latent in generators committed but never built.
+
+| | leaked | why | fix |
+|---|---|---|---|
+| `W1`, `W1-E` | `\text{MDCXLVIII}` | bare TeX into a `{{{markup}}}` slot | `bank_helpers.as_math()` |
+| `F5` | `\textbf` | left over from the `mode` merge | `<em>` |
+| `F2-E` | `\textbf` | written in the template's own prose | `<em>` |
+| `F3-E` | `\dfrac` | bare TeX into a `{{text}}` slot | `<m>` in the template |
+
+**`<em>` is the fix rather than a workaround**, because `latex.xsl` already
+renders `stx:em` as `\textbf{...}`. Print output is byte-identical and only the
+screen changes -- the same stylesheet seam that `<glyphs>` uses. `spatext_math`
+now rewrites `\textbf{...}` into `<em>` alongside the maths forms, so the
+generators that already route prose through it are fixed at one site.
+
+**Where the fix lives depends on what else fills the slot.** `F3-E` is fixed in
+its template, because those two slots only ever carry maths. `W1`/`W1-E` cannot
+be: the same slot also receives `glyphs()` output, and a `<glyphs>` element
+placed inside `<m>` is silently swallowed by the rule above. There the choice
+has to travel in the value, which is what `as_math()` is for.
+
+**A related one-line bug, same family.** `W1-E` wrote `'\Large\textpmhg{...}'`
+as a non-raw Python string, so `\t` became a tab and print received
+`\Large<TAB>extpmhg{...}`. Its two sibling lines escaped correctly; only that
+one did not, and `\L` is an *invalid* escape that warns while `\t` is a valid
+one that does not. 334 of the 382 occurrences were in seeds 50-399 -- the pool
+printed handouts draw from, so it would have surfaced on paper.
+
+**Three detectors now exist for this, all cheap** (currently in a scratchpad;
+worth moving into the bank if it recurs):
+
+- stray control characters (`\t`, `\f`, `\v`, `\b`, `\a`, `\r`) in any
+  precomputed format -- catches the non-raw-literal bug directly;
+- backslash-commands surviving in HTML *text*, after stripping tags and
+  `class="math"` spans -- catches everything in the table above;
+- the same two run over the `derived.json` bundles, because `bank.json` inlines
+  only the 50 public seeds and says nothing about what print will get.
+
+Run them against the previous build as well as the new one: the useful output
+is not "there are leaks" but "which of these are new today".
+
+**Two process lessons that cost real time.**
+
+`checkit generate` runs each generator in a subprocess and reports only
+`subprocess.CalledProcessError` with the argv -- the actual traceback is lost.
+A generator failure is therefore near-undiagnosable from the build log. An
+in-process runner that execs each `generator.py` in `wrapper.GENERATOR_NAMESPACE`
+and calls `data()` across a spread of seeds and every declared variant surfaces
+it in seconds, and checks all 29 generators faster than one build checks none.
+Construct the generator normally and set `seed`/`variant`; stubbing the object
+with `__new__` produces `AttributeError: variant` and four false failures.
+
+**Do not write these scripts through a Bash heredoc on this machine.** The tool
+mangles backslashes: `text.count('\\')` arrived as `text.count('\')`, and a
+sweep whose regex `r"\\[a-zA-Z]{2,}"` arrived as `r"\[a-zA-Z]{2,}"` reported a
+confident, wrong "none". On a LaTeX-heavy codebase that is a silent-failure
+generator. Write the file with an editor tool and run it, and give any detector
+a self-check against a known-bad probe so a broken pattern cannot pass as a
+clean result.
+
+> **Principle.** A detector that cannot demonstrate a failure has not reported
+> a pass. This is the same rule the test suite already follows by breaking the
+> code each guard protects.
+
+**Naming hazard.** The helper was first called `math()`, which replaced the
+stdlib `math` that `bank_helpers.py` imports at module level; `rel_primes` then
+called `math.gcd` on a function object and every `F5` seed died. Hence
+`as_math()`, and a standing assertion that `sm.math.gcd` is still callable.
 
 **Why not simply keep `mode`.** The pipeline already has two designed seams for
 this: the stylesheets, for how one thing renders in different media, and the
