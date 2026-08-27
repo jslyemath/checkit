@@ -103,7 +103,7 @@
     </xsl:template>
 
     <xsl:template name="parseDisplay">
-        <xsl:apply-templates select="text()|stx:m|stx:me|stx:q|stx:c|stx:em|stx:url|stx:image|stx:tikz-image|stx:glyphs"/>
+        <xsl:apply-templates select="text()|stx:m|stx:me|stx:q|stx:c|stx:em|stx:url|stx:image|stx:tikz-image|stx:glyphs|stx:nobreak"/>
     </xsl:template>
 
     <xsl:template match="stx:p">
@@ -168,6 +168,13 @@
          so the characters are emitted plainly. -->
     <xsl:template match="stx:glyphs">
         <xsl:value-of select="text()"/>
+    </xsl:template>
+
+    <!-- Line breaking is the business of whatever renders the PreTeXt, so the
+         hint is dropped and the content passed through. Content, not text():
+         this wraps <m> elements. -->
+    <xsl:template match="stx:nobreak">
+        <xsl:call-template name="parseDisplay"/>
     </xsl:template>
 
     <xsl:template match="stx:url[@href]">

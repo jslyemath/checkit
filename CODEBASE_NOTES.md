@@ -3439,6 +3439,44 @@ pool.
 * One was a difference of purpose rather than medium, and became a branch on
   `self.seed`: R1.
 
+**There was a fourth kind, and it was missed (found 2026-08-27).** W4 also used
+`mode` for *typesetting control*: its equations are long, LaTeX broke them at
+the operators, and `\mbox` was the fix. The generator wrote `\mbox{$...$}` and
+a `clean_latex_string` helper stripped it again when `mode == 'html'`. Print
+was the default, so print got the boxes and the browser did not.
+
+Retiring `mode` deleted the branch and orphaned `clean_latex_string` --
+defined, never called -- leaving `\mbox` in the string for both media. The
+template's `<m>` wrapper then swallowed it into `\(\mbox{\)`: an unmatched
+brace inside math mode, which does not compile. **Print was broken for 50
+versions of W4 while every HTML check was green,** and nothing noticed because
+the mode-drop commit landed 46 minutes after the last `docs/` build and was not
+built again for five days.
+
+The fix is `<nobreak>`, the same shape as `<glyphs>`: `latex.xsl` renders it
+`\mbox{...}`, `html.xsl` a `white-space: nowrap` span, `pretext.xsl` passes the
+content through. W4 emits two of them per equation, matching the original
+`\mbox{$...$} \mbox{$...$}` -- a break *between* the sides is fine, a break
+inside either is not.
+
+Unlike `<glyphs>`, this element **wraps** other elements, so every rule calls
+`parseDisplay` instead of reading `text()`. Reading text nodes would discard
+the `<m>` elements it exists to hold together, which is the same bug it was
+introduced to fix.
+
+> **Principle.** "Purely presentational" is not the same as "safe to delete".
+> Presentation is the whole deliverable for print, and the browser is not the
+> medium that proves it. A per-medium difference always has a stylesheet home;
+> removing the branch without building that home just loses the requirement.
+
+**A lesson about verification, not just about `\mbox`.** Every check written
+during the port read the HTML. The LaTeX comes from a different stylesheet with
+its own rules, and it shipped an uncompilable document while the HTML checks
+passed. The print-side checks worth keeping are cheap and structural: brace
+balance across the whole document, brace balance inside each `\(...\)`, and
+text-mode commands appearing inside inline maths. `\(\textbf{W1}\)` is the one
+standing exception -- the outcome-title element, legal and deliberate.
+
 Templates that receive generated markup must inject with **triple** braces, or
 Mustache escapes it into visible `&lt;m&gt;`. That in turn makes the prose the
 generator emits XML-relevant, which is why `spatext_math` escapes everything

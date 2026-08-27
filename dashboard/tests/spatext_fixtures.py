@@ -82,6 +82,12 @@ GLYPHS = f"""<knowl mode="exercise" {NS}>
     <outtro><p>3,502</p></outtro>
 </knowl>"""
 
+# a run that must not break across lines, wrapping maths (W4's equations)
+NOBREAK = f"""<knowl mode="exercise" {NS}>
+    <content><p>State the property: <nobreak><m>k + (j + u + 0) =</m></nobreak> <nobreak><m>k + (j + u)</m></nobreak></p></content>
+    <outtro><p>Identity (Addition)</p></outtro>
+</knowl>"""
+
 ALL = {
     "SIMPLE": SIMPLE,
     "TASKS": TASKS,
@@ -91,6 +97,7 @@ ALL = {
     "MATH": MATH,
     "IMAGE": IMAGE,
     "GLYPHS": GLYPHS,
+    "NOBREAK": NOBREAK,
 }
 
 # viewer `solutions` value -> (subset value, the classes utils/index.ts removes)

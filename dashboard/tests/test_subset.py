@@ -47,6 +47,21 @@ def transform(spatext, subset=None):
     return etree.tostring(result.getroot(), method="html").decode("utf-8")
 
 
+def transform_as(sheet, spatext, subset=None):
+    """Run any one of the three stylesheets over a SpaTeXt string.
+
+    `transform` above is html-only. latex.xsl declares method="text", which
+    produces no root element, so that result is stringified rather than
+    serialised from a tree.
+    """
+    xslt = etree.XSLT(etree.fromstring(read_resource(sheet)))
+    src = etree.fromstring(spatext.encode("utf-8"))
+    result = xslt(src) if subset is None else xslt(src, subset=f"'{subset}'")
+    if result.getroot() is None:
+        return str(result)
+    return etree.tostring(result.getroot()).decode("utf-8")
+
+
 def viewer_filter(html_string, classes):
     """Reproduce utils/index.ts: ele.querySelectorAll(...).forEach(remove)."""
     root = etree.fromstring(html_string.encode("utf-8"), etree.HTMLParser())
@@ -174,6 +189,60 @@ class GlyphsElement(unittest.TestCase):
                             "ParagraphNodes.svelte")
         with open(path, encoding="utf-8") as f:
             self.assertIn('"glyphs"', f.read())
+
+
+class NobreakElement(unittest.TestCase):
+    """<nobreak> is the fourth kind of `mode` branch, and the one the mode
+    retirement missed.
+
+    W4 wrote \mbox into its strings behind mode='latex' and stripped it again
+    for HTML. Dropping `mode` left the \mbox in the string for both media, and
+    the template's <m> wrapper then swallowed it into `\(\mbox{\)` -- an
+    unmatched brace inside math mode, which does not compile. Print was broken
+    for 50 versions while every HTML check was green.
+
+    Unlike <glyphs>, this element WRAPS other elements, so each rule must
+    recurse rather than read text(): reading text nodes would discard the very
+    <m> elements it exists to hold together.
+    """
+
+    def test_latex_emits_mbox_around_the_maths(self):
+        latex = transform_as("latex.xsl", fx.NOBREAK, "all")
+        self.assertIn("\mbox{", latex)
+        # the point of the element: the maths must survive inside the box
+        self.assertIn("k + (j + u + 0) =", latex)
+        self.assertNotIn("\mbox{}", latex)
+
+    def test_html_marks_it_unbreakable_and_keeps_the_maths(self):
+        html = transform(fx.NOBREAK, "all")
+        self.assertIn("nowrap", html)
+        self.assertIn("k + (j + u + 0) =", html)
+
+    def test_no_stray_mbox_reaches_the_browser(self):
+        """The symptom students actually saw."""
+        self.assertNotIn("mbox", transform(fx.NOBREAK, "all"))
+
+    def test_pretext_passes_the_content_through(self):
+        pretext = transform_as("pretext.xsl", fx.NOBREAK, "all")
+        self.assertIn("k + (j + u + 0) =", pretext)
+        self.assertNotIn("mbox", pretext)
+
+    def test_it_is_listed_in_every_parseDisplay(self):
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        for name in ("html.xsl", "latex.xsl", "pretext.xsl"):
+            with self.subTest(stylesheet=name):
+                path = os.path.join(root, "dashboard", "checkit", "static", name)
+                with open(path, encoding="utf-8") as f:
+                    source = f.read()
+                self.assertIn("stx:nobreak", source.split("parseDisplay")[1][:400],
+                              "%s has a rule but does not select it" % name)
+
+    def test_the_viewer_dispatches_it_too(self):
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        path = os.path.join(root, "viewer", "src", "spatext", "NodeList",
+                            "ParagraphNodes.svelte")
+        with open(path, encoding="utf-8") as f:
+            self.assertIn('"nobreak"', f.read())
 
 
 class _StubOutcome:
