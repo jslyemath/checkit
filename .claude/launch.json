@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mat106-new",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8090",
+        "--directory",
+        "C:\\Users\\slye\\Projects\\mat-106-checkit\\docs"
+      ],
+      "port": 8090
+    },
+    {
+      "name": "mat106-archive",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8080",
+        "--directory",
+        "C:\\Users\\slye\\Projects\\mat-106-archive-2025-09-19\\site"
+      ],
+      "port": 8080
+    }
+  ]
+}
