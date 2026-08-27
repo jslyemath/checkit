@@ -20,3 +20,6 @@ checkit.code-workspace
 #.venv
 .venv
 .vscode/settings.json
+
+# Local dev-server config: absolute paths, one machine only.
+.claude/launch.json
