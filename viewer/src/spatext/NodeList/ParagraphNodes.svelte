@@ -35,6 +35,13 @@
                  the viewer where the site stylesheet does not travel. -->
             <span class="stx-glyphs" data-font={node.getAttribute('font')}
                   style="font-size:2em; line-height:1.2">{node.textContent}</span>
+        {:else if node.nodeName.toLowerCase() == "nobreak"}
+            <!-- latex.xsl emits \mbox here; this is the browser's version of
+                 the same instruction. Recurses, unlike glyphs: the content is
+                 <m> elements, not text. -->
+            <span class="stx-nobreak" style="white-space: nowrap">
+                <svelte:self nodes={node.childNodes}/>
+            </span>
         {:else if node.nodeName.toLowerCase() == "url"}
             <a href={node.getAttribute("href")}>
                 {#if node.textContent.trim()===''}

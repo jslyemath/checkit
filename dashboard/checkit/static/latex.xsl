@@ -103,7 +103,7 @@
     </xsl:template>
 
     <xsl:template name="parseDisplay">
-        <xsl:apply-templates select="text()|stx:m|stx:me|stx:q|stx:c|stx:em|stx:url|stx:image|stx:tikz-image|stx:glyphs"/>
+        <xsl:apply-templates select="text()|stx:m|stx:me|stx:q|stx:c|stx:em|stx:url|stx:image|stx:tikz-image|stx:glyphs|stx:nobreak"/>
     </xsl:template>
 
     <xsl:template match="stx:p">
@@ -124,6 +124,20 @@
 
     <xsl:template match="stx:em">
         <xsl:text>\textbf{</xsl:text>
+        <xsl:call-template name="parseDisplay"/>
+        <xsl:text>}</xsl:text>
+    </xsl:template>
+
+    <!-- Print is the reason this element exists. W4's equations are long enough
+         that LaTeX broke them across lines at the operators, which is wrong for
+         a question asking which property an equation exemplifies. \mbox is the
+         fix. It used to be written into the generator behind a mode='latex'
+         branch, so the browser showed a literal "\mbox{" instead.
+
+         Content, not text(): this wraps <m> elements, and reading only text
+         nodes would discard them exactly as the <m> rule does. -->
+    <xsl:template match="stx:nobreak">
+        <xsl:text>\mbox{</xsl:text>
         <xsl:call-template name="parseDisplay"/>
         <xsl:text>}</xsl:text>
     </xsl:template>
