@@ -3281,6 +3281,32 @@ Known open questions, none blocking:
 
 ### Known platform bugs
 
+**`checkit generate` swallows generator tracebacks.** `run_generator` runs each
+generator in a subprocess and lets `subprocess.CalledProcessError` propagate, so
+a failing generator reports only the argv and an exit status -- the child's
+actual `AttributeError`/`NameError` and its line number are lost. On 2026-08-27
+this turned a one-line naming bug into a guessing game, because the only way to
+see the real exception was to write a separate in-process runner. Propagating
+the child's stderr into the raised error would fix it; the generator already
+runs under a known interpreter, so there is nothing to negotiate.
+
+Until it is fixed, the workaround is an in-process runner: exec each
+`generator.py` in `wrapper.GENERATOR_NAMESPACE`, construct `Generator()`
+normally, set `seed` and `variant`, and call `data()` across a spread of seeds.
+It checks every generator in seconds. Construct it normally rather than with
+`__new__` -- `BaseGenerator.__init__` sets `variant`, and stubbing around it
+produces false `AttributeError: variant` failures on any outcome declaring
+`variants`.
+
+**Build-verification tooling has no home.** The detectors described under
+"The second trap generalises" and the in-process generator runner live in a
+scratchpad, so each rebuild reinvents them. The generator runner is the one
+worth keeping -- it is fast, needs no build, and catches the failures that are
+otherwise invisible per the bug above. Whether it belongs in `dashboard/tests/`
+(generalised over any bank) or in each bank is undecided; the platform has no
+notion of "check this bank's generators" today.
+
+
 **`checkit generate -o SLUG` destroyed the rest of `bank.json`** (fixed
 2026-08-27). The command filtered `Bank._outcomes` down to the one requested
 and then called `write_json()`, which serialises whatever is left -- so a
@@ -3401,8 +3427,13 @@ pool.
 **How the nine were actually split.**
 
 * Six were the same false belief -- that a text field could not carry maths --
-  and became `bank_helpers.spatext_math()`, which rewrites the TeX the
-  generators already wrote into `<m>` elements: R2, N2, F5, W4, N1, N1-E.
+  and were fixed by emitting `<m>` elements: N2, F5, W4, N1, N1-E through
+  `bank_helpers.spatext_math()`, which rewrites the TeX the generators already
+  wrote; **R2 by hand**, writing `<m>` directly into its f-strings. Worth
+  knowing before editing R2: running `spatext_math` over a string that already
+  contains `<m>` would escape it into visible `&lt;m&gt;`, since the function
+  escapes everything outside the maths it matches. D4 was added to the
+  `spatext_math` group later (2026-08-27) for `\$` and `\%`.
 * Two were a genuine per-medium difference in the characters themselves, and
   became `<glyphs>`: W1 and W1-E.
 * One was a difference of purpose rather than medium, and became a branch on
@@ -3416,6 +3447,40 @@ than at the data: a field wrapped in `<m>` by its template silently swallows any
 element inside it, because `html.xsl`'s rule for `<m>` reads only text nodes;
 and a LaTeX spacing command that was harmless inside a maths field becomes
 literal text once the content is no longer inside one.
+
+### The `<m>` wrapper a converted generator leaves behind (found 2026-08-27)
+
+**This is the one that actually reached students, and it is the worse
+direction of the same mistake.** A generator that used to emit plain TeX had a
+template wrapping its slot in `<m>`:
+
+    <p><m>{{{p1_prob}}}</m></p>
+
+Converting the generator to emit `<m>` elements makes that wrapper *nested*,
+and `html.xsl` renders `<m>` with `normalize-space(text())` -- direct text
+children only. Every nested element is discarded and the prose between them
+survives, typeset as mathematics. So
+
+    <m><m>12</m> is a multiple of <m>4</m></m>
+
+renders as the words "is a multiple of" in italic maths, **with the numbers
+gone**. The exercise is not merely ugly, it is unanswerable, and nothing fails:
+the build is clean, the data is correct, and `bank.json` contains a perfectly
+well-formed `<span class="math">`.
+
+Found in 22 template slots across `N1` (11), `N1-E` (3) and `W4` (8). W4
+rendered as a bare `\mbox{`. **The conversion is only half done until the
+template's wrapper comes off** -- that is the step to look for whenever a
+generator starts emitting markup.
+
+The detector is exact, and belongs in any bank's checks: walk each exercise's
+SpaTeXt (`Exercise.spatext_ele()`) and report every `<m>` that has element
+children. Do not try to detect this in the rendered HTML -- by then the
+evidence has been deleted.
+
+> **Principle.** When a value changes from text to markup, every place that
+> *wraps* it is now wrong. The wrapper is not neutral just because it was
+> correct yesterday.
 
 ### The second trap generalises, and it was live (found 2026-08-27)
 
@@ -3456,7 +3521,13 @@ worth moving into the bank if it recurs):
 - stray control characters (`\t`, `\f`, `\v`, `\b`, `\a`, `\r`) in any
   precomputed format -- catches the non-raw-literal bug directly;
 - backslash-commands surviving in HTML *text*, after stripping tags and
-  `class="math"` spans -- catches everything in the table above;
+  `class="math"` spans -- catches everything in the table above. **Match both
+  shapes**: multi-letter commands (`\text`, `\dfrac`) *and* single-character
+  escapes (`\%`, `\$`, `\&`, `\_`, `\#`). The first version required two or
+  more letters after the backslash and therefore reported a confident clean
+  while `D4` showed students `27.6\%` and `\$770.13` in 300 places;
+- `<m>` elements containing child elements, read from the SpaTeXt rather than
+  the HTML -- see the section above, and note that the HTML cannot show it;
 - the same two run over the `derived.json` bundles, because `bank.json` inlines
   only the 50 public seeds and says nothing about what print will get.
 
@@ -3481,6 +3552,14 @@ confident, wrong "none". On a LaTeX-heavy codebase that is a silent-failure
 generator. Write the file with an editor tool and run it, and give any detector
 a self-check against a known-bad probe so a broken pattern cannot pass as a
 clean result.
+
+**A greedy pattern is the same failure in miniature.** `spatext_math`'s money
+rule was `\\\$[0-9][0-9,.]*`, which happily consumes the punctuation that ends
+the sentence: "worth \$982.69." became `<m>\$982.69.</m>`, setting the full stop
+in italic maths. Requiring the run to *end* in a digit fixes it. Nothing catches
+this by inspection of one example, because the amount looks right -- the
+detector is "maths whose content ends in `.` or `,`", and it has to allow
+display maths, where punctuation inside the equation is correct typesetting.
 
 > **Principle.** A detector that cannot demonstrate a failure has not reported
 > a pass. This is the same rule the test suite already follows by breaking the
