@@ -3237,6 +3237,27 @@ Known open questions, none blocking:
 - **The LMS export hardcodes 900 versions per outcome**, which is what makes the
   published `docs/` 25 MB. Reducing it is an instructor-facing choice.
 
+### Known platform bugs worth fixing
+
+**`checkit generate -o SLUG` destroys the rest of `bank.json`.** The command
+filters `Bank._outcomes` down to the one requested and then calls
+`write_json()`, which serialises whatever is left -- so a single-outcome
+regeneration silently rewrites the manifest to contain that outcome alone. The
+per-outcome `seeds.json` files survive, so nothing is lost permanently, but the
+published bank is wrong until a full `checkit generate` runs again. This is
+upstream behaviour, not a fork regression, and it is the natural thing to reach
+for when iterating on one generator.
+
+The fix is small: build the full manifest regardless of `-o`, and use the filter
+only to decide which outcomes to *regenerate*. Something has to load the
+unfiltered bank for `to_dict()` while the filtered list drives
+`generate_exercises()`. Worth a guard test that generating one outcome leaves
+the others present in `bank.json`.
+
+**`-o` also skips the missing-`remote` preflight for outcomes it filtered out.**
+Less serious, but the same shape: the check runs over `self.outcomes()`, which
+by then is the filtered list.
+
 ## Planned: porting the course banks, and a separate print tool
 
 Not started. Recorded so the reasoning survives.
@@ -3268,6 +3289,55 @@ Those banks also each carry a copy of a print pipeline (`pdfgenerator.py`,
 single PDF: many exercise versions, distributed by seating chart, student names
 inserted, answer keys appended. That is *not* CheckIt's assessment builder, which
 produces one anonymous assessment.
+
+### `mode` is the wrong layer, and what replaces it
+
+Nine generators in mat-106 took a `mode='html'|'latex'` argument and branched on
+it. Six were the same workaround for one false belief -- that a SpaTeXt text
+field could not carry mathematics -- and all six are gone, replaced by
+`bank_helpers.spatext_math()` emitting `<m>` elements from the TeX the
+generators already wrote.
+
+The remaining three are not that, and they are worth separating because they
+pull in opposite directions.
+
+**W1 and W1-E are a presentation difference.** Egyptian numerals are set with
+`\textpmhg` for print and `\Huge` in the browser, because that LaTeX font has
+no web equivalent. The content is identical; only its rendering differs. That is
+precisely what the three stylesheets exist for, so the fix belongs there: a
+SpaTeXt element (say `<glyphs font="...">`) that `html.xsl` renders as a styled
+span and `latex.xsl` as `\textpmhg{...}`. Adding a SpaTeXt element is the
+documented multi-file dance (§12), now three files rather than six.
+
+**R1 is a content difference tied to purpose.** Its `versions` and
+`html_versions` dictionaries share no keys, but the names pair up: `add-coladd-1`
+against `add-coladd-1p`. Comparing a pair shows they are different problems, and
+the print one has empty `thinking` and `feedback` fields -- because print is the
+student handout, where those are blanks to write in, while the viewer copy
+carries model answers for self-study.
+
+That is a real distinction, but it is not about the *medium*: it is about
+whether an exercise is for browsing or for assessment. The seed ranges already
+encode exactly that (§ "Bound the precomputed range"): 0..PUBLIC_SEEDS-1 is what
+students browse, everything above it feeds assessments, printed or exported. So
+R1 wants neither `mode` nor a variant -- it wants to branch on `self.seed`,
+which `BaseGenerator` already exposes for this purpose:
+
+    def data(self):
+        studying = self.seed < PUBLIC_SEEDS
+        return generate(pool='self_study' if studying else 'assessment')
+
+A variant would fit badly here: variants are dealt evenly across all seeds, so
+roughly half of the versions a student browses would come from the assessment
+pool.
+
+**Why not simply keep `mode`.** The pipeline already has two designed seams for
+this: the stylesheets, for how one thing renders in different media, and the
+seed ranges, for which exercises serve which purpose. A generator-level `mode`
+is a third place expressing the same distinctions, and the three cannot be kept
+consistent by anything but discipline -- the failure this codebase has already
+paid for twice with the duplicated stylesheets and the duplicated dependency
+list.
 
 ### The bank port
 
