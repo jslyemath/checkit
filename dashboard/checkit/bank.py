@@ -41,8 +41,22 @@ class Bank():
     def outcomes(self):
         return self._outcomes
     
-    def generate_exercises(self,regenerate=False,images=False,amount=1_000,image_seeds=None):
+    def generate_exercises(self,regenerate=False,images=False,amount=1_000,
+                           image_seeds=None,only=None):
+        """Regenerate exercises, optionally for a subset of outcomes.
+
+        `only` is a set of slugs, or None for every outcome. It narrows what is
+        *regenerated* and nothing else -- the Bank keeps every outcome it
+        parsed. That distinction is the whole point: write_json() serialises
+        whatever outcomes the Bank can see, so filtering the Bank itself (which
+        is what `checkit generate -o SLUG` used to do) rewrites bank.json to
+        hold that one outcome and silently drops the published manifest for the
+        rest. The per-outcome seeds.json survive, so it is recoverable, but the
+        site is wrong until a full generate runs.
+        """
         for o in self.outcomes():
+            if only is not None and o.slug not in only:
+                continue
             print(f"Generating {amount} exercises for outcome {o.slug}")
             o.generate_exercises(regenerate=regenerate,images=images,amount=amount,image_seeds=image_seeds)
 

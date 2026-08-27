@@ -142,9 +142,23 @@ def generate(amount,regenerate,images,image_seeds,outcome,remote,no_precompute):
             param_hint="--amount",
         )
     b = bank.Bank()
+    only = None
     if outcome != "ALL":
-        b._outcomes = [o for o in b._outcomes if o.slug.lower() == outcome.lower()]
-    b.generate_exercises(regenerate=regenerate,images=images,amount=amount,image_seeds=image_seeds)
+        # Resolve to slugs and hand them to generate_exercises, rather than
+        # narrowing the Bank. write_json() serialises every outcome the Bank
+        # holds, so a narrowed Bank writes a bank.json missing the others --
+        # and skips the missing-`remote` preflight for them too.
+        only = {o.slug for o in b.outcomes() if o.slug.lower() == outcome.lower()}
+        if not only:
+            # Silently regenerating nothing on a typo'd slug looks exactly like
+            # a successful run.
+            raise click.BadParameter(
+                f"no outcome with slug {outcome!r} in this bank. "
+                "Available: " + ", ".join(o.slug for o in b.outcomes()),
+                param_hint="--outcome",
+            )
+    b.generate_exercises(regenerate=regenerate,images=images,amount=amount,
+                         image_seeds=image_seeds,only=only)
     b.write_json(remote=remote,precompute=not no_precompute)
 
 # checkit viewer
