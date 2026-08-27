@@ -2566,6 +2566,7 @@ python -m unittest discover -s dashboard/tests -t dashboard/tests
 | `test_subset.py` | `subset` filtering, the `Exercise` API, cross-language constants |
 | `test_precompute.py` | the precompute emitter and its declared coverage |
 | `test_packaging.py` | what actually ends up in an installed copy |
+| `test_outcome_filter.py` | that `generate -o SLUG` narrows regeneration and nothing else |
 | `browser_harness.py` | manual: re-runs the stylesheet checks in a real browser |
 
 Four choices worth knowing about:
@@ -2591,7 +2592,8 @@ default, dropping the outtro guard, guarding the whole `xsl:choose`, leaving
 LaTeX beside the MathML, rendering display maths inline, skipping MathML
 conversion, dropping the missing-`remote` check, inlining every seed, starting
 the bundle at zero, adding pretext to it, dropping the coverage declaration,
-leaving stale bundles, and removing `sympy` again. A guard that cannot fail is
+leaving stale bundles, removing `sympy` again, and filtering the Bank
+instead of the regeneration pass. A guard that cannot fail is
 decoration, and this codebase has been bitten enough times by silent success to
 be worth the extra step.
 
@@ -3242,7 +3244,7 @@ PNG and relied on the `.tikz` source.
 | First test suite | done — see "Tests" |
 | Fork versioned and released as a wheel | done — v0.2.8.1 |
 | Port mat-106 off its Sage shims | done — 29 outcomes, `mode` retired |
-| Port mat-206 | **not started** |
+| mat-206 | **not started, and not a port** -- see below |
 | Print tool as its own package | **not started** |
 
 Known open questions, none blocking:
@@ -3257,26 +3259,47 @@ Known open questions, none blocking:
 - **The LMS export hardcodes 900 versions per outcome**, which is what makes the
   published `docs/` 25 MB. Reducing it is an instructor-facing choice.
 
-### Known platform bugs worth fixing
+### Known platform bugs
 
-**`checkit generate -o SLUG` destroys the rest of `bank.json`.** The command
-filters `Bank._outcomes` down to the one requested and then calls
-`write_json()`, which serialises whatever is left -- so a single-outcome
-regeneration silently rewrites the manifest to contain that outcome alone. The
-per-outcome `seeds.json` files survive, so nothing is lost permanently, but the
-published bank is wrong until a full `checkit generate` runs again. This is
-upstream behaviour, not a fork regression, and it is the natural thing to reach
-for when iterating on one generator.
+**`checkit generate -o SLUG` destroyed the rest of `bank.json`** (fixed
+2026-08-27). The command filtered `Bank._outcomes` down to the one requested
+and then called `write_json()`, which serialises whatever is left -- so a
+single-outcome regeneration silently rewrote the manifest to contain that
+outcome alone. The per-outcome `seeds.json` files survived, so nothing was lost
+permanently, but the published bank was wrong until a full `checkit generate`
+ran again. This was upstream behaviour, not a fork regression, and it is the
+natural thing to reach for when iterating on one generator.
 
-The fix is small: build the full manifest regardless of `-o`, and use the filter
-only to decide which outcomes to *regenerate*. Something has to load the
-unfiltered bank for `to_dict()` while the filtered list drives
-`generate_exercises()`. Worth a guard test that generating one outcome leaves
-the others present in `bank.json`.
+The same narrowing skipped the missing-`remote` preflight for the outcomes it
+excluded -- the same shape, since that check also runs over `self.outcomes()`.
+Their precomputed HTML still lands in `bank.json`, so it still needs an
+absolute base URL; without one the `<img src>` is root-relative and 404s
+wherever the HTML is displayed.
 
-**`-o` also skips the missing-`remote` preflight for outcomes it filtered out.**
-Less serious, but the same shape: the check runs over `self.outcomes()`, which
-by then is the filtered list.
+**The fix: the filter was one layer too high.** It now travels as `only=`, a
+set of slugs, into `Bank.generate_exercises()` -- the single operation that
+should be narrowed -- and the Bank keeps every outcome it parsed. `write_json()`
+is never handed a partial Bank, so both symptoms go away together rather than
+needing separate guards.
+
+Two consequences worth knowing:
+
+- **`-o` is no longer fast.** `write_json()` now re-renders the precomputed
+  formats for every outcome, because that is what a correct manifest contains.
+  It does *not* re-run generators: `write_json()` passes `regenerate=False`, so
+  each outcome loads from its existing `seeds.json`. Only the XSLT work repeats.
+- **`-o PLAIN` on a bank with figures now demands `--remote`,** even when the
+  named outcome has none. That is correct -- the manifest carries the other
+  outcomes' HTML -- but it is a behaviour change from before the fix.
+
+A slug matching no outcome now raises `BadParameter` listing the available
+slugs. It previously produced an empty filter, and regenerating nothing is
+indistinguishable from a successful run.
+
+`test_outcome_filter.py` guards all of it, reusing `test_precompute.py`'s
+two-outcome fixture: `PLAIN` has no figures and `FIGURED` does, which is exactly
+the pair both symptoms need. Seven of its ten tests fail against the unfixed
+code; the three that pass describe behaviour that was already correct.
 
 ## Planned: porting the course banks, and a separate print tool
 
@@ -3382,7 +3405,31 @@ consistent by anything but discipline -- the failure this codebase has already
 paid for twice with the duplicated stylesheets and the duplicated dependency
 list.
 
-### The bank port
+### mat-206 is not a port (established 2026-08-27)
+
+The roadmap above says "port mat-206" alongside mat-106. That is wrong, and it
+matters because it sets the wrong expectation for the work.
+
+**mat-206 has no generators.** All 30 `outcomes/*/pygenerator.py` are five-line
+stubs -- `def generate(**kwargs): return {}` -- and every `template.xml` is 255
+bytes. `outcomes/slye_math.py` is a copy of mat-106's, not a sibling: 27 of its
+29 functions are byte-identical, and the only real difference is that mat-106's
+`to_simple_babylonian` grew a `mode` parameter for `<glyphs>`. It also carries
+`generator.sage` shims, a `pdfgenerator.py`, and a `requirements.txt` pinning
+`checkit-dashboard == 0.2.7`, all inherited by copy rather than written.
+
+What *is* real is `bank.xml`: 28 outcomes with genuine titles, slugs,
+descriptions and a colour map (prefixes `G`, `M`, `A`, `S` -- geometry,
+measurement, algebra, statistics). That is the specification. The work is
+authoring 30 generators against it, not migrating anything.
+
+Consequences for the roadmap steps below: steps 1, 2 and 5 are moot for mat-206
+(there is nothing to move, unwrap, or audit), step 3 is moot (no generator
+mentions `mode`), and step 4 is moot (no generator mentions `course_progress`).
+What mat-206 should inherit is mat-106's *finished* `bank_helpers.py`, dropped
+in at the bank root, and the `Generator` class shape -- not its history.
+
+### The bank port (mat-106; done)
 
 1. Move `slye_math.py` from `outcomes/` to the **bank root**, renamed
    `bank_helpers.py` — `load_generator()` adds the bank root and the generator's
