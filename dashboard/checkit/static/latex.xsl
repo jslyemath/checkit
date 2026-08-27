@@ -158,6 +158,15 @@
          which would fail the whole document at compile time. -->
     <xsl:template match="stx:glyphs">
         <xsl:choose>
+            <xsl:when test="@latex">
+                <!-- Some scripts have no single set of characters that works in
+                     both media: Babylonian numerals are Unicode cuneiform on
+                     screen but macros in print, so no font
+                     wrapper can bridge them. Such an element carries both, and
+                     the element still holds the decision rather than a
+                     generator branching on the output format. -->
+                <xsl:value-of select="@latex"/>
+            </xsl:when>
             <xsl:when test="@font='egyptian'">
                 <xsl:text>{\Large\textpmhg{</xsl:text>
                 <xsl:value-of select="text()"/>

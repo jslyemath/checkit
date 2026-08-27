@@ -1050,6 +1050,25 @@ SpaTeXt uses three XSLT 1.0 stylesheets, and they live in exactly one place: `da
 
 ### The SpaTeXt XML Vocabulary
 
+> **`<glyphs>` (added 2026-08-22).** `<glyphs font="egyptian"
+> latex="\\Hone\\Hten">U+13000 U+13001</glyphs>` carries characters whose screen and
+> print forms differ irreducibly. mat-106's Egyptian and Babylonian numerals are
+> Unicode on screen but LaTeX macros in print -- the characters themselves
+> differ, so no font wrapper bridges them and the element holds both. `html.xsl`
+> emits a span sized inline (not by class: this HTML is also read in the LMS
+> exports and the AI payload, where no site stylesheet travels with it);
+> `latex.xsl` prefers the `latex` attribute and otherwise maps `@font` to a
+> command, falling through to plain text for an unknown one rather than emitting
+> an undefined macro that would fail the whole document; `pretext.xsl` emits the
+> characters plainly.
+>
+> Adding it touched four files: three stylesheets and
+> `viewer/src/spatext/NodeList/ParagraphNodes.svelte`, which builds DOM from
+> SpaTeXt directly and never sees the XSLT. Each stylesheet's `parseDisplay`
+> select also had to name it -- see the `tikz-image` post-mortem for what
+> happens when that step is missed.
+
+
 Before explaining the stylesheets, here is the complete SpaTeXt element reference. All elements are in the namespace `https://spatext.clontz.org`.
 
 **`<knowl mode="exercise">`** — The root element (or a nested exercise part). `mode="exercise"` on the outermost knowl signals it's an exercise (affects PreTeXt output). A knowl without `mode` renders as a theorem/block in PreTeXt.
@@ -3222,7 +3241,8 @@ PNG and relied on the `.tikz` source.
 | Viewer shows 50 versions, not 20 | done — `PUBLIC_SEEDS` |
 | First test suite | done — see "Tests" |
 | Fork versioned and released as a wheel | done — v0.2.8.1 |
-| Port the course banks off their Sage shims | **not started** |
+| Port mat-106 off its Sage shims | done — 29 outcomes, `mode` retired |
+| Port mat-206 | **not started** |
 | Print tool as its own package | **not started** |
 
 Known open questions, none blocking:
@@ -3290,7 +3310,11 @@ single PDF: many exercise versions, distributed by seating chart, student names
 inserted, answer keys appended. That is *not* CheckIt's assessment builder, which
 produces one anonymous assessment.
 
-### `mode` is the wrong layer, and what replaces it
+### `mode` is the wrong layer, and what replaces it (resolved 2026-08-22)
+
+**No generator in mat-106 branches on `mode` any more.** All nine are converted,
+in three groups.
+
 
 Nine generators in mat-106 took a `mode='html'|'latex'` argument and branched on
 it. Six were the same workaround for one false belief -- that a SpaTeXt text
@@ -3330,6 +3354,25 @@ which `BaseGenerator` already exposes for this purpose:
 A variant would fit badly here: variants are dealt evenly across all seeds, so
 roughly half of the versions a student browses would come from the assessment
 pool.
+
+**How the nine were actually split.**
+
+* Six were the same false belief -- that a text field could not carry maths --
+  and became `bank_helpers.spatext_math()`, which rewrites the TeX the
+  generators already wrote into `<m>` elements: R2, N2, F5, W4, N1, N1-E.
+* Two were a genuine per-medium difference in the characters themselves, and
+  became `<glyphs>`: W1 and W1-E.
+* One was a difference of purpose rather than medium, and became a branch on
+  `self.seed`: R1.
+
+Templates that receive generated markup must inject with **triple** braces, or
+Mustache escapes it into visible `&lt;m&gt;`. That in turn makes the prose the
+generator emits XML-relevant, which is why `spatext_math` escapes everything
+outside the maths it wraps. Two traps found by looking at rendered output rather
+than at the data: a field wrapped in `<m>` by its template silently swallows any
+element inside it, because `html.xsl`'s rule for `<m>` reads only text nodes;
+and a LaTeX spacing command that was harmless inside a maths field becomes
+literal text once the content is no longer inside one.
 
 **Why not simply keep `mode`.** The pipeline already has two designed seams for
 this: the stylesheets, for how one thing renders in different media, and the
