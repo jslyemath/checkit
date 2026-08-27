@@ -30,6 +30,11 @@
             <img style="max-width:100%" src={imageSrc(node)} alt={node.getAttribute('description')}/>
         {:else if node.nodeName.toLowerCase() == "tikz-image"}
             <img style="max-width:100%" src={tikzImageSrc(node)} alt={node.getAttribute('description')}/>
+        {:else if node.nodeName.toLowerCase() == "glyphs"}
+            <!-- Sized inline to match html.xsl, whose output is read outside
+                 the viewer where the site stylesheet does not travel. -->
+            <span class="stx-glyphs" data-font={node.getAttribute('font')}
+                  style="font-size:2em; line-height:1.2">{node.textContent}</span>
         {:else if node.nodeName.toLowerCase() == "url"}
             <a href={node.getAttribute("href")}>
                 {#if node.textContent.trim()===''}

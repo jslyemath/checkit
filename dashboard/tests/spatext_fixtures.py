@@ -76,6 +76,12 @@ IMAGE = f"""<knowl mode="exercise" {NS}>
     <outtro><p>The digit two.</p></outtro>
 </knowl>"""
 
+# characters that need a different typeface per medium (W1's Egyptian numerals)
+GLYPHS = f"""<knowl mode="exercise" {NS}>
+    <content><p>Write <glyphs font="egyptian">&#x13000;&#x13001;</glyphs> in modern numerals.</p></content>
+    <outtro><p>3,502</p></outtro>
+</knowl>"""
+
 ALL = {
     "SIMPLE": SIMPLE,
     "TASKS": TASKS,
@@ -84,6 +90,7 @@ ALL = {
     "LIST_CONTENT": LIST_CONTENT,
     "MATH": MATH,
     "IMAGE": IMAGE,
+    "GLYPHS": GLYPHS,
 }
 
 # viewer `solutions` value -> (subset value, the classes utils/index.ts removes)

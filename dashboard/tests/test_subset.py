@@ -138,6 +138,44 @@ class Structure(unittest.TestCase):
                 self.assertIn("stx-title", transform(fx.TITLED, subset))
 
 
+class GlyphsElement(unittest.TestCase):
+    """<glyphs> exists so a typeface difference lives in the stylesheets rather
+    than in a generator branching on `mode`. The trap when adding any SpaTeXt
+    element is parseDisplay: apply-templates with an explicit select ignores
+    anything not named there, so the rule fires but the element renders as
+    nothing, silently, in every format."""
+
+    def test_html_renders_the_characters(self):
+        html = transform(fx.GLYPHS, "all")
+        self.assertIn("stx-glyphs", html)
+        self.assertIn('data-font="egyptian"', html)
+        # lxml's html serialiser writes non-ASCII as numeric entities, so
+        # compare decoded text rather than raw bytes: &#77824; IS U+13000.
+        import html as html_module
+
+        self.assertIn("𓀀", html_module.unescape(html))
+
+    def test_it_is_listed_in_every_parseDisplay(self):
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        for name in ("html.xsl", "latex.xsl", "pretext.xsl"):
+            with self.subTest(stylesheet=name):
+                path = os.path.join(root, "dashboard", "checkit", "static", name)
+                with open(path, encoding="utf-8") as f:
+                    source = f.read()
+                self.assertIn("stx:glyphs", source.split("parseDisplay")[1][:400],
+                              "%s has a rule but does not select it" % name)
+
+    def test_the_viewer_dispatches_it_too(self):
+        """The student view builds DOM from SpaTeXt directly and never touches
+        the stylesheets, so an element added only to the XSLT is invisible
+        there."""
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        path = os.path.join(root, "viewer", "src", "spatext", "NodeList",
+                            "ParagraphNodes.svelte")
+        with open(path, encoding="utf-8") as f:
+            self.assertIn('"glyphs"', f.read())
+
+
 class _StubOutcome:
     """Enough of an Outcome for Exercise.spatext_ele() to render a template."""
 

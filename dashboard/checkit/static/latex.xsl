@@ -103,7 +103,7 @@
     </xsl:template>
 
     <xsl:template name="parseDisplay">
-        <xsl:apply-templates select="text()|stx:m|stx:me|stx:q|stx:c|stx:em|stx:url|stx:image|stx:tikz-image"/>
+        <xsl:apply-templates select="text()|stx:m|stx:me|stx:q|stx:c|stx:em|stx:url|stx:image|stx:tikz-image|stx:glyphs"/>
     </xsl:template>
 
     <xsl:template match="stx:p">
@@ -150,6 +150,23 @@
         <xsl:text>\input{</xsl:text>
         <xsl:value-of select="@source"/>
         <xsl:text>.tikz}</xsl:text>
+    </xsl:template>
+
+    <!-- Each font name maps to the LaTeX command that provides it; adding a
+         font means adding a case here and a rule in html.xsl. An unknown name
+         falls through to plain text rather than emitting an undefined command,
+         which would fail the whole document at compile time. -->
+    <xsl:template match="stx:glyphs">
+        <xsl:choose>
+            <xsl:when test="@font='egyptian'">
+                <xsl:text>{\Large\textpmhg{</xsl:text>
+                <xsl:value-of select="text()"/>
+                <xsl:text>}}</xsl:text>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:value-of select="text()"/>
+            </xsl:otherwise>
+        </xsl:choose>
     </xsl:template>
 
     <xsl:template match="stx:url[@href]">
