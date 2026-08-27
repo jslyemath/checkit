@@ -103,7 +103,7 @@
     </xsl:template>
 
     <xsl:template name="parseDisplay">
-        <xsl:apply-templates select="text()|stx:m|stx:me|stx:q|stx:c|stx:em|stx:url|stx:image|stx:tikz-image"/>
+        <xsl:apply-templates select="text()|stx:m|stx:me|stx:q|stx:c|stx:em|stx:url|stx:image|stx:tikz-image|stx:glyphs"/>
     </xsl:template>
 
     <xsl:template match="stx:p">
@@ -162,6 +162,12 @@
                 <xsl:value-of select="@description"/>
             </xsl:attribute>
         </image>
+    </xsl:template>
+
+    <!-- PreTeXt has no font-switching in the subset this vocabulary targets,
+         so the characters are emitted plainly. -->
+    <xsl:template match="stx:glyphs">
+        <xsl:value-of select="text()"/>
     </xsl:template>
 
     <xsl:template match="stx:url[@href]">

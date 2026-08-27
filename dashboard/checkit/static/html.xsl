@@ -113,7 +113,7 @@
     </xsl:template>
 
     <xsl:template name="parseDisplay">
-        <xsl:apply-templates select="text()|stx:m|stx:me|stx:q|stx:c|stx:em|stx:url|stx:image|stx:tikz-image"/>
+        <xsl:apply-templates select="text()|stx:m|stx:me|stx:q|stx:c|stx:em|stx:url|stx:image|stx:tikz-image|stx:glyphs"/>
     </xsl:template>
 
     <xsl:template match="stx:p">
@@ -186,6 +186,19 @@
                 <xsl:value-of select="@description"/>
             </xsl:attribute>
         </img>
+    </xsl:template>
+
+    <!-- Characters needing a typeface the browser and LaTeX name differently.
+         The size is inline rather than a class because this HTML is also read
+         outside the viewer, in the LMS exports and the AI payload, where none
+         of the site stylesheet travels with it. -->
+    <xsl:template match="stx:glyphs">
+        <span class="stx-glyphs" style="font-size:2em; line-height:1.2">
+            <xsl:attribute name="data-font">
+                <xsl:value-of select="@font"/>
+            </xsl:attribute>
+            <xsl:value-of select="text()"/>
+        </span>
     </xsl:template>
 
     <xsl:template match="stx:url[@href]">

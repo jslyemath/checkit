@@ -19,6 +19,13 @@ Sage's. A bank that switches runtimes regenerates from scratch.
 """
 import sys, json, os, datetime, random
 
+# This script is copied to a temp directory and run as a subprocess, but the
+# interpreter is the one checkit is installed into, so the package is
+# importable. Taking the seed boundaries from there rather than restating
+# them keeps one definition on the Python side; the viewer has the only
+# other copy, and a test asserts the two agree.
+from checkit import PUBLIC_SEEDS, BUNDLE_UNTIL
+
 import sympy
 from sympy import Matrix, Rational, Symbol, latex as _sympy_latex, zeros
 
@@ -533,6 +540,13 @@ GENERATOR_NAMESPACE = {
     "CheckIt": CheckIt,
     "BaseGenerator": BaseGenerator,
     "provide_data": provide_data,
+    # The seed boundaries, so a generator can tell which surface a seed is for.
+    # Below PUBLIC_SEEDS a student browses it; at or above, it feeds an
+    # assessment. Some outcomes hold genuinely different content for the two --
+    # a handout leaves the explanation blank where the study copy models it --
+    # and this is the axis that distinguishes them.
+    "PUBLIC_SEEDS": PUBLIC_SEEDS,
+    "BUNDLE_UNTIL": BUNDLE_UNTIL,
     # random
     "randrange": random.randrange,
     "shuffle": random.shuffle,
