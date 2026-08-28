@@ -168,6 +168,67 @@ def generate(amount,regenerate,images,image_seeds,outcome,remote,no_precompute):
 def viewer():
     bank.Bank().build_viewer()
 
+# checkit check
+@main.command(
+    short_help="structural checks on a built bank and its generators",
+)
+@click.option(
+    "--generators/--no-generators",
+    default=True,
+    help="Run every generator in-process. Fast, needs no build, and is the "
+         "only way to see a generator's actual traceback -- `generate` runs "
+         "them in a subprocess and reports only the exit status.",
+)
+@click.option(
+    "--built/--no-built",
+    default=True,
+    help="Check the built bank.json and the derived.json bundles. Requires a "
+         "previous `checkit generate`.",
+)
+def check(generators, built):
+    """Structural checks on a built bank and its generators.
+
+    Answers "will this render as something other than what it says", not "is
+    this good mathematics". Every check here exists because a real build
+    shipped the fault it catches while everything else looked healthy -- so a
+    clean run is not a substitute for looking at the page.
+    """
+    from . import checks, smoke
+
+    failed = False
+
+    if generators:
+        click.echo("generators")
+        broken = []
+        for slug, tb in smoke.run_generators("."):
+            if tb is None:
+                click.echo(f"  ok   {slug}")
+            else:
+                click.echo(f"  FAIL {slug}")
+                broken.append((slug, tb))
+        for slug, tb in broken:
+            click.echo(f"\n===== {slug}\n{tb}")
+        failed = failed or bool(broken)
+
+    if built:
+        click.echo("built bank")
+        b = bank.Bank()
+        try:
+            findings = checks.run_all(b)
+        except FileNotFoundError:
+            raise click.ClickException(
+                "no built bank found. Run `checkit generate` first, or pass "
+                "--no-built to check only the generators."
+            )
+        if not findings:
+            click.echo("  ok   no findings")
+        for f in findings:
+            click.echo(f"  FAIL [{f.check}] {f.slug}: {f.detail} (x{f.count})")
+        failed = failed or bool(findings)
+
+    if failed:
+        raise SystemExit(1)
+
 
 if __name__ == "__main__":
     main()
