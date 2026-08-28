@@ -173,6 +173,51 @@ def nested_elements_in_math(bank, seeds=8):
     return out
 
 
+_MUSTACHE = re.compile(r"\{\{\{?\s*([#^/&]?)\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}?\}\}")
+
+# Retired blocks are left commented out rather than deleted, and their fields
+# are naturally absent from the data. Mustache does substitute inside an XML
+# comment -- which is how F2-E smuggles {{#section}} tags past the XML parser
+# -- but the comment is then discarded by the stylesheets, so nothing there
+# can render either way.
+_XML_COMMENT = re.compile(r"<!--.*?-->", re.S)
+
+
+def template_fields_without_data(bank, seeds=4):
+    """Template fields the generator never supplies.
+
+    Mustache renders an absent key as the empty string, so the sentence around
+    it survives and the value vanishes: "explaining the  to an elementary
+    school student?". Nothing fails, and the exercise is unanswerable.
+
+    Section tags ({{#x}}, {{^x}}, {{/x}}) are excluded -- an absent key there
+    means "false", which is the whole point of them -- as is `__seed__`, which
+    the renderer injects.
+    """
+    out = []
+    hits = collections.Counter()
+    for outcome in bank.outcomes():
+        try:
+            template = outcome.template()
+        except Exception:                                  # pragma: no cover
+            continue
+        referenced = {
+            name for sigil, name in _MUSTACHE.findall(_XML_COMMENT.sub(" ", template))
+            if sigil not in ("#", "^", "/") and name != "__seed__"
+        }
+        if not referenced:
+            continue
+        for exercise in outcome.exercises()[:seeds]:
+            missing = referenced - set(exercise.data.keys())
+            for name in missing:
+                hits[(outcome.slug, name)] += 1
+    for (slug, name), count in sorted(hits.items()):
+        out.append(Finding("missing-data", slug,
+                           "template uses {{%s}}, which the generator never sets; "
+                           "it renders as nothing" % name, count))
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Print-side checks: a different stylesheet, with its own ways to fail
 # ---------------------------------------------------------------------------
@@ -318,5 +363,6 @@ def run_all(bank):
     findings += punctuation_in_inline_math(doc)
     findings += latex_structure(doc)
     findings += nested_elements_in_math(bank)
+    findings += template_fields_without_data(bank)
     findings += bundles(bank.abspath())
     return findings
