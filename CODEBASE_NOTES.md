@@ -80,6 +80,8 @@ checkit/                             (repo root)
 │       ├── dashboard.py             deprecated Jupyter widget dashboard
 │       ├── exercise.py              Exercise class + XSLT rendering
 │       ├── outcome.py               Outcome class
+│       ├── checks.py                structural checks on a built bank
+│       ├── smoke.py                 runs generators in-process, for tracebacks
 │       ├── utils.py                 working_directory() context manager
 │       ├── xml.py                   XML namespace constants
 │       ├── static/                  files bundled inside the installed package
@@ -208,7 +210,7 @@ checkit/                             (repo root)
 ### `dashboard/checkit/__init__.py`
 
 ```python
-VERSION = '0.2.8.1'
+VERSION = '0.2.8.4'
 PUBLIC_SEEDS = 50
 INLINE_FORMATS = ("html", "latex", "pretext")
 BUNDLE_FORMATS = ("html", "latex")
@@ -218,7 +220,7 @@ BUNDLE_FILENAME = "derived.json"
 
 Exports `VERSION`, `PUBLIC_SEEDS`, and the precompute coverage lists (`INLINE_FORMATS`, `BUNDLE_FORMATS`, `BUNDLE_FILENAME`).
 
-`VERSION` is read by `setup.cfg` (`version = attr: checkit.VERSION`), so it becomes the wheel's version and filename, and by `__main__.py` when writing a new bank's `requirements.txt`. It is **`0.2.8.1`, not `0.2.8`** — see "Packaging and distribution" for why sharing upstream's number is actively dangerous, and why the obvious `0.2.8+slye.1` does not work. The footer in `App.svelte` still says v0.2.8, which is the upstream release this forked from.
+`VERSION` is read by `setup.cfg` (`version = attr: checkit.VERSION`), so it becomes the wheel's version and filename, and by `__main__.py` when writing a new bank's `requirements.txt`. It is a fourth-component fork version — **`0.2.8.4` as of 2026-08-27, not `0.2.8`** — see Appendix A for why sharing upstream's number is actively dangerous, and why the obvious `0.2.8+slye.1` does not work. Bump it whenever a bank could tell the difference: a new SpaTeXt element is a hard dependency, since the stylesheets drop an unknown element and its contents silently. The footer in `App.svelte` still says v0.2.8, which is the upstream release this forked from.
 
 ---
 
@@ -1050,25 +1052,6 @@ SpaTeXt uses three XSLT 1.0 stylesheets, and they live in exactly one place: `da
 
 ### The SpaTeXt XML Vocabulary
 
-> **`<glyphs>` (added 2026-08-22).** `<glyphs font="egyptian"
-> latex="\\Hone\\Hten">U+13000 U+13001</glyphs>` carries characters whose screen and
-> print forms differ irreducibly. mat-106's Egyptian and Babylonian numerals are
-> Unicode on screen but LaTeX macros in print -- the characters themselves
-> differ, so no font wrapper bridges them and the element holds both. `html.xsl`
-> emits a span sized inline (not by class: this HTML is also read in the LMS
-> exports and the AI payload, where no site stylesheet travels with it);
-> `latex.xsl` prefers the `latex` attribute and otherwise maps `@font` to a
-> command, falling through to plain text for an unknown one rather than emitting
-> an undefined macro that would fail the whole document; `pretext.xsl` emits the
-> characters plainly.
->
-> Adding it touched four files: three stylesheets and
-> `viewer/src/spatext/NodeList/ParagraphNodes.svelte`, which builds DOM from
-> SpaTeXt directly and never sees the XSLT. Each stylesheet's `parseDisplay`
-> select also had to name it -- see the `tikz-image` post-mortem for what
-> happens when that step is missed.
-
-
 Before explaining the stylesheets, here is the complete SpaTeXt element reference. All elements are in the namespace `https://spatext.clontz.org`.
 
 **`<knowl mode="exercise">`** — The root element (or a nested exercise part). `mode="exercise"` on the outermost knowl signals it's an exercise (affects PreTeXt output). A knowl without `mode` renders as a theorem/block in PreTeXt.
@@ -1105,9 +1088,55 @@ Children of `<knowl>`:
 
 Because `viewer.zip` is a gitignored build artifact, the viewer-side fixes only reach end users after `update_viewer.py` (or `build_docs.py`) regenerates it.
 
+**`<glyphs font="..." latex="...">`** (added 2026-08-22) — Characters whose
+screen and print forms differ *irreducibly*. mat-106's Egyptian and Babylonian
+numerals are Unicode on screen but LaTeX macros in print — the characters
+themselves differ, so no font wrapper bridges them and the element carries both.
+`html.xsl` emits a span sized inline (not by class: this HTML is also read in the
+LMS exports and the AI payload, where no site stylesheet travels with it);
+`latex.xsl` prefers the `latex` attribute and otherwise maps `@font` to a
+command, **falling through to plain text for an unknown font** rather than
+emitting an undefined macro that would fail the whole document; `pretext.xsl`
+emits the characters plainly. Reads `text()`, so it holds characters, not markup.
+
+**`<nobreak>`** (added 2026-08-27) — Content that must not be broken across
+lines. `latex.xsl` renders it `\mbox{...}`, `html.xsl` a `white-space: nowrap`
+span, `pretext.xsl` passes the content through. It exists because W4's equations
+are long enough that LaTeX broke them at the operators, which is wrong for a
+question asking which property an equation exemplifies.
+
+Unlike every other element here, `<nobreak>` **wraps other elements**, so all
+three rules call `parseDisplay` rather than reading `text()`. Reading text nodes
+would discard the `<m>` elements it exists to hold together — which is the same
+bug it was introduced to fix, and the reason `<m>` itself must never wrap
+anything (see "The `<m>` wrapper a converted generator leaves behind").
+
+> **Where the line is.** An element earns a place in SpaTeXt if it asserts
+> something about *meaning* that each medium honours differently — "these
+> characters are Egyptian", "these belong together". It does not if it asserts
+> something about *appearance* — `<pagebreak>`, `<vspace>`. Appearance belongs to
+> a print theme; see "Print-specific appearance, without a second source of
+> truth".
+
 **`<list>`** — An unordered list.
 
 **`<item>`** — A list item inside `<list>`. May contain `<p>` and nested `<list>`.
+
+---
+
+**Adding an element touches four files, and three of them fail silently.**
+The three stylesheets and `viewer/src/spatext/NodeList/ParagraphNodes.svelte`,
+which builds DOM from SpaTeXt directly and never sees the XSLT. In each
+stylesheet it is *two* edits: the rule, and naming the element in the
+`parseDisplay` select. `apply-templates` with an explicit `select` processes
+only what is listed, so a rule that is never selected renders nothing, in every
+format, without an error — see the `tikz-image` post-mortem above. `test_subset.py`
+asserts both halves for `<glyphs>` and `<nobreak>`; copy that pattern.
+
+Because `viewer.zip` is a gitignored build artifact, the viewer half only
+reaches users after `update_viewer.py` regenerates it, and a bank only sees a
+new element after the platform version carrying it is installed — the "kill
+undefined elements" rule drops an unknown element *and its contents*.
 
 ---
 
@@ -2102,7 +2131,8 @@ Options:
   -r / --regenerate        Force regeneration even if seeds.json exists
   -i / --images            Also generate PNG image files
   -o / --outcome TEXT      Specific outcome slug to generate (default: ALL)
-Effect: Runs SageMath for each outcome, writes assets/bank.json
+Effect: Runs each outcome's generator, writes assets/bank.json.
+        Plain Python by default; SageMath only for a generator.sage.
 Code: __main__.py:generate() -> bank.Bank.generate_exercises() ->
       outcome.Outcome.generate_exercises() -> wrapper/__init__.py:sage() ->
       subprocess running wrapper/wrapper.sage
@@ -2113,6 +2143,14 @@ Code: __main__.py:generate() -> bank.Bank.generate_exercises() ->
 Options: none
 Effect: Extracts viewer.zip into docs/, copies assets/ to docs/assets/
 Code: __main__.py:viewer() -> bank.Bank.build_viewer()
+```
+
+**`checkit check`**
+```
+Options: --generators/--no-generators   run every generator in-process
+         --built/--no-built             check the built bank.json and bundles
+Effect: Structural checks; exits non-zero on findings. See "Checking a build".
+Code: __main__.py:check() -> checks.run_all() and smoke.run_generators()
 ```
 
 **`checkit tui`**
@@ -2267,6 +2305,13 @@ Modify `dashboard/checkit/static/html.xsl` and rebuild `viewer.zip` with `update
 Modify `viewer/src/templates/assessmentTemplate.tex`. The template uses Mustache. The `{{{latex}}}` placeholder is each exercise's LaTeX output (note triple braces for unescaped HTML, which in Mustache also bypasses HTML escaping — necessary here since LaTeX contains characters like `\`, `{`, `}`).
 
 ### Letting a bank declare its own LaTeX preamble (not implemented)
+
+> **Read "The split worth committing to" first.** That section places this
+> question: a bank declaring \usepackage{...} is stating a
+> *dependency* -- its content does not compile without \textpmhg --
+> not choosing a style, which is why it belongs to the bank rather than to a
+> print theme. What follows is the mechanics of getting it there, which are
+> the hard part.
 
 Wanted because `assessmentTemplate.tex` is currently the *platform's* file, identical for every bank, so a bank's LaTeX package requirements (e.g. `tkz-euclide`) have to be hardcoded into it for everyone. Worth understanding why this is a project rather than a one-liner:
 
@@ -2498,57 +2543,21 @@ build even when nothing meaningful did, so it would produce a stream of
 meaningless 1.1 MB diffs. Making the zip deterministic would fix that; nobody
 has needed to yet.
 
-### VERSION: `0.2.8.1`, and why not `0.2.8+slye.1`
-
-The fork needs a version distinct from upstream's, or `pip show
-checkit-dashboard` cannot tell you which one is installed.
-
-`0.2.8+slye.1` is the semantically correct form — a PEP 440 *local version*
-means precisely "this upstream release plus local changes" — and it does not
-survive GitHub. Uploading
-`checkit_dashboard-0.2.8+slye.1-py3-none-any.whl` to a release rewrites the `+`
-to `.`, and pip then refuses the stored file outright:
-
-```
-ERROR: Invalid wheel filename (invalid version):
-'checkit_dashboard-0.2.8.slye.1-py3-none-any'
-```
-
-The wheel would have been undownloadable-by-pip from the only place it is
-published. Hence `0.2.8.1` — digits and dots only, which passes through
-unchanged. `test_packaging.py` asserts the version contains no `+` and differs
-from upstream's `0.2.8`.
-
-> **Principle.** A version string is also a filename, and filenames pass through
-> systems that rewrite characters. Anything that has to survive that round trip
-> should stick to the least expressive form that works.
-
-### The sympy bug, and why it hid for months
-
-`setup.py` duplicates `install_requires` "for GitHub's dependency graph", and
-**setuptools uses setup.py's copy**, because a `setup()` keyword overrides
-`setup.cfg`. `sympy` was added only to `setup.cfg` when the plain-Python
-generator runtime landed. Every wheel this repo produced therefore shipped
-without it, and a clean install could scaffold a bank and then fail to generate
-a single exercise with `ModuleNotFoundError: No module named 'sympy'`.
-
-It was invisible here because the development environment is an *editable*
-install into a venv that already had sympy — nothing ever exercised the
-dependency list. It took building a wheel and installing it into a fresh venv
-to see it, which is not something anyone does by accident.
-
-This is the same shape as the duplicated stylesheets and the duplicated
-`PUBLIC_SEEDS`: one idea, two copies, no enforcement. `test_packaging.py` now
-asserts the two lists agree.
-
 ### Cutting a release
 
+0. **If anything under `viewer/src/` changed, run `dashboard/update_viewer.py`
+   first.** `viewer.zip` is gitignored, so it is not rebuilt by anything the
+   release does and a stale one ships silently — the wheel would carry
+   stylesheets that know a new element and a viewer that does not.
 1. Bump `VERSION` in `dashboard/checkit/__init__.py` (digits and dots only).
 2. `cd dashboard && python -m build --wheel` — output lands in `dashboard/dist/`
    (gitignored).
 3. Install that wheel into a throwaway venv and run `checkit new`,
-   `checkit generate`, `checkit viewer`. This is the only way the packaging
-   bugs above are visible.
+   `checkit generate`, `checkit viewer`, `checkit check`. This is the only way
+   the packaging bugs above are visible. If the release adds a SpaTeXt element,
+   assert it is actually in the installed stylesheets *and* in `viewer.zip`'s
+   bundled JS — the two travel separately and only one of them is tracked by
+   git.
 4. Commit and **push** — a release tags whatever `origin/main` is at publish
    time, so an unpushed commit silently tags the wrong code.
 5. Create the release and upload the wheel. `gh release create` reported a
@@ -2565,9 +2574,22 @@ gh api --method POST -H "Content-Type: application/octet-stream" \
 6. Check the **stored** asset name matches what was uploaded, then publish with
    `gh api repos/<owner>/checkit/releases/<id> --method PATCH -F draft=false`.
 
+7. Install once more **from the published URL** into an empty venv. This is the
+   round trip that caught the `+` mangling: the wheel building and the wheel
+   being downloadable are different claims.
+8. Repoint each bank's `requirements.txt` at the new URL. A bank using a new
+   SpaTeXt element *must* move, because the stylesheets drop an unknown element
+   and its contents without erroring.
+
 Creating it as a draft first is worth the extra step: a draft is invisible,
 creates no tag until published, and can be deleted without trace — which is how
 the `+` mangling was caught before anything went public.
+
+> **`pip show` lies in a development bank.** mat-106's venv has an editable
+> install pointing at the platform checkout, so `pip show checkit-dashboard`
+> reports whatever version was current when it was installed and never updates.
+> To see what is actually running: `python -c "import checkit;
+> print(checkit.__file__, checkit.VERSION)"`.
 
 ---
 
@@ -2740,206 +2762,17 @@ before anyone "tidies" `Exercise.svelte`. The XSLT calls sit inside
 accident. Hoisting any of those calls into a `$:` statement or a shared variable
 would destroy that guarantee and take the student view down with it.
 
-### The two implementations are not equivalent (verified 2026-08-20)
-
-The three stylesheets are byte-identical across `dashboard/checkit/static/` and
-`viewer/src/spatext/xsl/` — `diff` is clean on all three, so the hand-sync
-discipline has held so far. The *calling code* is another matter, and it
-diverged without either copy of the `.xsl` ever changing.
-
-**`subset` and `consumer` are dead parameters.** `Exercise.html_ele()` and
-`Exercise.pretext_ele()` pass `subset` and `consumer` into `etree.XSLT(...)`,
-but no stylesheet declares an `xsl:param` and neither name appears anywhere in
-any `.xsl`. They are accepted and silently ignored — a textbook instance of
-the silent-failure pattern, sitting in the public API of `Exercise`.
-
-This is a **regression, not an unfinished idea**, and the history matters
-because it says the feature is recoverable rather than hypothetical:
-
-- `ccc9b09` (Jan 2022) added `<xsl:param name="subset"/>` and
-  `<xsl:param name="consumer"/>` to `html.xsl`, with `$subset` gating
-  statement/answer output and `$consumer='canvas'` branching for the LMS.
-- `fde75e8` (May 2022, "update spatext") rewrote all three stylesheets and
-  dropped the params — while leaving the Python call signatures behind.
-- `4b48149` ("housecleaning") deleted `xsl/canvas.xsl`, `xsl/brightspace.xsl`
-  and the LMS manifest templates.
-
-So parameterized, LMS-aware, server-side rendering **used to exist here**. The
-browser's JS filtering is a later re-implementation of a capability lost in a
-rewrite. The duplication is not a design decision anyone made; it is drift.
-
-**What the browser does that Python currently cannot.** `outcomeToHtml()` takes
-`mathMode` and `solutions` and applies both *after* the transform, by DOM
-surgery: stripping `[class~="stx-outtro"]` / `stx-intro` / `stx-content` for
-`hide` and `only`, and running KaTeX to MathML for `canvas`/`brightspace`.
-`Exercise.html()` has no equivalent for either and can only produce the
-`all`/`basic` form.
-
-The `latex2mathml` import in `exercise.py` is the other half of the same lost
-feature: `tex_to_mathml()` is defined, never called, and `latex2mathml` is still
-a hard install dependency. Commit `51507be` names the gap it was meant to fill.
-
-**Consequence for option 1 below:** "the Python layer already performs exactly
-these three transforms" is true of the *transform* and false of the *feature*.
-Precomputing requires restoring subset filtering and adding server-side MathML
-first. `ccc9b09` is a known-good reference for the first.
-
-### Measured sizes (2026-08-20)
-
-Rendering every demo outcome to all three formats and comparing against its data
-JSON:
-
-```
-per seed, all 10 outcomes:  data 1,883   html 8,636   latex 5,895   ptx 5,615 bytes
-three formats / data     =  10.7x
-```
-
-`docs/demo/assets/bank.json` is 1.49 MB (10 outcomes x 1000 seeds, data only).
-Inlining all three formats for every seed would take it to roughly **16 MB**,
-downloaded by every visitor on load. HTML alone is ~4.6x, still ~7 MB. A blanket
-inline is therefore out, as previously assumed — but the consumers do not all
-want the same seeds, and that asymmetry is the opening:
-
-| surface | formats | seeds | source |
-|---|---|---|---|
-| instructor tabs | html, latex, ptx | 0 to PUBLIC_SEEDS-1 | `Exercise.svelte` |
-| Copy for AI Chatbot | html | 0 to PUBLIC_SEEDS-1 | `outcomeToAiText` |
-| assessment builder | latex | PUBLIC_SEEDS-999 | `getRandomAssessmentFromSlugs` |
-| LMS export | html x2 (hide + only) | 100-999 | `Export.svelte` (`Array(900)`, `seed=i+100`) |
-
-PreTeXt is **only ever needed for the public seeds**, which is the one clean
-saving available.
-
-**Measure the payload compressed, not raw.** An earlier version of this section
-said inlining the public seeds at `PUBLIC_SEEDS` = 50 costs "~1.0 MB, a 65%
-increase", and concluded it was no longer affordable. That figure was raw JSON
-bytes, which is not what a visitor downloads. Measured on the live site
-(2026-08-21, `performance.getEntriesByType('resource')`):
-
-```
-decodedBodySize (uncompressed): 1,420,295 bytes
-transferSize    (over the wire):  152,441 bytes
-compression ratio: 9.3x            download: 168 ms
-```
-
-`bank.json` is overwhelmingly repetitive -- the same tags, slugs and LaTeX
-fragments over and over -- so it compresses about tenfold, and precomputed HTML
-is *more* repetitive still. Rebuilding the published demo bank with seeds 0-49
-inlined:
-
-| inlined | raw | gzipped |
-|---|---|---|
-| nothing (today) | 1.42 MB | 148 KB |
-| html only | 1.81 MB (+28%) | 163 KB (+10%) |
-| html + latex | 2.07 MB (+46%) | 173 KB (+17%) |
-| all three formats | 2.33 MB (+64%) | **180 KB (+22%)** |
-
-So the honest cost of the full inline tier is about **32 KB more over the
-wire**, on a request that currently takes 168 ms. That is affordable, and the
-earlier warning was wrong. A course bank has roughly 3x the outcomes of the
-demo, so expect roughly 3x these figures and still well under a megabyte.
-
-Two costs compression does *not* remove, and neither is a blocker: the browser
-still parses the full uncompressed JSON (2.33 MB rather than 1.42 MB) and holds
-it in memory, and the raw file still occupies disk in the bank repo. Note also
-that `docs/**` is committed here, and generated files are marked `binary` in
-`.gitattributes` for good reason (see the corrupt-merge incident) -- a
-3x-larger generated JSON makes that more important, not less.
-
-> **Principle.** For anything served over HTTP, "how big is the file" is the
-> wrong question; "how many bytes cross the wire, and how long does that take"
-> is the right one. They differ here by a factor of nine, which is more than
-> enough to reverse a decision.
-
-Also worth knowing: the LMS export calls `outcomeToHtml` twice per seed across
-900 seeds, so **1,800 transforms per outcome per export**, on the main thread.
-Precomputing that surface is a performance win regardless of the deprecation.
-
-### Options
-
-1. **Precompute the derived formats at generate time (recommended).** The Python
-   layer runs these same three transforms via `lxml` (`Exercise.html()` /
-   `.latex()` / `.pretext()`). Emit them at build time and have the viewer fetch
-   rather than transform. Requires first restoring the `subset` filtering and
-   server-side MathML described above — real work, not a rename.
-
-   The strong argument is not the deadline. It is that the transforms exist
-   **twice**, which is why the three stylesheets are duplicated and must be kept
-   in sync by hand (§5), and which is what produced the document-vs-element
-   bug: the browser path silently required a different source node type than the
-   Python path, and only Firefox ever said so. Precomputing collapses two
-   implementations into one.
-
-2. **Replace browser XSLT with a JS/WASM implementation** (a libxslt WASM build,
-   SaxonJS, or hand-porting the stylesheets to TS). Keeps transforms
-   client-side, so no payload or seed-range design is needed, and it is the
-   smallest behavioral change. But it adds a dependency and *preserves* the
-   dual-implementation problem that caused the bug — it buys time without
-   buying simplification.
-
-3. **Drop derived formats from the browser entirely**, moving export to the CLI.
-   Smallest amount of code, largest loss of function for instructors.
-
-### Recommendation
-
-**Option 1, staged, with a two-tier payload. Not a hybrid with option 3.**
-
-The temptation is to send the heavy surfaces (assessment builder, LMS export) to
-the CLI and precompute only the cheap ones. Resist it. Those browser surfaces
-are what the platform is *for* from an instructor's point of view, and a
-CLI-only export is a real downgrade for the audience least likely to want a
-terminal. The reframe that makes this tractable: **"in the browser" is a claim
-about the instructor's experience, not about where the transform executes.** The
-button stays, the download stays, the copy-to-clipboard stays. Only the compute
-moves to build time. Nothing an instructor can do today is lost.
-
-Sequence, in dependency order:
-
-1. **Restore server-side parity first, while browser XSLT still works.** Port
-   `$subset` back into the three stylesheets from `ccc9b09`, and wire
-   `tex_to_mathml()` in for the `canvas`/`brightspace` consumer. Do this
-   *before* touching the viewer, because until 2026-11-17 you can render the
-   same seed both ways and diff them — the browser is a free oracle for
-   verifying the Python output. **That verification window closes on the removal
-   date**, and afterwards there is nothing left to check the port against. This
-   is the step with a real deadline; the rest is ordinary work that can happen
-   whenever.
-
-2. **Emit precomputed formats at generate time, in two tiers.** Inline the
-   public seeds (all three formats) into `bank.json` — that alone fixes the
-   instructor tabs and the AI button with no new fetch machinery, and costs
-   about 32 KB more over the wire (see the payload measurements above). Emit
-   the heavy ranges as per-outcome bundles under `assets/<slug>/generated/`,
-   fetched lazily only when an instructor actually clicks Assessment or Export.
-   The ranges differ per surface, so a partial precompute reintroduces the
-   coverage trap from `--image-seeds` (§ image_seeds): decide the range
-   policy *before* writing the emitter, and make a missing range fail loudly
-   rather than render blank.
-
-3. **Switch the viewer to read, then delete.** Replace the three
-   `XSLTProcessor` calls in `utils/index.ts` with lookups, then delete
-   `viewer/src/spatext/xsl/` outright. One implementation of the transforms
-   remains, in `lxml`, and §5's hand-sync requirement disappears with it.
-
-Two things to design rather than default:
-
-- `bank.json` becomes a compatibility surface. A bank generated by an older
-  CheckIt will not carry the precomputed keys, and the viewer must say so rather
-  than render an empty tab — the same concern recorded for `<ai-prompt>` and
-  for the bank-declared LaTeX preamble.
-- Build time grows by 1000 seeds x 3 transforms per outcome. Expect the same
-  staleness pressure `compile_tikz_for_outcome` already has, and plan to skip
-  unchanged outcomes rather than discovering the cost after the first full run.
-
-What this does *not* solve: the assessment `.tex` template is still baked into
-the bundle at build time (see "Letting a bank declare its own LaTeX preamble"),
-and that remains an independent problem.
-
 ### Status
 
-**Step 1 is complete as of 2026-08-21.** `Exercise` can now produce everything
-the viewer produces: filtered subsets, MathML for the LMS, and absolute image
-URLs. Step 2 (emitting the precomputed formats) is not started.
+**All three steps are complete as of 2026-08-21.** `Exercise` produces
+everything the viewer produces (filtered subsets, MathML for the LMS, absolute
+image URLs), `generate` emits the precomputed formats, and the viewer reads them
+instead of transforming. The migration write-ups — the measurements, the option
+comparison, and the two implementation steps — are in Appendix A; what stays
+here is the deadline itself, what step 1 landed, and the questions still open.
+
+Still open: whether MathML is the right target for Canvas at all, and Firefox,
+which has never been exercised. Both below.
 
 What landed:
 
@@ -2957,7 +2790,14 @@ What landed:
   `<exercise>` would emit structurally invalid PreTeXt, so that wants designing
   against a real consumer rather than guessing.
 - `latex.xsl` is untouched. `Exercise.latex()` accepts no `subset` and
-  `outcomeToLatex()` does not filter, so there is nothing to reach parity with.
+  `outcomeToLatex()` does not filter, so there was nothing to reach parity with
+  at the time.
+
+  **That is now the gap.** `latex.xsl` hides answers by unconditionally emitting
+  `\renewcommand{\stxOuttro}[1]{}` with a comment telling a human to delete the
+  line — the same decision `subset` expresses as a parameter in `html.xsl`, done
+  a second way in a second file. The print tool needs answer keys, so it needs
+  this settled; see "What is missing, concretely" under the print tool.
 
 Then the other two halves:
 
@@ -3027,118 +2867,6 @@ redesigning it. Deciding whether LaTeX would do — which would delete the
 consumer concept entirely — needs a real Canvas course to import into, not
 documentation.
 
-### Step 2, the emitter (done 2026-08-21; the viewer half is not)
-
-**Only `XSLTProcessor` disappears.** This is the realisation that shrank step 2,
-and it is worth stating plainly because it is easy to assume the whole of
-`outcomeToHtml()` is at risk. It is not: `DOMParser`, `querySelector`,
-`katex.render` and the class-based node removal all survive the deprecation
-untouched. The viewer therefore needs only the **base** rendering precomputed
-— `subset='all'`, `consumer='basic'` — and can keep applying its own
-`solutions` filtering and LMS MathML on top of it.
-
-Emitting every `subset` x `consumer` combination instead would have multiplied
-the payload roughly fourfold to replace code that still runs. It would also have
-been slower to build and no safer.
-
-That leaves the server-side `subset` and `consumer` support from step 1 off the
-critical path for the viewer migration. They are not wasted — they are what a
-CLI export would use, and building them is what produced the tested oracle
-proving the two filtering implementations agree — but the honest description
-is that step 1 was scoped slightly wider than the migration strictly required.
-
-**The coverage policy, decided before the emitter was written.** The ranges are
-unequal, and unequal coverage is exactly the trap `--image-seeds` set once:
-
-| tier | formats | seeds | where |
-|---|---|---|---|
-| inline | html, latex, pretext | 0 to `PUBLIC_SEEDS`-1 | inside `bank.json` |
-| bundle | html, latex | `PUBLIC_SEEDS` to end | `assets/<slug>/generated/derived.json` |
-
-PreTeXt is absent from the bundle deliberately: its only consumer is the
-instructor tab, and the version picker cannot reach past `PUBLIC_SEEDS`, so it
-would be dead weight for 950 seeds per outcome.
-
-The policy is **declared in `bank.json`** under a `precomputed` key rather than
-left implicit, so a consumer can ask "was this emitted?" instead of inferring a
-hole from rendering nothing. A bank generated before this exists has no such
-key at all, which is how the viewer will tell "not precomputed" from
-"precomputed but missing this seed".
-
-**Measured cost** (published demo bank, 8 outcomes x 1000 seeds):
-
-- inline tier: `bank.json` 1.42 MB -> 2.33 MB raw, but 149 KB -> 180 KB over
-  the wire, because it compresses about tenfold
-- bundle tier: ~1.4 MB raw per outcome, ~51 KB over the wire (this content
-  compresses about 28x), fetched only when an instructor acts
-- on disk a 31-outcome course bank grows by ~44 MB of generated files. Banks
-  gitignore `assets/**/generated`, so that lands in the repo only once
-  published under `docs/**`, where git's own compression absorbs most of it.
-
-**`--remote` is now required when a bank has images.** Precomputed HTML has to
-carry absolute `<img src>` values, and the check runs *before* anything is
-written so a build fails at once rather than several minutes in, and names the
-offending outcomes. `--no-precompute` skips the whole thing and also deletes any
-stale bundles, so `bank.json` never says "not precomputed" while old bundles sit
-beside it.
-
-### Steps 2 and 3, the viewer (done 2026-08-21)
-
-`utils/index.ts` no longer contains the word `XSLTProcessor`, and
-`viewer/src/spatext/xsl/` is gone. **The three stylesheets now exist once**, in
-`dashboard/checkit/static/`, and §5's hand-sync requirement is retired. The
-bundle shrank 603.6 KiB → 588.3 KiB, which is the inlined stylesheets leaving.
-
-How it reads:
-
-- `outcomeToLatex` and `outcomeToPtx` return the stored string directly.
-- `outcomeToHtml` parses the stored base HTML with `DOMParser` as `text/html`,
-  then applies its existing `solutions` filtering and LMS MathML. Those were
-  never XSLT and did not need replacing.
-- Seeds at or above `inline_below` need their outcome's bundle, so the
-  assessment builder and the LMS export `await ensureDerivedForSlugs(...)`
-  before rendering. One await at the top of each keeps every builder below it
-  synchronous. Bundles are fetched at most once per outcome and cached.
-
-**An old bank refuses rather than falling back.** A bank with no `precomputed`
-key gets a message naming the command to run. The alternative — keeping
-`XSLTProcessor` as a fallback — works only until Chrome 158 and would have kept
-the browser stylesheets alive forever, which is the duplication this whole
-migration exists to remove.
-
-**Every read failure renders.** This needed a second pass: the first version
-threw from inside markup, and Svelte's response to that is to leave the tab
-*blank*. An instructor clicking "Raw HTML" saw nothing at all, with the
-explanation only in the console — a silent failure introduced by the very code
-meant to prevent one. `Exercise.svelte` now renders the message, and the AI copy
-button distinguishes "could not build the payload" from "the clipboard refused",
-which are different problems with different fixes.
-
-Verified in a browser against two real banks: the current demo (student view,
-all three instructor tabs, the AI button, and an assessment that fetched two
-bundles and produced 2.8 KB of LaTeX with no `undefined` in it), and a
-deliberately stripped copy with no `precomputed` key, which shows the
-regenerate-me message in the tabs and in the assessment builder.
-
-Verification, and the first tests this repo has ever had, in `dashboard/tests/`
-(stdlib `unittest`, hermetic SpaTeXt fixtures, no bank or generated data
-needed). The core test asserts the two implementations agree rather than
-comparing against a golden file. Also confirmed: `subset='all'` output is
-byte-identical to the pre-change stylesheet across the demo bank, and a real
-Chromium `XSLTProcessor` agrees with `lxml` on every fixture and subset
-(`browser_harness.py`). The suite is mutation-checked.
-
-Two things this does **not** cover. Firefox was not exercised — the
-document-vs-element bug was Chromium-invisible, so `browser_harness.py` should
-be run there too before the viewer is rebuilt. And `static/viewer.zip` is still
-the pre-change build, so the browser-facing edit is inert until
-`update_viewer.py` runs; that also means there are effectively *three* copies
-of each stylesheet, the third being the one Vite inlined into the bundle.
-
-
-Sources: whatwg/html#11523, mozilla/standards-positions#1287,
-https://developer.chrome.com/docs/web-platform/deprecating-xslt
-
 ## Generator runtimes: plain Python (default) and SageMath (optional)
 
 **Implemented 2026-08-04.** Authoring no longer requires SageMath, and therefore
@@ -3170,17 +2898,6 @@ to `generator.sage`. Consequences worth knowing:
 
 The entry point was renamed `sage()` → `run_generator()`, since a function named
 `sage()` that may launch Python is actively misleading.
-
-### Why this was cheap: the important seam already existed
-
-`json_ready()` converts every generated value to a **string** before it reaches
-`seeds.json`. No backend object has ever crossed that boundary, so `bank.py`,
-`exercise.py`, the XSLTs and the viewer were always runtime-agnostic and needed
-no changes at all. The subprocess wall was already in the right place; only what
-runs *inside* it changed.
-
-**Do not collapse either wall.** Importing sympy directly into `outcome.py` for
-convenience, or letting a SymPy object into `seeds.json`, would undo this.
 
 ### What `wrapper/wrapper.py` contains
 
@@ -3258,17 +2975,6 @@ but that helper takes an explicitly ordered list, so the trick was unnecessary.
 Note `CheckIt.vars()`'s name-shuffling **is** still needed: SymPy orders the
 terms of a sum by symbol name exactly as Sage does.
 
-### Verified
-
-On a Windows host with no Sage installed: all eight outcomes generate; all eight
-render through `Exercise.latex()`/`.html()`; EX2's product rule, MX1's
-system-matrix correspondence and EX1's exact `-7` slope are correct; KaTeX
-renders SymPy's LaTeX in the browser with zero errors; `--image-seeds` still caps
-PNGs while writing `.tikz` for every seed; `build_docs.py` completes; and an
-assessment generated from the viewer compiles under `pdflatex` to a printable PDF
-containing the TikZ figure — drawn from a seed past the image cap, so it had no
-PNG and relied on the `.tikz` source.
-
 ### Known gaps and future options
 
 - **`matplotlib` is an optional extra** (`pip install checkit-dashboard[plots]`),
@@ -3314,7 +3020,7 @@ PNG and relied on the `.tikz` source.
   *(Assessed, not tested.)*
 
 
-## Where things stand (2026-08-21)
+## Where things stand (2026-08-27)
 
 | | |
 |---|---|
@@ -3322,11 +3028,14 @@ PNG and relied on the `.tikz` source.
 | TikZ image backend | done |
 | Browser XSLT migration (steps 1-3) | done — see "Browsers are removing XSLT" |
 | Viewer shows 50 versions, not 20 | done — `PUBLIC_SEEDS` |
-| First test suite | done — see "Tests" |
-| Fork versioned and released as a wheel | done — v0.2.8.1 |
-| Port mat-106 off its Sage shims | done — 29 outcomes, `mode` retired |
-| mat-206 | **not started, and not a port** -- see below |
-| Print tool as its own package | **not started** |
+| Test suite | done — 97 tests, see "Tests" |
+| Build verification | done — `checkit check`, see "Checking a build" |
+| Fork versioned and released as a wheel | done — **v0.2.8.4** |
+| Port mat-106 off its Sage shims | done — 28 outcomes + 1 associate, `mode` retired |
+| mat-106 published and verified | done — 2026-08-27, no `checkit check` findings |
+| SpaTeXt elements for per-medium differences | done — `<glyphs>`, `<nobreak>` |
+| mat-206 | **not started, and not a port** — see below |
+| Print tool as its own package | **next** — see "The print tool" |
 
 Known open questions, none blocking:
 
@@ -3339,6 +3048,37 @@ Known open questions, none blocking:
   project before.
 - **The LMS export hardcodes 900 versions per outcome**, which is what makes the
   published `docs/` 25 MB. Reducing it is an instructor-facing choice.
+- **No printed output has been compiled since the port.** Every check written so
+  far reads the emitted LaTeX, not a PDF. `checkit check` will tell you the
+  document is well-formed; it cannot tell you the page looks right. The print
+  tool is where that gets exercised for the first time.
+
+### The bank has not been reviewed exercise by exercise
+
+**Worth knowing before trusting a clean `checkit check`.** On 2026-08-27 a
+human spot-check of four outcomes found all four rendering visibly wrong
+content, and each fix exposed the next problem:
+
+| | rendering as | since |
+|---|---|---|
+| `N1`, `N1-E` | "is a multiple of" — *both numbers missing* | the port |
+| `W4` | a bare `\mbox{`; print would not compile | the port |
+| `D4` | `27.6\%` and `\$770.13`, literally | the port |
+| `R2` | `228 // 12`, `228 % 12`, `ceiling(...)` | earlier |
+| `W4` (embedded W4-E) | "explaining the &nbsp; to an elementary student" | the port |
+| `D1-E` | "If one &nbsp; represents one unit… ten **s** to create a single &nbsp;" | **predates the port** |
+
+Every one of them was found by a person looking at a page, and every automated
+check in place at the time passed them. `D1-E` is the one to keep in mind: it
+was broken before any of this work started, in an outcome nobody had cause to
+open.
+
+The checks now catch that whole family — empty substitutions, swallowed markup,
+TeX in prose, uncompilable LaTeX — and `checkit check` is clean across all 28
+outcomes. But **roughly 23 outcomes have never been read closely by anyone**,
+and the checks only know about faults that have already bitten. A pass through
+the bank, one outcome at a time, is unglamorous and is the highest-value
+unstarted work on this list after the print tool.
 
 ### Known platform bugs
 
@@ -3403,9 +3143,10 @@ two-outcome fixture: `PLAIN` has no figures and `FIGURED` does, which is exactly
 the pair both symptoms need. Seven of its ten tests fail against the unfixed
 code; the three that pass describe behaviour that was already correct.
 
-## Planned: porting the course banks, and a separate print tool
+## Next: mat-206, and a separate print tool
 
-Not started. Recorded so the reasoning survives.
+mat-106 is done and published; what remains here is mat-206 (which is not a
+port -- see below) and the print tool, which is the next thing to start.
 
 One thing that turned up while testing `latex2mathml` and makes the port easier
 than it looks: **the course banks' generators are already plain Python.** They
@@ -3434,113 +3175,6 @@ Those banks also each carry a copy of a print pipeline (`pdfgenerator.py`,
 single PDF: many exercise versions, distributed by seating chart, student names
 inserted, answer keys appended. That is *not* CheckIt's assessment builder, which
 produces one anonymous assessment.
-
-### `mode` is the wrong layer, and what replaces it (resolved 2026-08-22)
-
-**No generator in mat-106 branches on `mode` any more.** All nine are converted,
-in three groups.
-
-
-Nine generators in mat-106 took a `mode='html'|'latex'` argument and branched on
-it. Six were the same workaround for one false belief -- that a SpaTeXt text
-field could not carry mathematics -- and all six are gone, replaced by
-`bank_helpers.spatext_math()` emitting `<m>` elements from the TeX the
-generators already wrote.
-
-The remaining three are not that, and they are worth separating because they
-pull in opposite directions.
-
-**W1 and W1-E are a presentation difference.** Egyptian numerals are set with
-`\textpmhg` for print and `\Huge` in the browser, because that LaTeX font has
-no web equivalent. The content is identical; only its rendering differs. That is
-precisely what the three stylesheets exist for, so the fix belongs there: a
-SpaTeXt element (say `<glyphs font="...">`) that `html.xsl` renders as a styled
-span and `latex.xsl` as `\textpmhg{...}`. Adding a SpaTeXt element is the
-documented multi-file dance (§12), now three files rather than six.
-
-**R1 is a content difference tied to purpose.** Its `versions` and
-`html_versions` dictionaries share no keys, but the names pair up: `add-coladd-1`
-against `add-coladd-1p`. Comparing a pair shows they are different problems, and
-the print one has empty `thinking` and `feedback` fields -- because print is the
-student handout, where those are blanks to write in, while the viewer copy
-carries model answers for self-study.
-
-That is a real distinction, but it is not about the *medium*: it is about
-whether an exercise is for browsing or for assessment. The seed ranges already
-encode exactly that (§ "Bound the precomputed range"): 0..PUBLIC_SEEDS-1 is what
-students browse, everything above it feeds assessments, printed or exported. So
-R1 wants neither `mode` nor a variant -- it wants to branch on `self.seed`,
-which `BaseGenerator` already exposes for this purpose:
-
-    def data(self):
-        studying = self.seed < PUBLIC_SEEDS
-        return generate(pool='self_study' if studying else 'assessment')
-
-A variant would fit badly here: variants are dealt evenly across all seeds, so
-roughly half of the versions a student browses would come from the assessment
-pool.
-
-**How the nine were actually split.**
-
-* Six were the same false belief -- that a text field could not carry maths --
-  and were fixed by emitting `<m>` elements: N2, F5, W4, N1, N1-E through
-  `bank_helpers.spatext_math()`, which rewrites the TeX the generators already
-  wrote; **R2 by hand**, writing `<m>` directly into its f-strings. Worth
-  knowing before editing R2: running `spatext_math` over a string that already
-  contains `<m>` would escape it into visible `&lt;m&gt;`, since the function
-  escapes everything outside the maths it matches. D4 was added to the
-  `spatext_math` group later (2026-08-27) for `\$` and `\%`.
-* Two were a genuine per-medium difference in the characters themselves, and
-  became `<glyphs>`: W1 and W1-E.
-* One was a difference of purpose rather than medium, and became a branch on
-  `self.seed`: R1.
-
-**There was a fourth kind, and it was missed (found 2026-08-27).** W4 also used
-`mode` for *typesetting control*: its equations are long, LaTeX broke them at
-the operators, and `\mbox` was the fix. The generator wrote `\mbox{$...$}` and
-a `clean_latex_string` helper stripped it again when `mode == 'html'`. Print
-was the default, so print got the boxes and the browser did not.
-
-Retiring `mode` deleted the branch and orphaned `clean_latex_string` --
-defined, never called -- leaving `\mbox` in the string for both media. The
-template's `<m>` wrapper then swallowed it into `\(\mbox{\)`: an unmatched
-brace inside math mode, which does not compile. **Print was broken for 50
-versions of W4 while every HTML check was green,** and nothing noticed because
-the mode-drop commit landed 46 minutes after the last `docs/` build and was not
-built again for five days.
-
-The fix is `<nobreak>`, the same shape as `<glyphs>`: `latex.xsl` renders it
-`\mbox{...}`, `html.xsl` a `white-space: nowrap` span, `pretext.xsl` passes the
-content through. W4 emits two of them per equation, matching the original
-`\mbox{$...$} \mbox{$...$}` -- a break *between* the sides is fine, a break
-inside either is not.
-
-Unlike `<glyphs>`, this element **wraps** other elements, so every rule calls
-`parseDisplay` instead of reading `text()`. Reading text nodes would discard
-the `<m>` elements it exists to hold together, which is the same bug it was
-introduced to fix.
-
-> **Principle.** "Purely presentational" is not the same as "safe to delete".
-> Presentation is the whole deliverable for print, and the browser is not the
-> medium that proves it. A per-medium difference always has a stylesheet home;
-> removing the branch without building that home just loses the requirement.
-
-**A lesson about verification, not just about `\mbox`.** Every check written
-during the port read the HTML. The LaTeX comes from a different stylesheet with
-its own rules, and it shipped an uncompilable document while the HTML checks
-passed. The print-side checks worth keeping are cheap and structural: brace
-balance across the whole document, brace balance inside each `\(...\)`, and
-text-mode commands appearing inside inline maths. `\(\textbf{W1}\)` is the one
-standing exception -- the outcome-title element, legal and deliberate.
-
-Templates that receive generated markup must inject with **triple** braces, or
-Mustache escapes it into visible `&lt;m&gt;`. That in turn makes the prose the
-generator emits XML-relevant, which is why `spatext_math` escapes everything
-outside the maths it wraps. Two traps found by looking at rendered output rather
-than at the data: a field wrapped in `<m>` by its template silently swallows any
-element inside it, because `html.xsl`'s rule for `<m>` reads only text nodes;
-and a LaTeX spacing command that was harmless inside a maths field becomes
-literal text once the content is no longer inside one.
 
 ### The `<m>` wrapper a converted generator leaves behind (found 2026-08-27)
 
@@ -3685,34 +3319,21 @@ bytes. `outcomes/slye_math.py` is a copy of mat-106's, not a sibling: 27 of its
 `generator.sage` shims, a `pdfgenerator.py`, and a `requirements.txt` pinning
 `checkit-dashboard == 0.2.7`, all inherited by copy rather than written.
 
-What *is* real is `bank.xml`: 28 outcomes with genuine titles, slugs,
+What *is* real is `bank.xml`: **31 outcomes** with genuine titles, slugs,
 descriptions and a colour map (prefixes `G`, `M`, `A`, `S` -- geometry,
-measurement, algebra, statistics). That is the specification. The work is
-authoring 30 generators against it, not migrating anything.
+measurement, algebra, statistics). That is the specification, and it is a
+larger one than mat-106's 28. The work is authoring generators against it, not
+migrating anything.
+
+(There are 30 `outcomes/*/` directories against 31 declared outcomes, so the
+scaffold does not even cover its own manifest. Worth reconciling before writing
+anything.)
 
 Consequences for the roadmap steps below: steps 1, 2 and 5 are moot for mat-206
 (there is nothing to move, unwrap, or audit), step 3 is moot (no generator
 mentions `mode`), and step 4 is moot (no generator mentions `course_progress`).
 What mat-206 should inherit is mat-106's *finished* `bank_helpers.py`, dropped
 in at the bank root, and the `Generator` class shape -- not its history.
-
-### The bank port (mat-106; done)
-
-1. Move `slye_math.py` from `outcomes/` to the **bank root**, renamed
-   `bank_helpers.py` — `load_generator()` adds the bank root and the generator's
-   own folder to `sys.path`, not `outcomes/`.
-2. `pygenerator.py` → `generator.py`, wrapped in the `Generator` class; delete
-   `generator.sage`. Roughly 775 lines of shim disappear across 31 outcomes.
-3. Drop the `mode='html'|'latex'` parameter. Only ~9 generators branch on it, and
-   8 of those are formatting; emit `<m>` in the string instead (see the `WORDS`
-   walkthrough) and let the print side convert. `R1` is the exception — it
-   selects genuinely different content and wants `variants`, or splitting in two.
-4. Convert `course_progress` and friends to **`variants`**. Only five outcomes
-   read them (R1, R2, W4, W4-E, W5) and most are binary, so the variant space is
-   small. Today the value is frozen in each shim, so advancing the semester means
-   editing files and regenerating; as a variant it is pregenerated across all
-   cases and *filtered* at print time.
-5. Check LaTeX literals are raw strings: `"rac"` makes `` a formfeed.
 
 ### The print tool
 
@@ -3723,21 +3344,161 @@ not platform concerns, and it would worsen upstream merges) and not in a bank
 
 Intended shape: consume a bank's pregenerated `seeds.json` rather than importing
 generators, so printing needs no generation step and printed versions are
-reproducible. Draw from **seeds ≥ 20**, which the viewer does not expose, so
-students cannot look up the printed version. Join the roster locally — student
-names never enter the bank at all.
+reproducible. Draw from **seeds at or above `PUBLIC_SEEDS`**, which the viewer
+does not expose, so students cannot look up the printed version. Join the roster
+locally — student names never enter the bank at all.
 
-Open questions, all deliberately unanswered:
+**Start by compiling something.** No printed output has been produced since the
+port. `checkit check` verifies the emitted LaTeX is well-formed; nothing has
+verified it *typesets*. The first useful hour of this work is taking the current
+`latex` output for one outcome, dropping it into `main_template.tex`, and
+running it — that will surface the real state faster than any amount of reading.
 
-- `skillcheckpoints.sty` and `main_template.tex` may have drifted between the two
-  banks, and the `.sty` wants cleaning up regardless. Whether the package ships
-  one layout with overrides or needs real theming depends on how far apart they
-  are. The layout must stay **instructor-editable** either way; whether that
-  means exposing the files directly or providing a mechanism is undecided.
+### Print-specific appearance, without a second source of truth
+
+This is the open design question, and it is worth getting right because the
+project has already paid twice for getting the same question wrong (`mode`, the
+duplicated stylesheets).
+
+**The tension.** Printing needs decisions SpaTeXt deliberately cannot express:
+paper size, columns, how much room to leave for work, whether answers appear,
+where the name goes, how versions are distributed across a seating chart. None
+of that is a property of the mathematics. But it has to come from *somewhere*,
+and the two obvious somewheres are both wrong:
+
+- **In the generator.** This is `mode` again. It puts a per-medium decision in
+  the one place that has no business knowing about media, and it cannot be kept
+  consistent across 30 outcomes by anything but discipline.
+- **In SpaTeXt, as new elements.** A `<pagebreak>` or `<vspace>` poisons the
+  vocabulary: the same content now renders wrong on screen, and every consumer
+  — viewer, LMS export, chatbot payload — has to learn to ignore it.
+
+**The line to hold.** An element earns a place in SpaTeXt if it asserts
+something about *meaning* that each medium then honours differently. It does
+not if it asserts something about *appearance on a page*.
+
+- `<glyphs>` qualifies: "these characters are Egyptian numerals" is a claim
+  about the content. Print reaches for `\textpmhg`, the browser for a styled
+  span, and neither is written by the author.
+- `<nobreak>` qualifies, though it is the boundary case and worth being careful
+  about. It says "these belong together", which is a claim about the content's
+  integrity. It does *not* say "insert 30pt here". Print honours it with
+  `\mbox`, the browser with `white-space: nowrap`.
+- `<pagebreak>` does not qualify. There is no reading of it that is about the
+  mathematics.
+
+Anything on the wrong side of that line belongs to the **publication**, not the
+bank.
+
+### The mechanism is already half-built
+
+The important thing to notice before designing anything: **`latex.xsl` does not
+emit layout. It emits semantic commands and lets a preamble define them.**
+
+```latex
+%%%%% SpaTeXt Commands %%%%%
+\providecommand{\stxKnowl}{}\renewcommand{\stxKnowl}[1]{#1}
+\providecommand{\stxOuttro}{}\renewcommand{\stxOuttro}[1]{#1}
+\providecommand{\stxTitle}{}\renewcommand{\stxTitle}[1]{#1}
+% Comment next line to show outtros
+\renewcommand{\stxOuttro}[1]{}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+```
+
+That is already the PreTeXt idea in miniature: one source, and a separate file
+that decides how this particular publication renders it. A print theme is a
+`.sty` that redefines `\stxKnowl`, `\stxOuttro` and `\stxTitle` — no new SpaTeXt,
+no generator changes, no second copy of any exercise. **The direction is right;
+the vocabulary is just too small to be useful yet.**
+
+### What is missing, concretely
+
+1. **Structure is hardcoded where it should be a hook.** Nested knowls emit a
+   literal `\begin{enumerate}` / `\item`, and `<list>` emits `\begin{itemize}`.
+   A theme that wants tasks lettered (a), (b), (c), or wants each task in a
+   framed box with ruled space beneath, cannot get there — it would have to
+   redefine `enumerate` globally and hope nothing else uses it. These want to
+   become `\stxTasks{...}` / `\stxTask{...}`, defaulting to the current
+   `enumerate` behaviour so nothing changes until a theme asks for it.
+
+2. **The document cannot say what it is.** Nothing in the emitted LaTeX records
+   which outcome or which seed a chunk came from. A theme cannot print "W4 ·
+   version 137" in a margin, and the print tool cannot assemble a keyed answer
+   sheet from the same source it printed from. An `\stxExercise{slug}{seed}{...}`
+   wrapper would fix both, and costs one template in `latex.xsl`.
+
+3. **Hiding answers is done by a comment, not a parameter.** `html.xsl` takes a
+   `subset` parameter (`all` / `statement` / `answer`); `latex.xsl` instead
+   always emits `\renewcommand{\stxOuttro}[1]{}` with a note telling a human to
+   comment it out. That is the same idea implemented two different ways in two
+   files — the exact shape this codebase keeps getting bitten by. `latex.xsl`
+   should take `subset` too, and `Exercise.latex_ele()` should pass it. The
+   command-redefinition trick can stay as the *mechanism*; it is the decision
+   that should be a parameter.
+
+4. **Nothing declares the macros the content needs.** W1's output calls
+   `\textpmhg`, `\babo`, `\Hone`. Those are not style choices — the document
+   does not compile without them — but there is no place for a bank to say so.
+   See "Letting a bank declare its own LaTeX preamble", which is the same
+   problem approached from the other side.
+
+### The split worth committing to
+
+Three things, three homes. This is the part to get right; the rest is
+implementation.
+
+| | declares | lives in |
+|---|---|---|
+| **bank** | what the content *says*, and the macros it needs to compile (`\babo`, `\Hone`, the font package) | the bank, next to `bank.xml` |
+| **theme** | how `\stxKnowl`, `\stxTask`, `\stxOuttro` render — boxes, spacing, numbering | a `.sty`, shipped with the print tool, overridable |
+| **publication** | what *this run* wants: paper, columns, answers on or off, how many versions, seating policy, roster | a file in the course repo, versioned with the course |
+
+The bank column is the one people get wrong. A bank declaring `\usepackage{...}`
+is not styling — it is stating a dependency, the same way a generator importing
+`inflect` states one. A bank declaring `\geometry{margin=1in}` *is* styling, and
+belongs one column right.
+
+**Why a publication file rather than CLI flags.** Same reason PreTeXt uses one:
+a print run has too many decisions to pass on a command line, they need to be
+reproducible six months later, and they differ per course rather than per
+invocation. It should be plain data — the tool reads it, nothing executes it —
+and it should be diffable, so "why did this semester's handout change" has an
+answer.
+
+**What not to copy from PreTeXt.** Its publisher file is large because PreTeXt
+targets many output formats with deep customisation each. This needs one output
+format done well. Start with the handful of settings the two existing
+`main_template.tex` files actually differ on, and add settings when a real
+course needs one — a schema invented up front will mostly be wrong.
+
+### Before designing further, read the two existing pipelines
+
+`skillcheckpoints.sty` and `main_template.tex` exist in both banks and have
+probably drifted. **Diff them first.** How far apart they are decides whether
+the tool ships one theme with a few overrides or needs real theming, and that
+is a much better basis than a guess. The `.sty` wants cleaning up regardless.
+
+Whatever the answer, the layout has to stay **instructor-editable**: this is a
+tool for someone who knows LaTeX and will want to change how the page looks
+without filing an issue. Exposing the `.sty` directly is the cheapest way to
+keep that true, and "the theme is just a file you can edit" is a better promise
+than any options schema.
+
+### Open, and deliberately unanswered
+
 - The eventual goal is a GUI replacing much of the current Google Sheet: pull
   responses from Google Forms directly, set up the form and sheet for a new
   course, and drive printing. That makes the existing CSV-scraping code
   throwaway, so it is not worth porting carefully.
+- Whether the answer key is a separate compile of the same source with
+  `subset='answer'`, or one compile emitting both, is undecided. The first is
+  simpler and matches how `subset` already works; the second keeps version
+  numbering trivially consistent between handout and key.
+- Whether print draws from `derived.json` (pre-rendered LaTeX, no XSLT at print
+  time) or re-renders from `seeds.json` (slower, but picks up stylesheet fixes
+  without regenerating the bank). `BUNDLE_UNTIL` currently caps the pre-rendered
+  range at 400, so a print run wanting more versions than that has already
+  answered this question by force.
 
 ## Local divergences from upstream StevenClontz/checkit
 
@@ -3827,3 +3588,531 @@ upstream merge doesn't silently revert them:
 - The devcontainer installs a current TeX Live (2026) from upstream tlnet (scheme-infraonly + tlmgr), NOT Debian's apt texlive (which is 2019 and too old for current tkz-euclide/tkz-elements). Add LaTeX packages by extending the tlmgr install list in .devcontainer/setup.sh.
 - poppler-utils (pdftoppm) is installed via apt in setup.sh.
 - TikZ compilation currently lives in wrapper/. Revisit whether image-rendering backends deserve their own package once PreFigure is added (premature now with only one such file).
+
+---
+
+# Appendix A: closed decisions
+
+Everything below is **finished**. The decision was made, the work landed, and
+nothing here tells you what to do next -- it is kept because the reasoning is
+harder to reconstruct than the code, and because two of these were re-litigated
+once already before anyone found the note.
+
+If you are looking for what to work on, this is the wrong end of the file:
+see "Where things stand".
+
+## Packaging
+
+### Why the fork version is `0.2.8.N` and not `0.2.8+slye.N`
+
+The fork needs a version distinct from upstream's, or `pip show
+checkit-dashboard` cannot tell you which one is installed.
+
+`0.2.8+slye.1` is the semantically correct form — a PEP 440 *local version*
+means precisely "this upstream release plus local changes" — and it does not
+survive GitHub. Uploading
+`checkit_dashboard-0.2.8+slye.1-py3-none-any.whl` to a release rewrites the `+`
+to `.`, and pip then refuses the stored file outright:
+
+```
+ERROR: Invalid wheel filename (invalid version):
+'checkit_dashboard-0.2.8.slye.1-py3-none-any'
+```
+
+The wheel would have been undownloadable-by-pip from the only place it is
+published. Hence `0.2.8.1` — digits and dots only, which passes through
+unchanged. `test_packaging.py` asserts the version contains no `+` and differs
+from upstream's `0.2.8`.
+
+> **Principle.** A version string is also a filename, and filenames pass through
+> systems that rewrite characters. Anything that has to survive that round trip
+> should stick to the least expressive form that works.
+
+### The sympy bug, and why it hid for months
+
+`setup.py` duplicates `install_requires` "for GitHub's dependency graph", and
+**setuptools uses setup.py's copy**, because a `setup()` keyword overrides
+`setup.cfg`. `sympy` was added only to `setup.cfg` when the plain-Python
+generator runtime landed. Every wheel this repo produced therefore shipped
+without it, and a clean install could scaffold a bank and then fail to generate
+a single exercise with `ModuleNotFoundError: No module named 'sympy'`.
+
+It was invisible here because the development environment is an *editable*
+install into a venv that already had sympy — nothing ever exercised the
+dependency list. It took building a wheel and installing it into a fresh venv
+to see it, which is not something anyone does by accident.
+
+This is the same shape as the duplicated stylesheets and the duplicated
+`PUBLIC_SEEDS`: one idea, two copies, no enforcement. `test_packaging.py` now
+asserts the two lists agree.
+
+## The XSLT migration (2026-08-20 to 2026-08-21)
+
+Browsers dropping XSLT forced the viewer off in-browser transforms and onto
+precomputed formats. The deadline and the still-open questions live in
+"Browsers are removing XSLT"; the measurements and the decision are here.
+
+### The two implementations are not equivalent (verified 2026-08-20)
+
+The three stylesheets are byte-identical across `dashboard/checkit/static/` and
+`viewer/src/spatext/xsl/` — `diff` is clean on all three, so the hand-sync
+discipline has held so far. The *calling code* is another matter, and it
+diverged without either copy of the `.xsl` ever changing.
+
+**`subset` and `consumer` are dead parameters.** `Exercise.html_ele()` and
+`Exercise.pretext_ele()` pass `subset` and `consumer` into `etree.XSLT(...)`,
+but no stylesheet declares an `xsl:param` and neither name appears anywhere in
+any `.xsl`. They are accepted and silently ignored — a textbook instance of
+the silent-failure pattern, sitting in the public API of `Exercise`.
+
+This is a **regression, not an unfinished idea**, and the history matters
+because it says the feature is recoverable rather than hypothetical:
+
+- `ccc9b09` (Jan 2022) added `<xsl:param name="subset"/>` and
+  `<xsl:param name="consumer"/>` to `html.xsl`, with `$subset` gating
+  statement/answer output and `$consumer='canvas'` branching for the LMS.
+- `fde75e8` (May 2022, "update spatext") rewrote all three stylesheets and
+  dropped the params — while leaving the Python call signatures behind.
+- `4b48149` ("housecleaning") deleted `xsl/canvas.xsl`, `xsl/brightspace.xsl`
+  and the LMS manifest templates.
+
+So parameterized, LMS-aware, server-side rendering **used to exist here**. The
+browser's JS filtering is a later re-implementation of a capability lost in a
+rewrite. The duplication is not a design decision anyone made; it is drift.
+
+**What the browser does that Python currently cannot.** `outcomeToHtml()` takes
+`mathMode` and `solutions` and applies both *after* the transform, by DOM
+surgery: stripping `[class~="stx-outtro"]` / `stx-intro` / `stx-content` for
+`hide` and `only`, and running KaTeX to MathML for `canvas`/`brightspace`.
+`Exercise.html()` has no equivalent for either and can only produce the
+`all`/`basic` form.
+
+The `latex2mathml` import in `exercise.py` is the other half of the same lost
+feature: `tex_to_mathml()` is defined, never called, and `latex2mathml` is still
+a hard install dependency. Commit `51507be` names the gap it was meant to fill.
+
+**Consequence for option 1 below:** "the Python layer already performs exactly
+these three transforms" is true of the *transform* and false of the *feature*.
+Precomputing requires restoring subset filtering and adding server-side MathML
+first. `ccc9b09` is a known-good reference for the first.
+
+### Measured sizes (2026-08-20)
+
+Rendering every demo outcome to all three formats and comparing against its data
+JSON:
+
+```
+per seed, all 10 outcomes:  data 1,883   html 8,636   latex 5,895   ptx 5,615 bytes
+three formats / data     =  10.7x
+```
+
+`docs/demo/assets/bank.json` is 1.49 MB (10 outcomes x 1000 seeds, data only).
+Inlining all three formats for every seed would take it to roughly **16 MB**,
+downloaded by every visitor on load. HTML alone is ~4.6x, still ~7 MB. A blanket
+inline is therefore out, as previously assumed — but the consumers do not all
+want the same seeds, and that asymmetry is the opening:
+
+| surface | formats | seeds | source |
+|---|---|---|---|
+| instructor tabs | html, latex, ptx | 0 to PUBLIC_SEEDS-1 | `Exercise.svelte` |
+| Copy for AI Chatbot | html | 0 to PUBLIC_SEEDS-1 | `outcomeToAiText` |
+| assessment builder | latex | PUBLIC_SEEDS-999 | `getRandomAssessmentFromSlugs` |
+| LMS export | html x2 (hide + only) | 100-999 | `Export.svelte` (`Array(900)`, `seed=i+100`) |
+
+PreTeXt is **only ever needed for the public seeds**, which is the one clean
+saving available.
+
+**Measure the payload compressed, not raw.** An earlier version of this section
+said inlining the public seeds at `PUBLIC_SEEDS` = 50 costs "~1.0 MB, a 65%
+increase", and concluded it was no longer affordable. That figure was raw JSON
+bytes, which is not what a visitor downloads. Measured on the live site
+(2026-08-21, `performance.getEntriesByType('resource')`):
+
+```
+decodedBodySize (uncompressed): 1,420,295 bytes
+transferSize    (over the wire):  152,441 bytes
+compression ratio: 9.3x            download: 168 ms
+```
+
+`bank.json` is overwhelmingly repetitive -- the same tags, slugs and LaTeX
+fragments over and over -- so it compresses about tenfold, and precomputed HTML
+is *more* repetitive still. Rebuilding the published demo bank with seeds 0-49
+inlined:
+
+| inlined | raw | gzipped |
+|---|---|---|
+| nothing (today) | 1.42 MB | 148 KB |
+| html only | 1.81 MB (+28%) | 163 KB (+10%) |
+| html + latex | 2.07 MB (+46%) | 173 KB (+17%) |
+| all three formats | 2.33 MB (+64%) | **180 KB (+22%)** |
+
+So the honest cost of the full inline tier is about **32 KB more over the
+wire**, on a request that currently takes 168 ms. That is affordable, and the
+earlier warning was wrong. A course bank has roughly 3x the outcomes of the
+demo, so expect roughly 3x these figures and still well under a megabyte.
+
+Two costs compression does *not* remove, and neither is a blocker: the browser
+still parses the full uncompressed JSON (2.33 MB rather than 1.42 MB) and holds
+it in memory, and the raw file still occupies disk in the bank repo. Note also
+that `docs/**` is committed here, and generated files are marked `binary` in
+`.gitattributes` for good reason (see the corrupt-merge incident) -- a
+3x-larger generated JSON makes that more important, not less.
+
+> **Principle.** For anything served over HTTP, "how big is the file" is the
+> wrong question; "how many bytes cross the wire, and how long does that take"
+> is the right one. They differ here by a factor of nine, which is more than
+> enough to reverse a decision.
+
+Also worth knowing: the LMS export calls `outcomeToHtml` twice per seed across
+900 seeds, so **1,800 transforms per outcome per export**, on the main thread.
+Precomputing that surface is a performance win regardless of the deprecation.
+
+### The options that were weighed
+
+1. **Precompute the derived formats at generate time (recommended).** The Python
+   layer runs these same three transforms via `lxml` (`Exercise.html()` /
+   `.latex()` / `.pretext()`). Emit them at build time and have the viewer fetch
+   rather than transform. Requires first restoring the `subset` filtering and
+   server-side MathML described above — real work, not a rename.
+
+   The strong argument is not the deadline. It is that the transforms exist
+   **twice**, which is why the three stylesheets are duplicated and must be kept
+   in sync by hand (§5), and which is what produced the document-vs-element
+   bug: the browser path silently required a different source node type than the
+   Python path, and only Firefox ever said so. Precomputing collapses two
+   implementations into one.
+
+2. **Replace browser XSLT with a JS/WASM implementation** (a libxslt WASM build,
+   SaxonJS, or hand-porting the stylesheets to TS). Keeps transforms
+   client-side, so no payload or seed-range design is needed, and it is the
+   smallest behavioral change. But it adds a dependency and *preserves* the
+   dual-implementation problem that caused the bug — it buys time without
+   buying simplification.
+
+3. **Drop derived formats from the browser entirely**, moving export to the CLI.
+   Smallest amount of code, largest loss of function for instructors.
+
+### The recommendation, and what was built
+
+**Option 1, staged, with a two-tier payload. Not a hybrid with option 3.**
+
+The temptation is to send the heavy surfaces (assessment builder, LMS export) to
+the CLI and precompute only the cheap ones. Resist it. Those browser surfaces
+are what the platform is *for* from an instructor's point of view, and a
+CLI-only export is a real downgrade for the audience least likely to want a
+terminal. The reframe that makes this tractable: **"in the browser" is a claim
+about the instructor's experience, not about where the transform executes.** The
+button stays, the download stays, the copy-to-clipboard stays. Only the compute
+moves to build time. Nothing an instructor can do today is lost.
+
+Sequence, in dependency order:
+
+1. **Restore server-side parity first, while browser XSLT still works.** Port
+   `$subset` back into the three stylesheets from `ccc9b09`, and wire
+   `tex_to_mathml()` in for the `canvas`/`brightspace` consumer. Do this
+   *before* touching the viewer, because until 2026-11-17 you can render the
+   same seed both ways and diff them — the browser is a free oracle for
+   verifying the Python output. **That verification window closes on the removal
+   date**, and afterwards there is nothing left to check the port against. This
+   is the step with a real deadline; the rest is ordinary work that can happen
+   whenever.
+
+2. **Emit precomputed formats at generate time, in two tiers.** Inline the
+   public seeds (all three formats) into `bank.json` — that alone fixes the
+   instructor tabs and the AI button with no new fetch machinery, and costs
+   about 32 KB more over the wire (see the payload measurements above). Emit
+   the heavy ranges as per-outcome bundles under `assets/<slug>/generated/`,
+   fetched lazily only when an instructor actually clicks Assessment or Export.
+   The ranges differ per surface, so a partial precompute reintroduces the
+   coverage trap from `--image-seeds` (§ image_seeds): decide the range
+   policy *before* writing the emitter, and make a missing range fail loudly
+   rather than render blank.
+
+3. **Switch the viewer to read, then delete.** Replace the three
+   `XSLTProcessor` calls in `utils/index.ts` with lookups, then delete
+   `viewer/src/spatext/xsl/` outright. One implementation of the transforms
+   remains, in `lxml`, and §5's hand-sync requirement disappears with it.
+
+Two things to design rather than default:
+
+- `bank.json` becomes a compatibility surface. A bank generated by an older
+  CheckIt will not carry the precomputed keys, and the viewer must say so rather
+  than render an empty tab — the same concern recorded for `<ai-prompt>` and
+  for the bank-declared LaTeX preamble.
+- Build time grows by 1000 seeds x 3 transforms per outcome. Expect the same
+  staleness pressure `compile_tikz_for_outcome` already has, and plan to skip
+  unchanged outcomes rather than discovering the cost after the first full run.
+
+What this does *not* solve: the assessment `.tex` template is still baked into
+the bundle at build time (see "Letting a bank declare its own LaTeX preamble"),
+and that remains an independent problem.
+
+### Step 2: the emitter
+
+**Only `XSLTProcessor` disappears.** This is the realisation that shrank step 2,
+and it is worth stating plainly because it is easy to assume the whole of
+`outcomeToHtml()` is at risk. It is not: `DOMParser`, `querySelector`,
+`katex.render` and the class-based node removal all survive the deprecation
+untouched. The viewer therefore needs only the **base** rendering precomputed
+— `subset='all'`, `consumer='basic'` — and can keep applying its own
+`solutions` filtering and LMS MathML on top of it.
+
+Emitting every `subset` x `consumer` combination instead would have multiplied
+the payload roughly fourfold to replace code that still runs. It would also have
+been slower to build and no safer.
+
+That leaves the server-side `subset` and `consumer` support from step 1 off the
+critical path for the viewer migration. They are not wasted — they are what a
+CLI export would use, and building them is what produced the tested oracle
+proving the two filtering implementations agree — but the honest description
+is that step 1 was scoped slightly wider than the migration strictly required.
+
+**The coverage policy, decided before the emitter was written.** The ranges are
+unequal, and unequal coverage is exactly the trap `--image-seeds` set once:
+
+| tier | formats | seeds | where |
+|---|---|---|---|
+| inline | html, latex, pretext | 0 to `PUBLIC_SEEDS`-1 | inside `bank.json` |
+| bundle | html, latex | `PUBLIC_SEEDS` to end | `assets/<slug>/generated/derived.json` |
+
+PreTeXt is absent from the bundle deliberately: its only consumer is the
+instructor tab, and the version picker cannot reach past `PUBLIC_SEEDS`, so it
+would be dead weight for 950 seeds per outcome.
+
+The policy is **declared in `bank.json`** under a `precomputed` key rather than
+left implicit, so a consumer can ask "was this emitted?" instead of inferring a
+hole from rendering nothing. A bank generated before this exists has no such
+key at all, which is how the viewer will tell "not precomputed" from
+"precomputed but missing this seed".
+
+**Measured cost** (published demo bank, 8 outcomes x 1000 seeds):
+
+- inline tier: `bank.json` 1.42 MB -> 2.33 MB raw, but 149 KB -> 180 KB over
+  the wire, because it compresses about tenfold
+- bundle tier: ~1.4 MB raw per outcome, ~51 KB over the wire (this content
+  compresses about 28x), fetched only when an instructor acts
+- on disk a 31-outcome course bank grows by ~44 MB of generated files. Banks
+  gitignore `assets/**/generated`, so that lands in the repo only once
+  published under `docs/**`, where git's own compression absorbs most of it.
+
+**`--remote` is now required when a bank has images.** Precomputed HTML has to
+carry absolute `<img src>` values, and the check runs *before* anything is
+written so a build fails at once rather than several minutes in, and names the
+offending outcomes. `--no-precompute` skips the whole thing and also deletes any
+stale bundles, so `bank.json` never says "not precomputed" while old bundles sit
+beside it.
+
+### Step 3: the viewer reads what the emitter wrote
+
+`utils/index.ts` no longer contains the word `XSLTProcessor`, and
+`viewer/src/spatext/xsl/` is gone. **The three stylesheets now exist once**, in
+`dashboard/checkit/static/`, and §5's hand-sync requirement is retired. The
+bundle shrank 603.6 KiB → 588.3 KiB, which is the inlined stylesheets leaving.
+
+How it reads:
+
+- `outcomeToLatex` and `outcomeToPtx` return the stored string directly.
+- `outcomeToHtml` parses the stored base HTML with `DOMParser` as `text/html`,
+  then applies its existing `solutions` filtering and LMS MathML. Those were
+  never XSLT and did not need replacing.
+- Seeds at or above `inline_below` need their outcome's bundle, so the
+  assessment builder and the LMS export `await ensureDerivedForSlugs(...)`
+  before rendering. One await at the top of each keeps every builder below it
+  synchronous. Bundles are fetched at most once per outcome and cached.
+
+**An old bank refuses rather than falling back.** A bank with no `precomputed`
+key gets a message naming the command to run. The alternative — keeping
+`XSLTProcessor` as a fallback — works only until Chrome 158 and would have kept
+the browser stylesheets alive forever, which is the duplication this whole
+migration exists to remove.
+
+**Every read failure renders.** This needed a second pass: the first version
+threw from inside markup, and Svelte's response to that is to leave the tab
+*blank*. An instructor clicking "Raw HTML" saw nothing at all, with the
+explanation only in the console — a silent failure introduced by the very code
+meant to prevent one. `Exercise.svelte` now renders the message, and the AI copy
+button distinguishes "could not build the payload" from "the clipboard refused",
+which are different problems with different fixes.
+
+Verified in a browser against two real banks: the current demo (student view,
+all three instructor tabs, the AI button, and an assessment that fetched two
+bundles and produced 2.8 KB of LaTeX with no `undefined` in it), and a
+deliberately stripped copy with no `precomputed` key, which shows the
+regenerate-me message in the tabs and in the assessment builder.
+
+Verification, and the first tests this repo has ever had, in `dashboard/tests/`
+(stdlib `unittest`, hermetic SpaTeXt fixtures, no bank or generated data
+needed). The core test asserts the two implementations agree rather than
+comparing against a golden file. Also confirmed: `subset='all'` output is
+byte-identical to the pre-change stylesheet across the demo bank, and a real
+Chromium `XSLTProcessor` agrees with `lxml` on every fixture and subset
+(`browser_harness.py`). The suite is mutation-checked.
+
+Two things this does **not** cover. Firefox was not exercised — the
+document-vs-element bug was Chromium-invisible, so `browser_harness.py` should
+be run there too before the viewer is rebuilt. And `static/viewer.zip` is still
+the pre-change build, so the browser-facing edit is inert until
+`update_viewer.py` runs; that also means there are effectively *three* copies
+of each stylesheet, the third being the one Vite inlined into the bundle.
+
+
+Sources: whatwg/html#11523, mozilla/standards-positions#1287,
+https://developer.chrome.com/docs/web-platform/deprecating-xslt
+
+## The plain-Python generator runtime
+
+How it works is still live reference, under "Generator runtimes". These two
+are the record of doing it.
+
+### Why this was cheap: the important seam already existed
+
+`json_ready()` converts every generated value to a **string** before it reaches
+`seeds.json`. No backend object has ever crossed that boundary, so `bank.py`,
+`exercise.py`, the XSLTs and the viewer were always runtime-agnostic and needed
+no changes at all. The subprocess wall was already in the right place; only what
+runs *inside* it changed.
+
+**Do not collapse either wall.** Importing sympy directly into `outcome.py` for
+convenience, or letting a SymPy object into `seeds.json`, would undo this.
+
+### What the runtime port was verified against
+
+On a Windows host with no Sage installed: all eight outcomes generate; all eight
+render through `Exercise.latex()`/`.html()`; EX2's product rule, MX1's
+system-matrix correspondence and EX1's exact `-7` slope are correct; KaTeX
+renders SymPy's LaTeX in the browser with zero errors; `--image-seeds` still caps
+PNGs while writing `.tikz` for every seed; `build_docs.py` completes; and an
+assessment generated from the viewer compiles under `pdflatex` to a printable PDF
+containing the TikZ figure — drawn from a seed past the image cap, so it had no
+PNG and relied on the `.tikz` source.
+
+## The mat-106 port (2026-08-21 to 2026-08-27)
+
+Retiring `mode` is the single most useful thing in this appendix: it is the
+argument for why per-medium differences belong to the stylesheets and the
+seed ranges, which is the ethos everything since has been held to.
+
+### `mode` is the wrong layer, and what replaces it (resolved 2026-08-22)
+
+**No generator in mat-106 branches on `mode` any more.** All nine are converted,
+in three groups.
+
+
+Nine generators in mat-106 took a `mode='html'|'latex'` argument and branched on
+it. Six were the same workaround for one false belief -- that a SpaTeXt text
+field could not carry mathematics -- and all six are gone, replaced by
+`bank_helpers.spatext_math()` emitting `<m>` elements from the TeX the
+generators already wrote.
+
+The remaining three are not that, and they are worth separating because they
+pull in opposite directions.
+
+**W1 and W1-E are a presentation difference.** Egyptian numerals are set with
+`\textpmhg` for print and `\Huge` in the browser, because that LaTeX font has
+no web equivalent. The content is identical; only its rendering differs. That is
+precisely what the three stylesheets exist for, so the fix belongs there: a
+SpaTeXt element (say `<glyphs font="...">`) that `html.xsl` renders as a styled
+span and `latex.xsl` as `\textpmhg{...}`. Adding a SpaTeXt element is the
+documented multi-file dance (§12), now three files rather than six.
+
+**R1 is a content difference tied to purpose.** Its `versions` and
+`html_versions` dictionaries share no keys, but the names pair up: `add-coladd-1`
+against `add-coladd-1p`. Comparing a pair shows they are different problems, and
+the print one has empty `thinking` and `feedback` fields -- because print is the
+student handout, where those are blanks to write in, while the viewer copy
+carries model answers for self-study.
+
+That is a real distinction, but it is not about the *medium*: it is about
+whether an exercise is for browsing or for assessment. The seed ranges already
+encode exactly that (§ "Bound the precomputed range"): 0..PUBLIC_SEEDS-1 is what
+students browse, everything above it feeds assessments, printed or exported. So
+R1 wants neither `mode` nor a variant -- it wants to branch on `self.seed`,
+which `BaseGenerator` already exposes for this purpose:
+
+    def data(self):
+        studying = self.seed < PUBLIC_SEEDS
+        return generate(pool='self_study' if studying else 'assessment')
+
+A variant would fit badly here: variants are dealt evenly across all seeds, so
+roughly half of the versions a student browses would come from the assessment
+pool.
+
+**How the nine were actually split.**
+
+* Six were the same false belief -- that a text field could not carry maths --
+  and were fixed by emitting `<m>` elements: N2, F5, W4, N1, N1-E through
+  `bank_helpers.spatext_math()`, which rewrites the TeX the generators already
+  wrote; **R2 by hand**, writing `<m>` directly into its f-strings. Worth
+  knowing before editing R2: running `spatext_math` over a string that already
+  contains `<m>` would escape it into visible `&lt;m&gt;`, since the function
+  escapes everything outside the maths it matches. D4 was added to the
+  `spatext_math` group later (2026-08-27) for `\$` and `\%`.
+* Two were a genuine per-medium difference in the characters themselves, and
+  became `<glyphs>`: W1 and W1-E.
+* One was a difference of purpose rather than medium, and became a branch on
+  `self.seed`: R1.
+
+**There was a fourth kind, and it was missed (found 2026-08-27).** W4 also used
+`mode` for *typesetting control*: its equations are long, LaTeX broke them at
+the operators, and `\mbox` was the fix. The generator wrote `\mbox{$...$}` and
+a `clean_latex_string` helper stripped it again when `mode == 'html'`. Print
+was the default, so print got the boxes and the browser did not.
+
+Retiring `mode` deleted the branch and orphaned `clean_latex_string` --
+defined, never called -- leaving `\mbox` in the string for both media. The
+template's `<m>` wrapper then swallowed it into `\(\mbox{\)`: an unmatched
+brace inside math mode, which does not compile. **Print was broken for 50
+versions of W4 while every HTML check was green,** and nothing noticed because
+the mode-drop commit landed 46 minutes after the last `docs/` build and was not
+built again for five days.
+
+The fix is `<nobreak>`, the same shape as `<glyphs>`: `latex.xsl` renders it
+`\mbox{...}`, `html.xsl` a `white-space: nowrap` span, `pretext.xsl` passes the
+content through. W4 emits two of them per equation, matching the original
+`\mbox{$...$} \mbox{$...$}` -- a break *between* the sides is fine, a break
+inside either is not.
+
+Unlike `<glyphs>`, this element **wraps** other elements, so every rule calls
+`parseDisplay` instead of reading `text()`. Reading text nodes would discard
+the `<m>` elements it exists to hold together, which is the same bug it was
+introduced to fix.
+
+> **Principle.** "Purely presentational" is not the same as "safe to delete".
+> Presentation is the whole deliverable for print, and the browser is not the
+> medium that proves it. A per-medium difference always has a stylesheet home;
+> removing the branch without building that home just loses the requirement.
+
+**A lesson about verification, not just about `\mbox`.** Every check written
+during the port read the HTML. The LaTeX comes from a different stylesheet with
+its own rules, and it shipped an uncompilable document while the HTML checks
+passed. The print-side checks worth keeping are cheap and structural: brace
+balance across the whole document, brace balance inside each `\(...\)`, and
+text-mode commands appearing inside inline maths. `\(\textbf{W1}\)` is the one
+standing exception -- the outcome-title element, legal and deliberate.
+
+Templates that receive generated markup must inject with **triple** braces, or
+Mustache escapes it into visible `&lt;m&gt;`. That in turn makes the prose the
+generator emits XML-relevant, which is why `spatext_math` escapes everything
+outside the maths it wraps. Two traps found by looking at rendered output rather
+than at the data: a field wrapped in `<m>` by its template silently swallows any
+element inside it, because `html.xsl`'s rule for `<m>` reads only text nodes;
+and a LaTeX spacing command that was harmless inside a maths field becomes
+literal text once the content is no longer inside one.
+
+### The bank port (mat-106; done)
+
+1. Move `slye_math.py` from `outcomes/` to the **bank root**, renamed
+   `bank_helpers.py` — `load_generator()` adds the bank root and the generator's
+   own folder to `sys.path`, not `outcomes/`.
+2. `pygenerator.py` → `generator.py`, wrapped in the `Generator` class; delete
+   `generator.sage`. Roughly 775 lines of shim disappear across 31 outcomes.
+3. Drop the `mode='html'|'latex'` parameter. Only ~9 generators branch on it, and
+   8 of those are formatting; emit `<m>` in the string instead (see the `WORDS`
+   walkthrough) and let the print side convert. `R1` is the exception — it
+   selects genuinely different content and wants `variants`, or splitting in two.
+4. Convert `course_progress` and friends to **`variants`**. Only five outcomes
+   read them (R1, R2, W4, W4-E, W5) and most are binary, so the variant space is
+   small. Today the value is frozen in each shim, so advancing the semester means
+   editing files and regenerating; as a variant it is pregenerated across all
+   cases and *filtered* at print time.
+5. Check LaTeX literals are raw strings: `"rac"` makes `` a formfeed.
