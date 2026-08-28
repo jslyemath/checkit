@@ -2571,6 +2571,66 @@ the `+` mangling was caught before anything went public.
 
 ---
 
+## Checking a build
+
+```
+checkit check                    # generators, then the built bank
+checkit check --no-built         # generators only; needs no build
+checkit check --no-generators    # the built bank only
+```
+
+Exits non-zero on findings. Added 2026-08-27 (`0.2.8.4`), after the same
+detectors had been written as throwaway scripts three times.
+
+`smoke.py` execs each `generator.py` in `wrapper.GENERATOR_NAMESPACE`,
+constructs `Generator()` properly, and calls `data()` across seeds either side
+of both range boundaries and every declared variant. **Construct it, do not
+stub it**: `BaseGenerator.__init__` sets `variant`, and `Gen.__new__(Gen)`
+produces false `AttributeError: variant` failures on every outcome declaring
+`variants`. This is the fastest thing available -- 29 generators in seconds,
+no build -- and the only way to see a generator's real traceback while
+`generate` still hides it.
+
+`checks.py` covers what a build gets wrong *without failing*:
+
+| check | catches |
+|---|---|
+| `escaped-markup` | `{{double braces}}` showing `&lt;m&gt;` to a student |
+| `raw-tex` | TeX rendering as literal text |
+| `control-char` | non-raw literals turning `\textpmhg` into TAB + `extpmhg` |
+| `relative-img` | root-relative `<img src>`, which 404s off-site |
+| `math-punctuation` | a greedy pattern italicising a full stop |
+| `latex-braces` | documents that will not compile |
+| `nested-in-m` | `<m>` containing elements, whose content is dropped |
+| `bundle` | the same, over seeds 50-399 |
+
+Three of these have a design point worth not undoing:
+
+- **`raw-tex` matches single-character escapes too.** Requiring two or more
+  letters after the backslash is what let `27.6\%` and `\$770.13` ship in 300
+  versions while the check reported clean.
+- **`nested-in-m` reads the SpaTeXt, never the HTML.** `<m>` renders with
+  `normalize-space(text())` in both stylesheets, so the dropped content does
+  not exist by the time there is HTML to inspect.
+- **`latex-braces` deliberately does not flag `\text`, `\textbf` or `\mbox`
+  inside maths.** All three are legal in math mode and all are used on purpose
+  here; flagging them produced 976 findings against a correct bank, which is
+  how a check teaches people to ignore it. The real bug was an unbalanced
+  brace, which brace balance catches by itself.
+
+**A clean run is not a substitute for looking at the page.** Three of these
+checks were written *after* a human spot-check found what the automated checks
+had passed, and one earlier check passed an outcome that was rendering "is a
+multiple of" with both of its numbers missing. They catch documents that will
+not compile and markup that will not render. They say nothing about whether an
+exercise is right, readable, or breaks lines in a sensible place.
+
+Run it against the *previous* build as well as the new one when investigating:
+the useful output is rarely "there are findings", it is "which of these are new
+today".
+
+---
+
 ## Tests
 
 There were none until 2026-08-21; `dashboard/tests/` had held an empty `.keep`
@@ -2587,6 +2647,7 @@ python -m unittest discover -s dashboard/tests -t dashboard/tests
 | `test_precompute.py` | the precompute emitter and its declared coverage |
 | `test_packaging.py` | what actually ends up in an installed copy |
 | `test_outcome_filter.py` | that `generate -o SLUG` narrows regeneration and nothing else |
+| `test_checks.py` | that every `checkit check` detector can actually fail |
 | `browser_harness.py` | manual: re-runs the stylesheet checks in a real browser |
 
 Four choices worth knowing about:
@@ -3298,13 +3359,8 @@ It checks every generator in seconds. Construct it normally rather than with
 produces false `AttributeError: variant` failures on any outcome declaring
 `variants`.
 
-**Build-verification tooling has no home.** The detectors described under
-"The second trap generalises" and the in-process generator runner live in a
-scratchpad, so each rebuild reinvents them. The generator runner is the one
-worth keeping -- it is fast, needs no build, and catches the failures that are
-otherwise invisible per the bug above. Whether it belongs in `dashboard/tests/`
-(generalised over any bank) or in each bank is undecided; the platform has no
-notion of "check this bank's generators" today.
+~~**Build-verification tooling has no home.**~~ Resolved 2026-08-27: it is
+`checkit check`, in `checks.py` and `smoke.py`. See "Checking a build" below.
 
 
 **`checkit generate -o SLUG` destroyed the rest of `bank.json`** (fixed
@@ -3553,8 +3609,8 @@ one did not, and `\L` is an *invalid* escape that warns while `\t` is a valid
 one that does not. 334 of the 382 occurrences were in seeds 50-399 -- the pool
 printed handouts draw from, so it would have surfaced on paper.
 
-**Three detectors now exist for this, all cheap** (currently in a scratchpad;
-worth moving into the bank if it recurs):
+**These are now `checkit check`** (see "Checking a build"). What they look for,
+and why each shape matters:
 
 - stray control characters (`\t`, `\f`, `\v`, `\b`, `\a`, `\r`) in any
   precomputed format -- catches the non-raw-literal bug directly;
