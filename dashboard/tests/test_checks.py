@@ -147,5 +147,74 @@ class PunctuationInMath(unittest.TestCase):
         self.assertEqual(checks.punctuation_in_inline_math(doc(html=html)), [])
 
 
+class _StubExercise:
+    def __init__(self, data):
+        self.data = data
+
+
+class _StubOutcome:
+    def __init__(self, slug, template, data):
+        self.slug = slug
+        self._template = template
+        self._exercises = [_StubExercise(data)]
+
+    def template(self):
+        return self._template
+
+    def exercises(self):
+        return self._exercises
+
+
+class _StubBank:
+    def __init__(self, outcomes):
+        self._outcomes = outcomes
+
+    def outcomes(self):
+        return self._outcomes
+
+
+class TemplateFieldsWithoutData(unittest.TestCase):
+    """Mustache renders an absent key as empty, so the sentence survives and
+    the value disappears. W4 carried a duplicated block asking students to
+    explain "the  " for months: nothing failed, and the question could not be
+    answered."""
+
+    def check(self, template, data):
+        bank = _StubBank([_StubOutcome("X", template, data)])
+        return checks.template_fields_without_data(bank)
+
+    def test_missing_key_is_found(self):
+        found = self.check("<p>explain the {{{expl_text}}}</p>", {})
+        self.assertEqual(len(found), 1)
+        self.assertIn("expl_text", found[0].detail)
+
+    def test_present_key_is_fine(self):
+        self.assertEqual(
+            self.check("<p>explain the {{{expl_text}}}</p>", {"expl_text": "x"}), [])
+
+    def test_double_and_triple_braces_both_count(self):
+        self.assertEqual(len(self.check("<p>{{a}} and {{{b}}}</p>", {})), 2)
+
+    def test_section_tags_are_exempt(self):
+        """An absent key in a section means 'false', which is what they are
+        for -- F2-E uses {{#p1_prob_text}} exactly that way."""
+        self.assertEqual(self.check("<!-- {{#opt}} --><p>x</p><!-- {{/opt}} -->", {}), [])
+
+    def test_seed_is_injected_not_generated(self):
+        self.assertEqual(self.check("<p>{{__seed__}}</p>", {}), [])
+
+    def test_commented_out_blocks_are_exempt(self):
+        """Retired sub-skills are left commented rather than deleted, and their
+        fields are naturally absent. N1, D1, R2 and W5 all carry one, and
+        flagging them would be four false positives on a correct bank."""
+        self.assertEqual(
+            self.check("<!-- <p>{{{explain_prob_1}}}</p> --><p>fine</p>", {}), [])
+
+    def test_a_field_outside_the_comment_is_still_found(self):
+        """Stripping comments must not swallow the live markup around them."""
+        found = self.check("<!-- old --><p>{{{expl_text}}}</p>", {})
+        self.assertEqual(len(found), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
