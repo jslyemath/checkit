@@ -3351,9 +3351,15 @@ not platform concerns, and it would worsen upstream merges) and not in a bank
 
 Intended shape: consume a bank's pregenerated `seeds.json` rather than importing
 generators, so printing needs no generation step and printed versions are
-reproducible. Draw from **seeds at or above `PUBLIC_SEEDS`**, which the viewer
-does not expose, so students cannot look up the printed version. Join the roster
-locally — student names never enter the bank at all.
+reproducible. Join the roster locally — student names never enter the bank at
+all.
+
+**But not from the published seed range.** An earlier version of this note said
+to draw from seeds at or above `PUBLIC_SEEDS` because the viewer does not offer
+them. That is wrong: `derived.json` publishes seeds 50-399 *with their answers*.
+See "The conflict: printed seeds cannot come from the published range" below,
+which has to be settled before the tool is written — it decides whether the tool
+takes a bank checkout or a URL.
 
 **Start by compiling something.** No printed output has been produced since the
 port. `checkit check` verifies the emitted LaTeX is well-formed; nothing has
@@ -3430,6 +3436,103 @@ exercise wants*, and that is a property of the exercise, not of the page.
 - **Bank-specific macros the content cannot compile without**: `\babo`,
   `\babt`, `\babz` (TikZ drawings, not font glyphs), `hieroglf` for
   `\textpmhg`, `\rnc` for Roman numerals, `\arc`, `\additiontable`.
+
+---
+
+### The full feature list, from reading `pdfgenerator.py`
+
+The tool is not "render templates and concatenate". Catalogued so nothing gets
+dropped by a rewrite that only looked at the LaTeX:
+
+| feature | where | note |
+|---|---|---|
+| **Per-student skill selection** | roster columns `1:`, `2:`, … | each student's packet is a *different subset* of skills |
+| **Variant → seed mapping** | `Var:` column | students sharing a variant share a version; this is the seating-chart defence |
+| **Random 5-digit seeds** | `random.choice(range(10000, 100000))` | see the conflict below |
+| **Seed override** | `Seed Override:` | forces one seed for every variant, for reprints |
+| **Sections** | `Sec:` column | `\setsect`, appended to the header |
+| **Names on/off** | `Include Names:` | real name, or a ruled blank |
+| **Key count** | `Key Amount:` | whole key packet repeated N times |
+| **Per-run generator settings** | `course_progress`, `w7_allow_terminating`, `n3_n4_force_listing_method`, `d2_allow_repeating` | passed straight into `generate(**settings)` |
+| **Per-skill colour** | `bank.xml` `<color_map>`, or a per-outcome `<color>` | resolved by slug prefix, defaulting to `scCOLOR` |
+| **Associates** | `<associate>` entries | parsed, and deliberately not generated |
+| **Key deduplication** | `used_versions` set | only versions actually handed out get keys, sorted in bank order |
+| **Double-sided safety** | `\preparefornextstudent` | stops one student's packet backing onto another's |
+| **Course/semester/professor** | spreadsheet | the four `\VAR{}`s in `main_template.tex` |
+| **Error log to file** | `latex_error_log.txt` | a LaTeX failure does not flood the terminal |
+
+Two of these deserve attention in any redesign.
+
+**The per-run settings are `variants` by another name.** `course_progress` and
+friends are read from the spreadsheet and passed as kwargs, which is exactly the
+axis CheckIt models with `variants` — except CheckIt pregenerates every variant
+across the seed space and *filters* at use time, while this decides at
+generation time. Reconciling those two is a real design question, not a
+detail: it decides whether the print tool can consume pregenerated seeds at all
+(below).
+
+**Per-student packet assembly is the feature with no CheckIt counterpart.**
+Nothing in the platform knows about rosters, per-student skill lists, or
+double-sided packet boundaries, and nothing should. This is the print tool's
+actual job.
+
+### The conflict: printed seeds cannot come from the published range
+
+The earlier note here said to draw print versions from seeds at or above
+`PUBLIC_SEEDS`, "which the viewer does not expose, so students cannot look up
+the printed version". **That is wrong, and worth correcting loudly.**
+
+`derived.json` ships in `docs/`, covers seeds `PUBLIC_SEEDS` to `BUNDLE_UNTIL-1`
+(50-399 today), and contains the rendered `outtro` — the answers. Verified
+2026-08-27. The viewer's *picker* does not offer those seeds, but the file is a
+plain fetch away, so a printed quiz drawn from that range is a printed quiz
+whose answers are published.
+
+The existing tool avoids this by accident of design: it seeds with
+`random.choice(range(10000, 100000))` and runs the generator directly, so
+printed versions exist nowhere else.
+
+Three ways out, none free:
+
+1. **Keep generating at print time.** Print imports generators and seeds them
+   itself, as today. Printed versions are unpublished by construction. Costs:
+   printing needs a working generator environment, and reproducing a specific
+   printed sheet means recording its seed.
+2. **Extend the bundle past what is published.** Generate seeds 400-999 into
+   `seeds.json` but exclude them from `docs/`. `BUNDLE_UNTIL` already exists to
+   bound what gets published — this is the seam it was built for. Costs: the
+   print tool needs the bank checkout, not just the published site.
+3. **A separate unpublished bundle.** Emit a `print.json` alongside
+   `derived.json`, gitignored or published elsewhere. Costs: another artifact,
+   another thing to keep in sync.
+
+(2) fits the existing design best and is the reason `BUNDLE_UNTIL` is a
+constant rather than a hardcoded number. It is worth settling *before* writing
+the tool, because it determines whether the tool takes a bank path or a URL.
+
+### A fifth answer mechanism: figures
+
+The four table entries above are the ones in `skillcheckpoints.sty`. There is a
+fifth, and it is the hardest to fit any vocabulary:
+
+- `\ans{}` **inside a TikZ picture**. F2's number line puts `\ans{$label$}` in
+  the axis tick labels and `\ans{\node ... circle}` for the mark itself, so
+  turning answers on adds a dot to a diagram rather than any text.
+- The generator side does the same thing differently: `tikz_graphics()` emits
+  **paired figures**, `p1_prob_model.tikz` and `p1_ans_model.tikz`, and the
+  choice is which one to include.
+
+The paired-figure approach is the better one and is already how the web works.
+It also means "answers on" is not a single mechanism but a *policy* applied
+differently per response type, which is the thing a redesign has to preserve
+rather than flatten.
+
+**Do not migrate the inline-TikZ templates yet.** F2, F2-E and F3 carry TikZ
+written by hand in `textemplate.tex`, duplicating what `tikz_graphics()` now
+produces. Consolidating onto the generator is right eventually, but the HTML
+viewer's TikZ output needs tweaks first, and the hand-written code is the only
+reference for what the figures should look like. Losing it before the web
+version is correct would be losing the specification.
 
 ---
 
