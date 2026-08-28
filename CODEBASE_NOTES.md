@@ -3036,6 +3036,7 @@ terms of a sum by symbol name exactly as Sage does.
 | SpaTeXt elements for per-medium differences | done — `<glyphs>`, `<nobreak>` |
 | mat-206 | **not started, and not a port** — see below |
 | Print tool as its own package | **next** — see "The print tool" |
+| `skillcheckpoints.sty` drift between banks | none — byte-identical (2026-08-27) |
 
 Known open questions, none blocking:
 
@@ -3052,6 +3053,12 @@ Known open questions, none blocking:
   far reads the emitted LaTeX, not a PDF. `checkit check` will tell you the
   document is well-formed; it cannot tell you the page looks right. The print
   tool is where that gets exercised for the first time.
+- **The bank has two templates per outcome, and always has.** `template.xml`
+  for the web and `textemplate.tex` for print. The print templates carry
+  things SpaTeXt cannot say -- true/false items, fill-in blanks, two-column
+  layout, working space -- which is why they exist. Whether that stays a
+  permanent split or shrinks to an escape hatch is the print tool's central
+  design question; see "Print-specific appearance".
 
 ### The bank has not been reviewed exercise by exercise
 
@@ -3143,7 +3150,7 @@ two-outcome fixture: `PLAIN` has no figures and `FIGURED` does, which is exactly
 the pair both symptoms need. Seven of its ten tests fail against the unfixed
 code; the three that pass describe behaviour that was already correct.
 
-## Next: mat-206, and a separate print tool
+## Next: mat-206, and the lessons the mat-106 port left behind
 
 mat-106 is done and published; what remains here is mat-206 (which is not a
 port -- see below) and the print tool, which is the next thing to start.
@@ -3335,7 +3342,7 @@ mentions `mode`), and step 4 is moot (no generator mentions `course_progress`).
 What mat-206 should inherit is mat-106's *finished* `bank_helpers.py`, dropped
 in at the bank root, and the `Generator` class shape -- not its history.
 
-### The print tool
+## The print tool
 
 Belongs in **its own repo**, installed as a package depending on
 `checkit-dashboard` — not in the platform (Google OAuth and seating charts are
@@ -3350,139 +3357,270 @@ locally — student names never enter the bank at all.
 
 **Start by compiling something.** No printed output has been produced since the
 port. `checkit check` verifies the emitted LaTeX is well-formed; nothing has
-verified it *typesets*. The first useful hour of this work is taking the current
-`latex` output for one outcome, dropping it into `main_template.tex`, and
-running it — that will surface the real state faster than any amount of reading.
+verified it *typesets*.
 
-### Print-specific appearance, without a second source of truth
+---
 
-This is the open design question, and it is worth getting right because the
-project has already paid twice for getting the same question wrong (`mode`, the
-duplicated stylesheets).
+## What the print pipeline actually is today
 
-**The tension.** Printing needs decisions SpaTeXt deliberately cannot express:
-paper size, columns, how much room to leave for work, whether answers appear,
-where the name goes, how versions are distributed across a seating chart. None
-of that is a property of the mathematics. But it has to come from *somewhere*,
-and the two obvious somewheres are both wrong:
+Read this before designing anything. The existing setup is considerably more
+capable than "a LaTeX template", and an earlier version of these notes badly
+under-described it.
 
-- **In the generator.** This is `mode` again. It puts a per-medium decision in
-  the one place that has no business knowing about media, and it cannot be kept
-  consistent across 30 outcomes by anything but discipline.
-- **In SpaTeXt, as new elements.** A `<pagebreak>` or `<vspace>` poisons the
-  vocabulary: the same content now renders wrong on screen, and every consumer
-  — viewer, LMS export, chatbot payload — has to learn to ignore it.
+**`skillcheckpoints.sty`, 610 lines, and byte-identical between the two banks.**
+The open question about whether it had drifted is answered: it has not
+(`diff` produces nothing, 2026-08-27). That is a much better starting position
+than assumed — one file, one theme, no reconciliation needed.
 
-**The line to hold.** An element earns a place in SpaTeXt if it asserts
-something about *meaning* that each medium then honours differently. It does
-not if it asserts something about *appearance on a page*.
+**Each outcome has *two* templates.** `template.xml` is SpaTeXt for the web.
+`textemplate.tex` sits beside it and is a full Jinja-style LaTeX template
+(`\VAR{p1_prob}`) rendered against the same generator data. So the bank already
+has a print-specific template per outcome, and has had one all along.
 
-- `<glyphs>` qualifies: "these characters are Egyptian numerals" is a claim
-  about the content. Print reaches for `\textpmhg`, the browser for a styled
-  span, and neither is written by the author.
-- `<nobreak>` qualifies, though it is the boundary case and worth being careful
-  about. It says "these belong together", which is a claim about the content's
-  integrity. It does *not* say "insert 30pt here". Print honours it with
-  `\mbox`, the browser with `white-space: nowrap`.
-- `<pagebreak>` does not qualify. There is no reading of it that is about the
-  mathematics.
+**`pdfgenerator.py` assembles.** It writes `Skill Descriptions.tex` from
+`bank.xml` (slug, colour, description → `\setskilldesc[colour]{slug}{desc}`),
+renders each outcome's `textemplate.tex` per seed, wraps student copies with
+`\setname{...}` and `\preparefornextstudent`, and then emits the whole thing a
+second time under `\setboolean{anstoggle}{true}` to produce the answer keys.
 
-Anything on the wrong side of that line belongs to the **publication**, not the
-bank.
+### The four answer mechanisms, which are the important part
 
-### The mechanism is already half-built
+`anstoggle` is a single boolean, but it is *consumed* four different ways, and
+the differences are not stylistic — they are about what kind of answer the
+exercise has.
 
-The important thing to notice before designing anything: **`latex.xsl` does not
-emit layout. It emits semantic commands and lets a preamble define them.**
+| | definition | reveals by | used by |
+|---|---|---|---|
+| `\ans{...}` | `.sty:71` | printing the answer text inline, in the theme colour | F2, F2-E, R1 |
+| `ansenv` | `.sty:72` | un-commenting a whole block and colouring it | 21 outcomes |
+| `\tfleft[True]{stmt}` | `.sty:77-89` | **boxing one of two already-printed words** | N1 |
+| `\fillinblank[2.25in]{ans}` | `.sty:100-102` | filling a ruled space that is *always* there | D3, W4 |
 
-```latex
-%%%%% SpaTeXt Commands %%%%%
-\providecommand{\stxKnowl}{}\renewcommand{\stxKnowl}[1]{#1}
-\providecommand{\stxOuttro}{}\renewcommand{\stxOuttro}[1]{#1}
-\providecommand{\stxTitle}{}\renewcommand{\stxTitle}[1]{#1}
-% Comment next line to show outtros
-\renewcommand{\stxOuttro}[1]{}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+That table is the whole design problem in miniature.
+
+- `ansenv` is the only one CheckIt can currently express. It is exactly
+  `<outtro>` and `subset='statement'`.
+- `\tfleft` reveals an answer **without printing anything new**: TRUE and FALSE
+  are both on the page either way, and turning answers on draws a box around
+  the right one. Nothing in SpaTeXt can describe that, because SpaTeXt has no
+  notion of an exercise whose answer is a *selection*.
+- `\fillinblank` reserves space unconditionally — a 2.25in rule the student
+  writes on — and puts the answer inside it when keys are printed. The blank
+  is part of the *question's* layout, not the answer's.
+- `\ans` is an inline fragment inside otherwise-shared prose.
+
+**`\tfleft` and `\fillinblank` are the two that matter**, because they prove the
+gap is not about styling. Both are statements about *what kind of response the
+exercise wants*, and that is a property of the exercise, not of the page.
+
+### The other pieces worth naming
+
+- **`\skillheader{N1}`** (`.sty:476`) opens each skill with a coloured
+  `tcolorbox` titled with the slug and containing the outcome description,
+  looked up from the `pgfkeys` dictionary that `pdfgenerator.py` generated out
+  of `bank.xml`. The bank is already the single source of truth for that
+  content; only the box is print-specific. **This one is already right** and
+  needs no redesign — it just needs to keep working.
+- **`\setvseed{\VAR{seed}}`** puts the version in the footer, so printed
+  versions are already identifiable. CheckIt's LaTeX output, by contrast,
+  records neither slug nor seed anywhere in the document.
+- **Layout the templates rely on**: `\minicol[.5][.427]{prob}{Property: blank}`
+  for two columns, `\vfill` between items for working space (22 outcomes),
+  `\onehalfspacing` / `\doublespacing`, `\\[4ex]`.
+- **Bank-specific macros the content cannot compile without**: `\babo`,
+  `\babt`, `\babz` (TikZ drawings, not font glyphs), `hieroglf` for
+  `\textpmhg`, `\rnc` for Roman numerals, `\arc`, `\additiontable`.
+
+---
+
+## Print-specific appearance, without a second source of truth
+
+### Correcting the obvious first answer
+
+The tempting reading of `latex.xsl` is: it already emits `\stxKnowl`,
+`\stxOuttro` and `\stxTitle` rather than layout, so a print theme is just a
+`.sty` redefining those, and nothing else is needed. That is true as far as it
+goes and it is the right *mechanism* — but it is nowhere near sufficient, and
+believing it would throw away most of what `skillcheckpoints.sty` does.
+
+Redefining `\stxOuttro` gets you `ansenv`. It cannot get you `\tfleft`, because
+there is nothing in the SpaTeXt for a theme to know that the exercise is a
+true/false item. The answer is not a block to hide — it is a choice to
+highlight among options that are on the page either way.
+
+**So the gap is vocabulary, and the missing vocabulary is not layout. It is
+response type.**
+
+### The line: meaning versus appearance
+
+An element earns a place in SpaTeXt if it asserts something about *meaning*
+that each medium then honours differently. It does not if it asserts something
+about *appearance on a page*.
+
+Applying that to what the templates currently do:
+
+| | verdict | why |
+|---|---|---|
+| "this is a true/false item" | **SpaTeXt** | a property of the exercise; the web can render it as a T/F pair too |
+| "this answer is short enough to write on a line" | **SpaTeXt** | a claim about the response, not the rule |
+| "the rule is 2.25in wide" | theme | pure appearance |
+| "the blank sits to the right in a second column" | theme | pure appearance |
+| "leave `\vfill` of working space here" | theme | pure appearance |
+| "the skill header is a blue rounded box" | theme | pure appearance |
+| "this skill's colour is `scCOLOR`" | **bank** | already in `bank.xml`'s `<color_map>` |
+| "these characters are Egyptian" | **SpaTeXt** | `<glyphs>`, already done |
+| "don't break this equation" | **SpaTeXt** | `<nobreak>`, already done |
+
+The pattern: **the templates are currently mixing all three**, and the reason
+`textemplate.tex` has to exist per outcome is that there is no way to say the
+first column of that table in SpaTeXt.
+
+### Response type is the missing element
+
+The concrete proposal. SpaTeXt gains a way for a knowl to declare what kind of
+response it wants, and each stylesheet renders that its own way:
+
+```xml
+<knowl>
+  <content><p>Every factor of <m>6</m> is a factor of <m>42</m>.</p></content>
+  <response type="truefalse"/>
+  <outtro><p>True</p></outtro>
+</knowl>
 ```
 
-That is already the PreTeXt idea in miniature: one source, and a separate file
-that decides how this particular publication renders it. A print theme is a
-`.sty` that redefines `\stxKnowl`, `\stxOuttro` and `\stxTitle` — no new SpaTeXt,
-no generator changes, no second copy of any exercise. **The direction is right;
-the vocabulary is just too small to be useful yet.**
+- `latex.xsl` emits `\stxTrueFalse{True}{...}`, which the theme defines as
+  today's `\tfleft` — including the `\fcolorbox` highlight when answers are on.
+- `html.xsl` renders a TRUE / FALSE pair, and the viewer can mark the right one
+  when solutions are shown. **The web gets a feature it does not currently
+  have**, which is the tell that this is real semantics rather than a print
+  workaround.
+- `pretext.xsl` has a genuine equivalent in PreTeXt's `<statement>` /
+  `<choices>`, so this direction stays open.
 
-### What is missing, concretely
+Similarly `<response type="short"/>` for the `\fillinblank` cases: print emits
+`\stxBlank{answer}` and the theme decides it is a 2.25in rule; the web renders
+an input-sized span or simply the answer under the question.
+
+**What this buys.** The per-outcome `textemplate.tex` files collapse from "a
+second copy of the exercise" to "nothing at all" for the regular cases, because
+the response type now travels in the SpaTeXt and the widths live in the theme.
+N1's print template becomes unnecessary: `\stxTasks` + `\stxTrueFalse` from a
+theme reproduces it.
+
+**What this does not buy.** Outcomes with genuinely bespoke print layout will
+still want a hand-written file. That is fine — see "the escape hatch" below.
+The goal is not to eliminate `textemplate.tex`; it is to stop *every* outcome
+needing one to express things that are not actually per-outcome.
+
+### The answer machinery, restated so nothing is lost
+
+This is the part to be most careful about, because the requirement is explicitly
+that none of the current behaviour is lost. Mapping each mechanism forward:
+
+| today | becomes | who decides what |
+|---|---|---|
+| `\setboolean{anstoggle}{true}` | `subset='answer'` / `'all'` passed to `latex.xsl` | the **publication** ("this run is a key") |
+| `ansenv` | `\stxOuttro`, already emitted | the **theme** (colour, `\vfill` around it) |
+| `\ans{x}` | `<outtro>` inline within a `<p>`, or `\stxAns` | the **theme** (colour) |
+| `\tfleft[True]{s}` | `<response type="truefalse"/>` → `\stxTrueFalse` | **SpaTeXt** says it is T/F; the theme draws the box |
+| `\fillinblank[w]{a}` | `<response type="short"/>` → `\stxBlank` | **SpaTeXt** says short answer; the theme sets the width |
+
+The single `anstoggle` boolean stays exactly as it is inside the theme. What
+changes is only that the *decision* to set it arrives as a parameter rather than
+as a hardcoded `\setboolean` line, so one source can produce handout and key
+without the tool editing LaTeX text.
+
+**Important detail worth preserving deliberately:** `\tfleft` prints TRUE and
+FALSE identically whether answers are on or off, and only the box changes. That
+property — the handout and the key have *identical layout*, differing only in
+ink — is why a key can be laid over a handout and compared at a glance. Any
+replacement must keep it. It is also the reason `\fillinblank` reserves its
+space unconditionally. **Do not let a redesign turn these into "print the answer
+after the question".**
+
+### What is missing in `latex.xsl` regardless
+
+Independent of response types, four gaps stand between today's output and a
+theme being able to do anything:
 
 1. **Structure is hardcoded where it should be a hook.** Nested knowls emit a
-   literal `\begin{enumerate}` / `\item`, and `<list>` emits `\begin{itemize}`.
-   A theme that wants tasks lettered (a), (b), (c), or wants each task in a
-   framed box with ruled space beneath, cannot get there — it would have to
-   redefine `enumerate` globally and hope nothing else uses it. These want to
-   become `\stxTasks{...}` / `\stxTask{...}`, defaulting to the current
-   `enumerate` behaviour so nothing changes until a theme asks for it.
-
-2. **The document cannot say what it is.** Nothing in the emitted LaTeX records
-   which outcome or which seed a chunk came from. A theme cannot print "W4 ·
-   version 137" in a margin, and the print tool cannot assemble a keyed answer
-   sheet from the same source it printed from. An `\stxExercise{slug}{seed}{...}`
-   wrapper would fix both, and costs one template in `latex.xsl`.
-
-3. **Hiding answers is done by a comment, not a parameter.** `html.xsl` takes a
-   `subset` parameter (`all` / `statement` / `answer`); `latex.xsl` instead
-   always emits `\renewcommand{\stxOuttro}[1]{}` with a note telling a human to
-   comment it out. That is the same idea implemented two different ways in two
-   files — the exact shape this codebase keeps getting bitten by. `latex.xsl`
-   should take `subset` too, and `Exercise.latex_ele()` should pass it. The
-   command-redefinition trick can stay as the *mechanism*; it is the decision
-   that should be a parameter.
-
-4. **Nothing declares the macros the content needs.** W1's output calls
-   `\textpmhg`, `\babo`, `\Hone`. Those are not style choices — the document
-   does not compile without them — but there is no place for a bank to say so.
-   See "Letting a bank declare its own LaTeX preamble", which is the same
-   problem approached from the other side.
+   literal `\begin{enumerate}` / `\item`; `<list>` emits `\begin{itemize}`. A
+   theme wanting `enumitem`'s `label=(\alph*)` — which `skillcheckpoints.sty`
+   already sets globally — or `\vfill` between items, cannot get there without
+   redefining `enumerate` for the whole document. These want to be
+   `\stxTasks{...}` / `\stxTask{...}`, defaulting to current behaviour.
+2. **The document cannot say what it is.** Nothing records which outcome or
+   which seed a chunk came from, so a theme cannot reproduce
+   `\setvseed{\VAR{seed}}` or `\skillheader{N1}` from CheckIt's own output. An
+   `\stxExercise{slug}{seed}{...}` wrapper fixes both and costs one template.
+3. **`subset` does not exist in `latex.xsl`.** `html.xsl` takes it; `latex.xsl`
+   instead always emits `\renewcommand{\stxOuttro}[1]{}` with a comment telling
+   a human to delete the line. Same idea, two implementations, two files — the
+   shape this codebase keeps paying for. The print tool needs keys, so this has
+   to be settled first.
+4. **Nothing declares the macros the content needs.** `\babo` and `\textpmhg`
+   are not style choices; the document does not compile without them. See
+   "Letting a bank declare its own LaTeX preamble".
 
 ### The split worth committing to
 
-Three things, three homes. This is the part to get right; the rest is
-implementation.
-
 | | declares | lives in |
 |---|---|---|
-| **bank** | what the content *says*, and the macros it needs to compile (`\babo`, `\Hone`, the font package) | the bank, next to `bank.xml` |
-| **theme** | how `\stxKnowl`, `\stxTask`, `\stxOuttro` render — boxes, spacing, numbering | a `.sty`, shipped with the print tool, overridable |
-| **publication** | what *this run* wants: paper, columns, answers on or off, how many versions, seating policy, roster | a file in the course repo, versioned with the course |
+| **bank** | what the content says; response types; the macros it needs to compile (`\babo`, `hieroglf`); slug, description and colour | `template.xml`, `bank.xml`, and a new preamble declaration |
+| **theme** | how `\stxTasks`, `\stxTrueFalse`, `\stxBlank`, `\stxOuttro`, `\stxExercise` render — widths, colours, spacing, the skill box | `skillcheckpoints.sty`, shipped by the print tool, overridable |
+| **publication** | what *this run* wants: handout or key, which outcomes, how many versions, roster, seating, course/semester/professor | a file in the course repo |
 
-The bank column is the one people get wrong. A bank declaring `\usepackage{...}`
-is not styling — it is stating a dependency, the same way a generator importing
-`inflect` states one. A bank declaring `\geometry{margin=1in}` *is* styling, and
-belongs one column right.
+`bank.xml` already holds slug, description and colour, and `pdfgenerator.py`
+already turns them into `\setskilldesc`. That flow is correct as-is and should
+survive unchanged.
 
-**Why a publication file rather than CLI flags.** Same reason PreTeXt uses one:
-a print run has too many decisions to pass on a command line, they need to be
-reproducible six months later, and they differ per course rather than per
-invocation. It should be plain data — the tool reads it, nothing executes it —
-and it should be diffable, so "why did this semester's handout change" has an
-answer.
+The middle column is where `skillcheckpoints.sty` mostly already sits. Most of
+its 610 lines — the boxes, the pgfplots styles, the fonts, the header/footer —
+are already pure theme and need no change at all. The parts that would move are
+the four answer commands, which become definitions of `\stx*` hooks rather than
+commands the templates call directly.
 
-**What not to copy from PreTeXt.** Its publisher file is large because PreTeXt
-targets many output formats with deep customisation each. This needs one output
-format done well. Start with the handful of settings the two existing
-`main_template.tex` files actually differ on, and add settings when a real
-course needs one — a schema invented up front will mostly be wrong.
+### The escape hatch, and why it is not a failure
 
-### Before designing further, read the two existing pipelines
+**`textemplate.tex` should not be abolished.** Some outcomes will want layout no
+vocabulary will ever capture, and the promise "you can always drop to LaTeX for
+one outcome" is worth more than purity. The design that keeps both:
 
-`skillcheckpoints.sty` and `main_template.tex` exist in both banks and have
-probably drifted. **Diff them first.** How far apart they are decides whether
-the tool ships one theme with a few overrides or needs real theming, and that
-is a much better basis than a guess. The `.sty` wants cleaning up regardless.
+- If an outcome has a `textemplate.tex`, the print tool uses it, exactly as
+  `pdfgenerator.py` does today. Nothing breaks on day one.
+- If it does not, the tool renders the SpaTeXt through `latex.xsl` and the
+  theme. New outcomes cost one template instead of two.
+- Outcomes migrate one at a time, when someone touches them anyway.
 
-Whatever the answer, the layout has to stay **instructor-editable**: this is a
-tool for someone who knows LaTeX and will want to change how the page looks
-without filing an issue. Exposing the `.sty` directly is the cheapest way to
-keep that true, and "the theme is just a file you can edit" is a better promise
-than any options schema.
+That also means **this work can start without migrating anything**, which is the
+main reason to prefer it. The first version of the print tool is
+`pdfgenerator.py` cleaned up and packaged, reading `seeds.json` instead of
+importing generators, with the theme and templates carried across unchanged.
+Response types come afterwards, one outcome at a time, and each migration is
+verifiable by diffing a PDF against the old one.
+
+### On the PreTeXt analogy
+
+The instinct is right and worth stating precisely. PreTeXt's separation is
+*source* (what the mathematics is) from *publisher file* (how this particular
+publication renders it), so one source serves many outputs without the author
+choosing an output. That is the model.
+
+Where CheckIt differs, and should: PreTeXt's publisher file is large because it
+targets many formats with deep customisation of each. This needs one output
+format done well, and it has something PreTeXt does not — a **theme in the
+target language itself**. A LaTeX `.sty` is a far better customisation surface
+for a LaTeX document than any options schema, because the instructor already
+knows LaTeX and can change anything without the tool anticipating it.
+
+So: take PreTeXt's *split*, not its publisher-file design. Keep the publication
+file small — the settings that vary per course, which today are the four
+`\VAR{}`s in `main_template.tex` (`course`, `semester`, `professor`,
+`full_title`) plus roster and seating — and let the theme be a file you edit.
+
+**"The theme is just a file you can edit" is a better promise than any options
+schema**, and it is the one thing here that must not be traded away for
+tidiness.
 
 ### Open, and deliberately unanswered
 
@@ -3490,15 +3628,18 @@ than any options schema.
   responses from Google Forms directly, set up the form and sheet for a new
   course, and drive printing. That makes the existing CSV-scraping code
   throwaway, so it is not worth porting carefully.
-- Whether the answer key is a separate compile of the same source with
-  `subset='answer'`, or one compile emitting both, is undecided. The first is
-  simpler and matches how `subset` already works; the second keeps version
-  numbering trivially consistent between handout and key.
-- Whether print draws from `derived.json` (pre-rendered LaTeX, no XSLT at print
-  time) or re-renders from `seeds.json` (slower, but picks up stylesheet fixes
-  without regenerating the bank). `BUNDLE_UNTIL` currently caps the pre-rendered
-  range at 400, so a print run wanting more versions than that has already
-  answered this question by force.
+- Whether the key is a second compile of the same source with `subset='answer'`
+  (simple, matches `html.xsl`) or one compile emitting both (keeps version
+  numbering trivially consistent). `pdfgenerator.py` currently does the former,
+  in the same document.
+- Whether print draws from `derived.json` (pre-rendered, no XSLT at print time)
+  or re-renders from `seeds.json` (slower, picks up stylesheet fixes without
+  regenerating). `BUNDLE_UNTIL` caps the pre-rendered range at 400, so a run
+  wanting more versions than that has already answered this by force.
+- Whether `<response>` is one element with a `type` attribute or several
+  elements. The attribute reads better in the XML; separate elements are easier
+  to give distinct content models to later (a `truefalse` has no answer text
+  beyond the value, a `short` does).
 
 ## Local divergences from upstream StevenClontz/checkit
 
