@@ -3463,13 +3463,40 @@ dropped by a rewrite that only looked at the LaTeX:
 
 Two of these deserve attention in any redesign.
 
-**The per-run settings are `variants` by another name.** `course_progress` and
-friends are read from the spreadsheet and passed as kwargs, which is exactly the
-axis CheckIt models with `variants` — except CheckIt pregenerates every variant
-across the seed space and *filters* at use time, while this decides at
-generation time. Reconciling those two is a real design question, not a
-detail: it decides whether the print tool can consume pregenerated seeds at all
-(below).
+### The state of `variants` versus `course_progress` (audited 2026-08-27)
+
+**The per-run settings are `variants` by another name**, and converting them is
+the one prerequisite that is genuinely unfinished. `course_progress` and friends
+are read from the spreadsheet and passed as kwargs; CheckIt instead pregenerates
+every variant across the seed space and *filters* at use time. Since printed
+versions now come from pregenerated seeds, kwargs cannot work — the seeds were
+generated before anyone chose the setting.
+
+Actual state, which is not what the port plan claims:
+
+| | count | outcomes |
+|---|---|---|
+| declare `variants` | 4 | `R2`, `W4`, `W4-E`, `W5` |
+| still read `course_progress` | 25 | everything else |
+| `data()` hardcodes `course_progress=6` | 20 | frozen at the end-of-semester maximum |
+| still pass `mode='html'` | 17 | **dead argument** — no `generate()` reads it |
+
+Three things follow.
+
+**The conversion was started, not finished.** Four outcomes went across; the
+rest kept the kwarg. The port plan's "only five outcomes read them" was an
+undercount by a factor of five, which is probably why it looked done.
+
+**`course_progress=6` frozen at the maximum is invisible on the web and fatal
+for print.** A student browsing sees end-of-semester content, which is
+defensible. But a printed quiz for week 4 cannot be assembled from those seeds,
+because the earlier-semester versions were never generated. This is the concrete
+reason the conversion blocks the print tool.
+
+**`mode='html'` is still being passed in 17 generators.** No `generate()` reads
+it -- confirmed by grep. It is a dead argument left over from the `mode`
+retirement, harmless but misleading, and worth deleting in the same pass that
+handles `course_progress`, since it touches the same lines.
 
 **Per-student packet assembly is the feature with no CheckIt counterpart.**
 Nothing in the platform knows about rosters, per-student skill lists, or
@@ -4369,9 +4396,14 @@ literal text once the content is no longer inside one.
    8 of those are formatting; emit `<m>` in the string instead (see the `WORDS`
    walkthrough) and let the print side convert. `R1` is the exception — it
    selects genuinely different content and wants `variants`, or splitting in two.
-4. Convert `course_progress` and friends to **`variants`**. Only five outcomes
-   read them (R1, R2, W4, W4-E, W5) and most are binary, so the variant space is
-   small. Today the value is frozen in each shim, so advancing the semester means
-   editing files and regenerating; as a variant it is pregenerated across all
-   cases and *filtered* at print time.
+4. Convert `course_progress` and friends to **`variants`**. Today the value is
+   frozen in each shim, so advancing the semester means editing files and
+   regenerating; as a variant it is pregenerated across all cases and *filtered*
+   at print time.
+
+   > **Only partly done, and the count in this step was wrong** (audited
+   > 2026-08-27). It said five outcomes read these settings; twenty-five do.
+   > Four declare `variants` (`R2`, `W4`, `W4-E`, `W5`); the rest still call
+   > `generate(course_progress=6)` with the value hardcoded at the maximum. See
+   > "The state of `variants` versus `course_progress`".
 5. Check LaTeX literals are raw strings: `"rac"` makes `` a formfeed.
