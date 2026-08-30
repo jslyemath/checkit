@@ -3488,27 +3488,42 @@ the printed version". **That is wrong, and worth correcting loudly.**
 plain fetch away, so a printed quiz drawn from that range is a printed quiz
 whose answers are published.
 
-The existing tool avoids this by accident of design: it seeds with
-`random.choice(range(10000, 100000))` and runs the generator directly, so
-printed versions exist nowhere else.
+The existing tool sidesteps it by seeding with
+`random.choice(range(10000, 100000))` and running the generator directly, so
+printed versions exist nowhere else. That was a deliberate delineation, not an
+accident — but it is also no longer necessary.
 
-Three ways out, none free:
+**The unpublished pregenerated range already exists.** Verified 2026-08-27:
 
-1. **Keep generating at print time.** Print imports generators and seeds them
-   itself, as today. Printed versions are unpublished by construction. Costs:
-   printing needs a working generator environment, and reproducing a specific
-   printed sheet means recording its seed.
-2. **Extend the bundle past what is published.** Generate seeds 400-999 into
-   `seeds.json` but exclude them from `docs/`. `BUNDLE_UNTIL` already exists to
-   bound what gets published — this is the seam it was built for. Costs: the
-   print tool needs the bank checkout, not just the published site.
-3. **A separate unpublished bundle.** Emit a `print.json` alongside
-   `derived.json`, gitignored or published elsewhere. Costs: another artifact,
-   another thing to keep in sync.
+| range | where it lives | published? |
+|---|---|---|
+| 0 - 49 (`PUBLIC_SEEDS`) | inlined in `bank.json`, all three formats | **yes** |
+| 50 - 399 (`BUNDLE_UNTIL`) | `derived.json`, html + latex, answers included | **yes** |
+| 400 - 999 | `seeds.json` only, data with no rendered formats | **no** |
 
-(2) fits the existing design best and is the reason `BUNDLE_UNTIL` is a
-constant rather than a hardcoded number. It is worth settling *before* writing
-the tool, because it determines whether the tool takes a bank path or a URL.
+`build_viewer()` copies `assets/` into `docs/` with
+`ignore_patterns("seeds.json", "*.tikz")`, so the seed *data* never ships — only
+the two rendered tiers do. Seeds 400-999 are therefore pregenerated,
+reproducible, in the bank, and absent from the published site in any form.
+**That is the print pool, and no new mechanism is needed to get it.**
+
+That is what the three constants are for, and it is worth stating plainly
+because the names do not say it:
+
+- `PUBLIC_SEEDS` — how many versions a student can browse.
+- `BUNDLE_UNTIL` — where publishing stops. Everything from here to `--amount`
+  is generated but not published.
+- `--amount` — how many exist at all. Raise it for more print versions; 1000
+  gives 600 unpublished ones today.
+
+The only cost is that seeds 400-999 have no precomputed LaTeX, so the print
+tool renders them through `latex.xsl` itself. That is not a real cost: the tool
+has the platform installed by definition, and rendering at print time means
+stylesheet fixes reach print without regenerating the bank.
+
+**Consequence for the tool's input:** it takes a bank checkout, not a URL. That
+follows from wanting unpublished versions and is not a limitation to design
+around.
 
 ### A fifth answer mechanism: figures
 
