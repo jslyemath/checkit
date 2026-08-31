@@ -3465,38 +3465,45 @@ Two of these deserve attention in any redesign.
 
 ### The state of `variants` versus `course_progress` (audited 2026-08-27)
 
-**The per-run settings are `variants` by another name**, and converting them is
-the one prerequisite that is genuinely unfinished. `course_progress` and friends
-are read from the spreadsheet and passed as kwargs; CheckIt instead pregenerates
-every variant across the seed space and *filters* at use time. Since printed
-versions now come from pregenerated seeds, kwargs cannot work — the seeds were
-generated before anyone chose the setting.
+**It is done, and the port plan's count was right.** An earlier version of this
+section claimed twenty-five outcomes still read `course_progress` and that
+converting them blocked the print tool. Both claims were wrong, from grepping
+for the token rather than checking whether the value is ever read.
 
-Actual state, which is not what the port plan claims:
+Only **five** generators use it, which is exactly what the port plan said:
 
-| | count | outcomes |
+| | mechanism | state |
 |---|---|---|
-| declare `variants` | 4 | `R2`, `W4`, `W4-E`, `W5` |
-| still read `course_progress` | 25 | everything else |
-| `data()` hardcodes `course_progress=6` | 20 | frozen at the end-of-semester maximum |
-| still pass `mode='html'` | 17 | **dead argument** — no `generate()` reads it |
+| `W4`, `W4-E`, `W5` | `variants = ["no_multiplication", "multiplication"]`, and `progress` derived from `self.variant` | converted |
+| `R2` | `variants`, passed as `generate(group=self.variant)` | converted |
+| `R1` | branches on `self.seed < PUBLIC_SEEDS`: self-study pool below, assessment pool above | converted, by seed rather than variant |
 
-Three things follow.
+The other twenty write `course_progress = kwargs.get('course_progress')` and
+never read it. That is a dead extraction, not a setting. Seventeen also pass
+`mode='html'`, which no `generate()` reads. Both are leftovers from the shims;
+both are noise rather than debt.
 
-**The conversion was started, not finished.** Four outcomes went across; the
-rest kept the kwarg. The port plan's "only five outcomes read them" was an
-undercount by a factor of five, which is probably why it looked done.
+**So nothing here blocks the print tool.** Printed versions can come from
+pregenerated seeds today: every axis that varies content is already either a
+`variant` (pregenerated across the seed space, filterable at print time) or a
+function of the seed itself.
 
-**`course_progress=6` frozen at the maximum is invisible on the web and fatal
-for print.** A student browsing sees end-of-semester content, which is
-defensible. But a printed quiz for week 4 cannot be assembled from those seeds,
-because the earlier-semester versions were never generated. This is the concrete
-reason the conversion blocks the print tool.
+What remains is tidying, worth doing when those files are next open:
 
-**`mode='html'` is still being passed in 17 generators.** No `generate()` reads
-it -- confirmed by grep. It is a dead argument left over from the `mode`
-retirement, harmless but misleading, and worth deleting in the same pass that
-handles `course_progress`, since it touches the same lines.
+- delete the dead `course_progress = kwargs.get(...)` line from twenty
+  generators, and `mode='html'` from seventeen `data()` calls;
+- decide what happens to `R1`'s and `R2`'s legacy `course_progress` branches.
+  Both are reachable only from `pdfgenerator.py`, which passes the kwarg
+  directly; once the print tool selects variants instead, those branches become
+  dead too. `R1`'s also reads `assets/R1/used_versions.json`, which makes
+  generation stateful and is deliberately bypassed by the CheckIt path.
+
+> **Method note.** Three counts in this section were wrong before this audit,
+> each from a grep that matched a token rather than a use. `grep -l
+> course_progress` finds files that mention it; `kwargs['course_progress']` is
+> a subscript with a string constant, so an AST walk looking for a *variable*
+> of that name misses it too. What settled it was printing every matching line
+> and reading them. When a count drives a decision, read the lines.
 
 **Per-student packet assembly is the feature with no CheckIt counterpart.**
 Nothing in the platform knows about rosters, per-student skill lists, or
@@ -4401,9 +4408,9 @@ literal text once the content is no longer inside one.
    regenerating; as a variant it is pregenerated across all cases and *filtered*
    at print time.
 
-   > **Only partly done, and the count in this step was wrong** (audited
-   > 2026-08-27). It said five outcomes read these settings; twenty-five do.
-   > Four declare `variants` (`R2`, `W4`, `W4-E`, `W5`); the rest still call
-   > `generate(course_progress=6)` with the value hardcoded at the maximum. See
-   > "The state of `variants` versus `course_progress`".
+   > **Done** (audited 2026-08-27). The count in this step was correct: five
+   > outcomes use these settings, and all five are converted -- `R2`, `W4`,
+   > `W4-E` and `W5` by `variants`, `R1` by seed. The twenty others extract the
+   > kwarg and never read it. See "The state of `variants` versus
+   > `course_progress`".
 5. Check LaTeX literals are raw strings: `"rac"` makes `` a formfeed.
