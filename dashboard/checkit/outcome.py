@@ -7,7 +7,7 @@ from .wrapper import run_generator
 from .wrapper.tikz import compile_tikz_for_outcome
 
 class Outcome():
-    def __init__(self, title=None, slug=None, path=None, description=None, bank=None, ai_prompt=None):
+    def __init__(self, title=None, slug=None, path=None, description=None, bank=None, ai_prompt=None, frozen=False):
         self.title = title
         self.slug = slug
         self.relpath = path
@@ -15,6 +15,10 @@ class Outcome():
         self.bank = bank
         # None means "inherit the bank's ai_prompt"; see Bank.__init__
         self.ai_prompt = ai_prompt
+        # <frozen/> in bank.xml: students are working through these versions
+        # right now, so the seeds must not move under them. Blocks regeneration
+        # only -- see Bank.generate_exercises.
+        self.frozen = frozen
     
     def abspath(self):
         return os.path.join(self.bank.abspath(),self.relpath)

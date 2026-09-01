@@ -3,7 +3,7 @@ import os, json, datetime, zipfile, shutil
 from pathlib import Path
 from . import static
 from .outcome import Outcome
-from .xml import CHECKIT_NS, optional_text
+from .xml import CHECKIT_NS, optional_text, has_flag
 from . import (PUBLIC_SEEDS, BUNDLE_UNTIL, INLINE_FORMATS, BUNDLE_FORMATS,
                BUNDLE_FILENAME)
 
@@ -29,6 +29,7 @@ class Bank():
                 ele.find(f"{CHECKIT_NS}description").text,
                 self,
                 ai_prompt=optional_text(ele, "ai-prompt"),
+                frozen=has_flag(ele, "frozen"),
             )
             for ele in xml.find(f"{CHECKIT_NS}outcomes").iter(f"{CHECKIT_NS}outcome")
         ]
@@ -42,7 +43,7 @@ class Bank():
         return self._outcomes
     
     def generate_exercises(self,regenerate=False,images=False,amount=1_000,
-                           image_seeds=None,only=None):
+                           image_seeds=None,only=None,thaw=()):
         """Regenerate exercises, optionally for a subset of outcomes.
 
         `only` is a set of slugs, or None for every outcome. It narrows what is
@@ -53,9 +54,27 @@ class Bank():
         hold that one outcome and silently drops the published manifest for the
         rest. The per-outcome seeds.json survive, so it is recoverable, but the
         site is wrong until a full generate runs.
+
+        `thaw` is the set of slugs allowed to regenerate despite `<frozen/>`.
+        Naming an outcome is deliberately the only way past the flag: a blanket
+        --force would be typed reflexively, which is exactly the reflex the flag
+        exists to interrupt.
         """
         for o in self.outcomes():
             if only is not None and o.slug not in only:
+                continue
+            if o.frozen and regenerate and o.slug not in thaw:
+                # Refusing is the whole point: a frozen outcome is one students
+                # are working through right now, and replacing its seeds.json
+                # changes their homework underneath them. Say so loudly rather
+                # than skipping quietly, so a -r run cannot appear to have done
+                # more than it did.
+                print(
+                    f"SKIPPING {o.slug}: marked <frozen/> in bank.xml. "
+                    f"Its existing seeds are kept. To regenerate it anyway: "
+                    f"--thaw {o.slug}"
+                )
+                o.generate_exercises(regenerate=False,images=images,amount=amount,image_seeds=image_seeds)
                 continue
             print(f"Generating {amount} exercises for outcome {o.slug}")
             o.generate_exercises(regenerate=regenerate,images=images,amount=amount,image_seeds=image_seeds)

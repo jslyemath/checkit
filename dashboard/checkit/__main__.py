@@ -122,12 +122,22 @@ def new(directory):
          "would 404 wherever the HTML is displayed (an LMS, a chatbot).",
 )
 @click.option(
+    "--thaw",
+    multiple=True,
+    metavar="SLUG",
+    help="Regenerate an outcome marked <frozen/> in bank.xml. Repeatable. "
+         "Freezing exists because students may be working through those "
+         "versions right now, so replacing the seeds changes their homework "
+         "underneath them -- naming the outcome is deliberately the only way "
+         "past it.",
+)
+@click.option(
     "--no-precompute",
     is_flag=True,
     help="Skip precomputing HTML/LaTeX/PreTeXt. Faster, but the viewer needs "
          "them once browsers drop XSLT (Chrome 158, 2026-11-17).",
 )
-def generate(amount,regenerate,images,image_seeds,outcome,remote,no_precompute):
+def generate(amount,regenerate,images,image_seeds,outcome,remote,thaw,no_precompute):
     if amount < PUBLIC_SEEDS:
         # The viewer's version picker always offers PUBLIC_SEEDS versions, and
         # the assessment builder draws from seeds at or above it -- with fewer
@@ -157,8 +167,24 @@ def generate(amount,regenerate,images,image_seeds,outcome,remote,no_precompute):
                 "Available: " + ", ".join(o.slug for o in b.outcomes()),
                 param_hint="--outcome",
             )
+    frozen = {o.slug for o in b.outcomes() if o.frozen}
+    unknown = set(thaw) - {o.slug for o in b.outcomes()}
+    if unknown:
+        raise click.BadParameter(
+            f"no outcome with slug {', '.join(sorted(unknown))} in this bank.",
+            param_hint="--thaw",
+        )
+    pointless = set(thaw) - frozen
+    if pointless:
+        # Thawing something that was never frozen means the author believes it
+        # is protected when it is not.
+        raise click.BadParameter(
+            f"{', '.join(sorted(pointless))} is not marked <frozen/>, so there "
+            "is nothing to thaw. Check bank.xml.",
+            param_hint="--thaw",
+        )
     b.generate_exercises(regenerate=regenerate,images=images,amount=amount,
-                         image_seeds=image_seeds,only=only)
+                         image_seeds=image_seeds,only=only,thaw=set(thaw))
     b.write_json(remote=remote,precompute=not no_precompute)
 
 # checkit viewer

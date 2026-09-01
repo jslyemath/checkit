@@ -3047,11 +3047,28 @@ md5sum assets/W1/generated/seeds.json assets/W1-E/generated/seeds.json
 Take that before and after. It is what was done for the 2026-08-31 variant
 conversion, and it is two seconds against a fortnight of student work.
 
-**This is a note, not a mechanism.** Nothing in the platform enforces it, and a
-`-r` typed at the wrong moment is unrecoverable without the previous
-`seeds.json` from git. A `<frozen/>` flag in `bank.xml` that made
-`generate_exercises` skip an outcome unless explicitly forced would turn this
-paragraph into something that cannot be forgotten; it is unbuilt.
+**This is now a mechanism, not just a note** (built 2026-08-31). Both outcomes
+carry `<frozen/>` in `bank.xml`, and `generate_exercises` refuses to regenerate
+a frozen outcome:
+
+```
+SKIPPING W1: marked <frozen/> in bank.xml. Its existing seeds are kept.
+To regenerate it anyway: --thaw W1
+```
+
+Four properties worth keeping if this is ever touched:
+
+- **It blocks regeneration, not rendering.** A plain `checkit generate` still
+  re-renders a frozen outcome, so a stylesheet fix reaches published HTML
+  without anyone thawing anything. The problems do not change; only how they
+  are drawn.
+- **It is loud.** A `-r` that quietly did less than asked would be its own
+  hazard, so the skip is printed per outcome with the exact command to override.
+- **The outcome stays in `bank.json`.** Frozen means "keep these versions", not
+  "drop this outcome" -- the `-o` bug taught that lesson already.
+- **Thawing names the outcome.** `--thaw W1`, repeatable, and refused if the
+  slug is unknown *or* not actually frozen. A blanket `--force` would be typed
+  reflexively, which is the reflex the flag exists to interrupt.
 
 ---
 
