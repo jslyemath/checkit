@@ -3088,7 +3088,7 @@ Four properties worth keeping if this is ever touched:
 | SpaTeXt elements for per-medium differences | done — `<glyphs>`, `<nobreak>` |
 | mat-206 | **not started, and not a port** — see below |
 | Print tool as its own package | done — [checkit-printit](https://github.com/jslyemath/checkit-printit), stages 1-5 and 9; see `PRINT_TOOL_DESIGN.md` |
-| A real quiz printed from mat-106 | **next** — the tool has only ever printed its 2-outcome test fixture |
+| A real quiz printed from mat-106 | done — 2026-09-01, 98 pages; all 28 outcomes build. See "The first real quiz" |
 | `skillcheckpoints.sty` drift between banks | none — byte-identical (2026-08-27) |
 
 Known open questions, none blocking:
@@ -3419,6 +3419,91 @@ Consequences for the roadmap steps below: steps 1, 2 and 5 are moot for mat-206
 mentions `mode`), and step 4 is moot (no generator mentions `course_progress`).
 What mat-206 should inherit is mat-106's *finished* `bank_helpers.py`, dropped
 in at the bank root, and the `Generator` class shape -- not its history.
+
+## The first real quiz, and what it found (2026-09-01)
+
+Four pretend students, the first 14 outcomes, A/B by seating, keys at the back.
+Ninety-eight pages, and it took three fixes to get there. Then all 28 outcomes,
+two students: 130 pages, clean.
+
+Worth reading because none of it was visible to `checkit check`, to the test
+suite, or to the website. All three needed a PDF.
+
+### SpaTeXt was leaking into LaTeX in nine of 28 outcomes
+
+The bug the whole two-template split was always going to produce.
+
+A generator returns strings, and since the port some of those strings carry
+inline SpaTeXt: `<m>` for maths, `<em>`, `<glyphs>` for an ancient numeral,
+`<nobreak>`. `template.xml` inserts such a field with **triple** braces, so the
+markup becomes part of the document the stylesheets transform, and the web is
+right. `textemplate.tex` inserts the same field into LaTeX, where a tag is just
+characters. W1 sent pdflatex an Egyptian hieroglyph inside a `latex="..."`
+attribute and the build stopped:
+
+    ! LaTeX Error: Unicode character U+133FA not set up for use with LaTeX.
+    l.15 ...thousand\Hmillion\Hmillion\Hmillion}">
+
+Affected: **R2, W1, W1-E, W4, N1, N1-E, N2, F5, D4**. Every one of them is an
+outcome whose generator was reformatted to emit SpaTeXt. Fixing the web broke
+print, silently, and nothing looked at print until now.
+
+The fix is in the print tool, not the bank: `checkit_printit/spatext.py` renders
+each field through `latex.xsl` before Jinja sees it. Reusing the stylesheet
+matters -- it already knew to prefer a `<glyphs>` element's `@latex` attribute
+over its Unicode, which is exactly the case `<glyphs>` was added for. A
+reimplementation in Python would have had to learn that again.
+
+Two banks files needed editing too: W1 and W1-E wrapped those fields in
+`$...$`, which was right while the field was a bare LaTeX string and nests
+maths inside maths once the field renders its own. Seeds untouched -- the
+freeze on W1/W1-E is about seeds, and this changes only how a page is built.
+
+**The lesson to carry to mat-206.** A field that carries markup has exactly one
+correct consumer: something that parses it. Any second template that pastes the
+same field as text will drift the moment a generator changes, and the drift is
+invisible until someone compiles. An outcome with no `textemplate.tex` cannot
+have this bug at all, which is the strongest argument yet for the SpaTeXt route
+being the default.
+
+### Figures: only the machine-made ones were being copied
+
+`_copy_assets` copied `assets/<slug>/generated/`, which is where the TikZ
+backend writes. R1's 38 hand-drawn PNGs sit directly in `assets/R1/` and never
+travelled, so the output folder referenced `assets/R1/pemdas-1p.png` and did not
+contain it.
+
+It now scans the written skill files for `\includegraphics` and `\input{*.tikz}`
+and copies exactly what they name. Two gains beyond the fix: the folder carries
+2 figures instead of 38, and a reference the bank cannot satisfy is reported by
+name at assembly instead of surfacing as `using draft setting` a thousand log
+lines before pdflatex gives up.
+
+### The pdflatex log was decoded with the locale encoding
+
+`subprocess.run(..., text=True)` decodes with the locale codec, which is cp1252
+on this machine. pdflatex echoes font and file names byte for byte, one of them
+contained 0x81, and the decode ran on subprocess's reader **thread** -- so the
+exception printed to stderr, `stdout` came back as `None`, and a real LaTeX
+error became `TypeError: unsupported operand type(s) for +: 'NoneType' and
+'str'` six lines later. Now decoded as UTF-8 with `errors="replace"`.
+
+Worth remembering as a shape, not just a bug: an exception on a reader thread
+does not fail the call, it empties the result.
+
+### Still open after this run
+
+- **Babylonian answers print black on the key.** `\babo` and `\babt` in
+  `skillcheckpoints.sty` draw with TikZ `fill=black`, which ignores the ambient
+  `\color{scCOLOR}` that `ansenv` sets. `fill=.` would take the current colour.
+  Not fixed because the `.sty` exists in three byte-identical copies (both banks
+  and the print package) and they should change together.
+- **N1's `textemplate.tex` asks for six fields no generator sets** --
+  `explain_prob_1..3`, `explain_ans_1..3`. All six are inside `%` comments,
+  left from when N1-E shared the slot, so the run is correct. The tool reports
+  them because a missing field inside a comment and a missing field in live
+  text look identical to Jinja.
+- **W4 runs to two pages** (ten items) and **N1** likewise. Content, not layout.
 
 ## The print tool
 
