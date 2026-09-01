@@ -3087,7 +3087,7 @@ Four properties worth keeping if this is ever touched:
 | mat-106 published and verified | done — 2026-08-27, no `checkit check` findings |
 | SpaTeXt elements for per-medium differences | done — `<glyphs>`, `<nobreak>` |
 | mat-206 | **not started, and not a port** — see below |
-| Print tool as its own package | **next** — see "The print tool" |
+| Print tool as its own package | **next** — designed, not started; see `PRINT_TOOL_DESIGN.md` |
 | `skillcheckpoints.sty` drift between banks | none — byte-identical (2026-08-27) |
 
 Known open questions, none blocking:
@@ -3140,6 +3140,31 @@ the bank, one outcome at a time, is unglamorous and is the highest-value
 unstarted work on this list after the print tool.
 
 ### Known platform bugs
+
+**The assessment builder references images that were never rendered**
+(found 2026-09-01, unfixed). `getRandomAssessmentFromSlugs` picks a seed in
+`[PUBLIC_SEEDS, BUNDLE_UNTIL)` -- 50 to 399. `--image-seeds N` rasterises PNGs
+only for seeds `0` to `N-1`. mat-106 publishes with `--image-seeds 50`, so
+**every assessment containing `F2` or `F2-E` points at a PNG that does not
+exist**, in both the HTML preview and the LaTeX export.
+
+Three things hide it:
+
+- browsing is fine, because the viewer only ever shows seeds 0-49;
+- print is fine, because mat-106's `textemplate.tex` writes TikZ inline and
+  never touches the PNGs;
+- `checkit check`'s `relative-img` check passes, because the `<img src>` *is*
+  absolute -- it points at a real URL that happens to 404.
+
+The immediate fix is `--image-seeds 400`, at roughly eight times the
+rasterisation time and `docs/` size. The better fix is publishing `.tikz` and
+having figures `\input` their source, which also makes an exported assessment
+self-contained -- see `PRINT_TOOL_DESIGN.md` section 6b.
+
+A check worth adding: every `<img src>` and `\includegraphics` in the published
+bundles resolves to a file that exists. That is a cheap addition to
+`checks.py` and it would have caught this.
+
 
 **`checkit generate` swallows generator tracebacks.** `run_generator` runs each
 generator in a subprocess and lets `subprocess.CalledProcessError` propagate, so
@@ -3395,6 +3420,16 @@ What mat-206 should inherit is mat-106's *finished* `bank_helpers.py`, dropped
 in at the bank root, and the `Generator` class shape -- not its history.
 
 ## The print tool
+
+> **Superseded by `PRINT_TOOL_DESIGN.md`** (2026-09-01), which folds in a
+> review conversation and reverses one decision recorded below. The short
+> version of the reversal: `skillcheckpoints.sty` is deliberately a working
+> *by-hand* system -- MAT 206's skills are hand-written `.tex` files using it,
+> with no CheckIt involved -- so the unit of exchange is a skill `.tex` file and
+> the `.sty`'s existing commands are the interface. The proposal below, to have
+> `latex.xsl` emit semantic `\stxKnowl`/`\stxTask` commands for a theme to
+> redefine, would create a second vocabulary that hand-authors never write.
+> What follows is kept for the reasoning that still holds.
 
 Belongs in **its own repo**, installed as a package depending on
 `checkit-dashboard` — not in the platform (Google OAuth and seating charts are

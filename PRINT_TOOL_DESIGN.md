@@ -137,52 +137,81 @@ implementations, and the second one looks broken when read alone.
 
 Who exists, what each student selected, and which section they are in.
 
-Today: a CSV exported from a Google Sheet, located by a Tk file dialog, parsed
-by finding the literal string `Full Name:` and reading right and down.
+**The tool's own format is structured data it defines** — TOML or JSON with real
+fields:
 
-Proposed: a **roster adapter** interface with two implementations from the
-start —
-
-- `CsvRoster` — the current export, so nothing breaks on day one;
-- `GoogleFormsRoster` — pulls responses directly (§7).
-
-Both produce the same structure:
-
-```python
-Student(name, section, variant, skills=["W1", "N3", "F2"])
+```toml
+[[student]]
+name    = "Ada Lovelace"
+email   = "kstellat@oswego.edu"
+sid     = "806510955"
+section = "800"
+skills  = ["G2-E", "G4", "A2"]
 ```
+
+**Getting Google responses into that shape is an import step, not the format.**
+The current pipeline treats a CSV export *as* the data model: magic headers
+(`Full Name:`, `Sec:`, `Var:`, `1:`) located by string-searching a grid, in a
+format never intended for structured records. Reproducing that would be
+inheriting the hack rather than replacing it.
+
+Two importers, either of which writes the structured file:
+
+- **Forms/Sheets API** — the eventual path, and the only reason Google is
+  involved at all (university-controlled accounts, no good alternative for
+  polling students).
+- **A CSV import step** — map columns once, interactively, eyeball the result.
+  Useful as a fallback when the API is down or scopes lapse.
+
+Either way nothing downstream ever sees a magic header.
+
+### 4.2b Skill selection modes
+
+Three overrides, all in the current Apps Script, all wanted:
+
+| mode | behaviour |
+|---|---|
+| **Simply Print** | everyone gets the same listed skills; responses ignored entirely |
+| **No Submission? Default to…** | fallback skills for students who did not respond |
+| **Append for Everyone** | these skills are added on top of whatever each student chose |
+
+They compose: Append applies on top of both of the others.
 
 ### 4.3 Seating chart
 
-Currently a second Google Sheet, and currently **not used by the tool at all** —
-students print in roster order.
+Currently a set of sheets (one per section) with columns
+`Group | Variant | Students | N`. Students sit in groups of four; the Variant
+column alternates `A, B, A, B` within a group, typed by hand.
 
-It determines three things:
+It determines the **order** students print in, so a stack of paper matches the
+room, and which version each gets.
 
-- the **order** students are printed in, so a stack of paper matches a room;
-- how many **distinct versions** are needed, which is a property of the seating
-  (neighbours must differ), not of the class size;
-- how versions are **shuffled** across seats.
+**The rule, stated plainly: two versions, and no two immediately adjacent
+students share one.** Not "everyone at a table differs" — immediate neighbours.
+That is why two versions suffice for a table of four.
 
-Proposed input, deliberately simple:
+Sections currently share the pool: `A`/`B` across both 800 and 810. A later
+seating chart could use `E`/`F`/`G`/`H` to make a section disjoint, but nothing
+needs that today.
+
+**Long term** this becomes a GUI: drag seats into position, mark each with a
+version letter, and the tool derives everything. That is the target.
+
+**In the interim**, the smallest thing that removes the hand-typing: a seating
+file listing groups in order, with the tool alternating versions along each
+group and warning when two adjacent seats collide. A seat may be pinned to a
+version explicitly, so the tool never overrules a deliberate choice.
 
 ```toml
-[seating]
-rows = [
-  ["Alice", "Bob",   "Carol"],
-  ["Dave",  "Erin",  "Frank"],
-]
+[[group]]
+seats = ["Ada Lovelace", "Alan Turing", "Grace Hopper", "Katherine Johnson"]
+
+[[group]]
+seats = ["Emmy Noether", "Srinivasa Ramanujan", "David Blackwell", "Mary Cartwright"]
 ```
 
-or a CSV of the same shape. The tool then derives the version count from the
-layout rather than being told it.
-
-**Longer term** this becomes a feature of the print tool: give it a room shape
-and a roster, and let it assign seats and versions to satisfy "no two adjacent
-students share a version". That is a small constraint-satisfaction problem and
-is much better solved in code than in a spreadsheet.
-
----
+The interim format should be whatever the GUI will eventually read and write,
+so the GUI is a front end for it rather than a replacement.
 
 ## 5. Where versions come from
 
@@ -207,6 +236,17 @@ W7 = "terminating"
 ```
 
 Without an entry, any variant is acceptable.
+
+**Seed overrides** let the user choose the seeds *and* how they map onto the
+seating versions — not just "use seed 509", but "version A is seed 509, version
+B is seed 662". That makes a reprint exact, and it makes "give me the same quiz
+as last section" a one-line change.
+
+```toml
+[seeds]
+A = 509
+B = 662
+```
 
 ---
 
@@ -262,6 +302,150 @@ For hand-written banks with no `bank.xml`, the descriptions file is written by
 hand — which is exactly how MAT 206 works today.
 
 ---
+
+---
+
+## 6b. The assessment builder should converge on this
+
+The viewer already has an assessment builder: pick outcomes, get one random
+version of each as LaTeX, copy it or push it to Overleaf. **The goal is for it
+to be the same thing as a print run with one student, a blank name, and one
+seed.**
+
+That is closer than it looks, because the mechanism already exists.
+
+### What is already there
+
+`viewer/src/templates/assessmentTemplate.tex` is a **self-contained** document —
+its own `\documentclass`, its own `\usepackage` list, a Mustache loop over the
+exercises. It is **already user-editable in the UI**, stored per browser, with a
+reset-to-default button. It already POSTs to Overleaf.
+
+So "carry the theme in the header" is not a new capability. It is a different
+default template.
+
+### Inlining the theme
+
+LaTeX has a feature for exactly this, and Overleaf supports it:
+
+```latex
+\begin{filecontents*}[overwrite]{skillcheckpoints.sty}
+... the whole theme ...
+\end{filecontents*}
+
+\begin{filecontents*}[overwrite]{Skill Descriptions.tex}
+\setskilldesc[Blue]{G1}{I can identify lines of symmetry...}
+\end{filecontents*}
+
+\documentclass[12pt]{article}
+\usepackage{skillcheckpoints}
+\begin{document}
+\setname{Blank}\setsect{Blank}
+\skillheader{G1}
+... exercise body ...
+\end{document}
+```
+
+`filecontents` writes those files at compile time, so one pasteable block
+carries the theme *and* the `\input{Skill Descriptions.tex}` the theme depends
+on. No attachments, no folder.
+
+**The exported assessment carries answers** — it is an instructor artefact, so
+`\setboolean{anstoggle}{true}`.
+
+### The obstacle: figures
+
+`latex.xsl` renders `<image>` as `\includegraphics{assets/<slug>/generated/<seed>/<name>.png}`
+— a **relative path**. Pasted into Overleaf there is no `assets/` folder, so the
+figure is missing.
+
+And there is a live bug behind it (found 2026-09-01, see `CODEBASE_NOTES.md`):
+the assessment builder draws seeds from `[PUBLIC_SEEDS, BUNDLE_UNTIL)` = 50–399,
+but `--image-seeds 50` rasterises PNGs only for seeds 0–49. **Every assessment
+containing `F2` or `F2-E` currently references a PNG that was never rendered.**
+Browsing looks fine because the viewer only ever shows seeds 0–49; print is fine
+because it uses `textemplate.tex` with TikZ written inline and never touches the
+PNGs.
+
+Three ways to close it:
+
+1. **Raise `--image-seeds` to `BUNDLE_UNTIL`.** Fixes the broken images. Does
+   not fix copy-paste, and multiplies rasterisation time and `docs/` size by
+   about eight.
+2. **Publish `.tikz` and have `<image>`-style figures `\input` the source.**
+   `build_viewer` currently excludes `*.tikz`. With the source published,
+   `filecontents` can inline the figure too, and a pasted document draws its own
+   figures with no image files at all. **This is the only option that actually
+   yields one self-contained file**, and it matches what print already does.
+3. **Base64 the PNGs into the document.** Works; bloats the paste enormously.
+
+Recommended: (2), with (1) as an immediate stopgap if assessments are needed
+before the tool exists.
+
+### How close the two get
+
+| | print | assessment builder |
+|---|---|---|
+| theme | `\usepackage{skillcheckpoints}` from a file | same, via `filecontents` |
+| skill body | `\input{W1/W1 v451.tex}` | inlined |
+| name | `\setname{Kate}` | `\setname{Blank}` |
+| answers | off for students, on for keys | on |
+| seeds | one per seating version | one, random from 50–399 |
+| assembly | loop over students | no loop |
+
+Everything but the last two rows is identical. **If the print tool's theme
+becomes the assessment builder's default template, the two differ by a loop.**
+
+---
+
+## 6c. Print tracking
+
+The tool records what was printed for whom, and lets the instructor mark what
+happened afterwards.
+
+```
+printed 2026-05-06 "Skill Checkpoint" :
+  Ada Lovelace  G2-E seed 509   → passed
+  Ada Lovelace  G4   seed 509   → did not pass
+  Ada Lovelace  A2   seed 509   → did not take
+```
+
+**For instructor record-keeping only.** It does *not* feed back into printing —
+no "skip skills already passed", no "prioritise repeated failures". That keeps
+the print path a pure function of its inputs.
+
+Lives **in the tool**, not a spreadsheet. That means a table-style editor in the
+eventual GUI, which is a later bridge; until then the store is a local file the
+tool reads and writes.
+
+Its shape matters more than its editor. It should answer:
+
+- what did this student receive, on what date, at which seed?
+- what happened with it?
+
+which also makes exact reprints a lookup rather than a re-derivation. That is
+why **byte-for-byte reproducibility is not a requirement**: recording the seed
+is cheaper and more honest than making the whole run deterministic, and it does
+not cost the freedom to reshuffle.
+
+---
+
+## 6d. Where output goes
+
+A canonical location on the local machine, so the same PDF can be rebuilt later:
+
+```
+~/CheckItPrint/MAT 206/2026-05-06 Skill Checkpoint/
+├── main.tex
+├── skillcheckpoints.sty
+├── bank_helpers.sty
+├── skills/…
+└── assets/…
+```
+
+`pdflatex main.tex` works there, forever, with no tool and no bank. **Not
+committed to a repository** — it is a local record, not a published artefact.
+
 
 ## 7. Google integration
 
@@ -319,6 +503,15 @@ Everything the current tool does, plus what is wanted. Marked by state.
 | **Google Forms read** | ❌ manual CSV export | build |
 | **Google Forms write** | ❌ | build |
 | **Selecting variants** | ❌ n/a | build |
+| Simply Print / No-Sub default / Append | ✅ in Apps Script | keep all three |
+| Available-skills list drives the Form | ✅ Apps Script | keep |
+| Form validation (at most / least / exactly N) | ✅ Apps Script | keep |
+| Email students who did not respond | ✅ Apps Script | **eventually**, in the tool |
+| Printed log | ✅ a sheet | becomes tracking, §6c |
+| **Attempt outcomes (took / passed / failed)** | ❌ | build, §6c |
+| Per-skill print counts, page estimate | ✅ Apps Script | keep as a preview |
+| Reset settings after a run | ✅ `printAndReset` | keep |
+| **Auto-attached explanation skills** | ✅ Apps Script | **deprecated** — explanations are standalone outcomes now |
 
 ---
 
@@ -327,38 +520,71 @@ Everything the current tool does, plus what is wanted. Marked by state.
 Each stage ends with something that works.
 
 **1 — Package the existing tool.** `pdfgenerator.py` cleaned up, importable,
-tested, reading the same CSV. Same output. Establishes the repo, the theme's
-home, and a golden-PDF comparison to protect everything after.
+tested, driven by a structured roster file rather than a magic-header CSV. Same
+output. Establishes the repo, the theme's home, and a golden-PDF comparison to
+protect everything after.
 
-**2 — Pregenerated seeds.** Swap generator-at-print-time for seeds 400–999.
-First point at which printing needs no generator environment.
+**2 — Pregenerated seeds.** Swap generator-at-print-time for seeds 400–999, with
+seed overrides mapping to seating versions. First point at which printing needs
+no generator environment.
 
-**3 — Publication file.** Replace the named cells. Implement or drop the three
-dead settings.
+**3 — Publication file.** Replace the named cells. Skill selection modes
+(Simply Print / No-Submission default / Append) move here.
 
-**4 — Seating and extras.** Ordering, version count, extras with blank names,
-optional keys.
+**4 — Seating, extras, keys.** Group-based ordering with A/B alternation and a
+collision warning; extras appended at the end with blank names and shuffled
+versions; keys optional.
 
-**5 — Output guarantee.** The folder compiles standalone; a test asserts it.
+**5 — Output guarantee.** The canonical folder compiles standalone; a test
+asserts it.
 
-**6 — Google.** Read first, then write.
+**6 — Tracking.** Record what each student received; a way to mark outcomes
+afterwards. Storage first, editor later.
 
-**7 — SpaTeXt fallback.** Skills with no `textemplate.tex` render through
-`latex.xsl`. Optional, and last, because nothing needs it until a new bank is
-authored without print templates.
+**7 — Google.** Read responses, then write the form.
 
----
+**8 — Assessment-builder convergence.** The theme becomes the viewer's default
+assessment template, inlined with `filecontents`. Depends on the figure decision
+in §6b.
 
-## 10. Open questions
+**9 — SpaTeXt fallback.** Skills with no `textemplate.tex` render through
+`latex.xsl`. Last, because nothing needs it until a bank is authored without
+print templates.
 
-Collected for the review conversation rather than answered here.
+**Not staged: the seating GUI.** It is the eventual target, and the interim
+seating file should be the format it will read and write, so the GUI is a front
+end rather than a rewrite.
 
-1. Whether the theme ships in the print package with a bank override (as agreed
-   for `bank_helpers.sty`), and what happens to the two banks' identical copies.
-2. Whether "how many versions" should be derived from seating or stated
-   outright.
-3. Whether extras are per-skill or per-packet.
-4. Whether the roster's variant column survives, given variants now mean
-   something specific in CheckIt.
-5. What a hand-authored bank looks like end to end, since MAT 206 is one.
-6. Whether output should be reproducible byte-for-byte given the same inputs.
+## 10. Decisions taken
+
+Settled in review, recorded so they are not relitigated.
+
+| | |
+|---|---|
+| Theme location | ships in the print package; a bank may replace it, same convention as `bank_helpers.sty` |
+| Versions needed | **two**, avoiding *immediate* neighbours — not everyone at a table |
+| Sections | share the A/B pool today; a seating chart may use other letters later |
+| Seed overrides | user picks the seeds **and** their mapping onto seating versions |
+| Extras | appended at the end, blank name line, versions shuffled among those available |
+| Roster format | the tool's own structured file; CSV is an import step, never the model |
+| Skill selection modes | all three kept, and they compose |
+| Assessment export | carries answers |
+| Tracking | in the tool, instructor-only, does **not** feed back into printing |
+| Reproducibility | not a requirement — the tracking log records seeds instead |
+| Output folder | canonical local path, rebuildable, never committed |
+| Auto-attach | deprecated; explanations are standalone outcomes |
+| Email missing students | in the tool, but far out |
+
+## 11. Still open
+
+1. Whether the interim seating file and the eventual GUI share a format from the
+   start. Recommended yes; it costs nothing now and avoids a migration.
+2. Which figure route to take for self-contained assessments (§6b): raise
+   `--image-seeds`, publish `.tikz`, or base64. Recommended: publish `.tikz`.
+3. Whether the two banks' identical `skillcheckpoints.sty` copies are deleted in
+   favour of the package default, or kept until each course diverges.
+4. What a hand-authored bank's `bank.xml` looks like, given the tool should keep
+   `Skill Descriptions.tex` in step with it — MAT 206 has a real `bank.xml`
+   already, so possibly nothing special is needed.
+5. Whether `Submission Cutoff:` is implemented or dropped. It is read and unused
+   on both sides today.
