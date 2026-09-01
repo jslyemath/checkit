@@ -1,4 +1,4 @@
-# checkit-print — design draft
+# checkit-printit — design draft
 
 **Status: draft for review.** Nothing here is built. Written 2026-09-01 from
 reading `pdfgenerator.py`, `skillcheckpoints.sty`, `main_template.tex` and the
