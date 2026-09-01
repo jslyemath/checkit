@@ -180,6 +180,19 @@ class GlyphsElement(unittest.TestCase):
                 self.assertIn("stx:glyphs", source.split("parseDisplay")[1][:400],
                               "%s has a rule but does not select it" % name)
 
+    def test_latex_groups_the_latex_attribute(self):
+        r"""A @latex value typically opens with \Large or another size switch,
+        and a switch is a declaration, not a wrapper: emitted without a group it
+        stays in force to the end of the enclosing one. Unbraced, the first
+        Egyptian numeral on a quiz made every page after it enormous, and the
+        document still compiled."""
+        latex = transform_as("latex.xsl", fx.GLYPHS_LATEX, "all")
+        self.assertIn(r"{\Large\textpmhg{\Hone\Hten}}", latex)
+        after = latex.split(r"\Hten}}", 1)[1]
+        self.assertIn("This text is after it", after)
+        self.assertNotIn(r"\Large", after,
+                         "the size switch escaped the glyphs element")
+
     def test_the_viewer_dispatches_it_too(self):
         """The student view builds DOM from SpaTeXt directly and never touches
         the stylesheets, so an element added only to the XSLT is invisible
