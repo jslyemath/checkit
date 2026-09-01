@@ -11,7 +11,7 @@
 # checkit_dashboard-0.2.8.slye.1-py3-none-any.whl -- which pip then refuses
 # outright with "Invalid wheel filename (invalid version)". Anything that has
 # to survive a release asset name must stick to digits and dots.
-VERSION = '0.2.8.4'
+VERSION = '0.2.8.5'
 
 # How many exercise versions the viewer exposes to students, and therefore the
 # range everything else measures itself against: `checkit preview` generates
