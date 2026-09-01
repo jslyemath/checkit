@@ -121,9 +121,17 @@ skill  = "W1"
 copies = 3                # blank name line; versions shuffled if > 1
 ```
 
-Replaces the named cells currently read from the sheet. Three of those are read
-and then ignored today (`Include Names:`, `Submission Cutoff:`, and the save
-dialog flag) — this is the chance to either implement or drop them.
+Replaces the named cells currently read from the sheet.
+
+`PDF Location:` is genuinely used and should stay: "Default Folder" or a save
+dialog. An earlier draft of this document said it was ignored; that was wrong —
+it drives `filedialog.asksaveasfilename` at `pdfgenerator.py:165`.
+
+`Include Names:` is dead *in Python*, but only because the Apps Script already
+applied it, writing the literal `Blank` into the name column before the CSV is
+exported. That is the split-brain problem in miniature: one setting, two
+implementations, and the second one looks broken when read alone.
+`Submission Cutoff:` is read and unused on both sides.
 
 ### 4.2 Roster
 
@@ -299,9 +307,9 @@ Everything the current tool does, plus what is wanted. Marked by state.
 | Skill headers with descriptions | ✅ from `bank.xml` | keep |
 | Version stamp in footer | ✅ `\setvseed` | keep |
 | LaTeX error log to file | ✅ | keep |
-| **Names on/off** | ⚠️ read, never used | implement |
-| **Submission cutoff** | ⚠️ read, never used | implement or drop |
-| **Save-as dialog** | ⚠️ computed, never used | implement or drop |
+| PDF location: default folder or choose | ✅ `pdf_location_raw` drives a save dialog | keep |
+| **Names on/off** | ⚠️ dead *in Python* — the Sheet already applied it | one place, not two |
+| **Submission cutoff** | ⚠️ read, never used, in both | implement or drop |
 | **Seating-chart ordering** | ❌ prints in roster order | build |
 | **Version count from seating** | ❌ | build |
 | **Extras with blank names** | ❌ (`\setname{Blank}` exists) | build |
