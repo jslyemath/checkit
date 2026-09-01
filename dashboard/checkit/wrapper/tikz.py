@@ -47,6 +47,7 @@ def compile_tikz_for_outcome(outcome, image_seeds=None):
                 png_path=png_path,
                 name=name,
                 preamble=preamble,
+                bank_root=outcome.bank.abspath(),
             )
             compiled += 1
     if compiled or skipped:
@@ -80,16 +81,38 @@ def _png_is_current(tikz_path, png_path):
         return False
     return os.path.getmtime(png_path) >= os.path.getmtime(tikz_path)
 
+BANK_HELPERS_STY = "bank_helpers.sty"
+
+
 def _load_preamble(bank_root):
+    """The preamble each figure is compiled under.
+
+    A tikz_preamble.tex in the bank root replaces this wholesale -- it carries
+    its own \\documentclass, so it is a complete preamble rather than an
+    addition, and a bank that writes one is taking full control.
+
+    Otherwise the default gains \\usepackage{bank_helpers} when the bank has a
+    bank_helpers.sty. That file holds the commands the bank's *content* needs,
+    so a figure emitting one should be able to compile it, exactly as the
+    printed document can.
+    """
     custom = os.path.join(bank_root, "tikz_preamble.tex")
     if os.path.isfile(custom):
         with open(custom) as f:
             return f.read()
+    if os.path.isfile(os.path.join(bank_root, BANK_HELPERS_STY)):
+        return PREAMBLE + "\\usepackage{bank_helpers}\n"
     return PREAMBLE
 
-def _compile_one(tikz_path, png_path, name, preamble):
+def _compile_one(tikz_path, png_path, name, preamble, bank_root=None):
     with tempfile.TemporaryDirectory() as tmp:
         shutil.copy(tikz_path, os.path.join(tmp, f"{name}.tikz"))
+        # pdflatex runs in the temp directory, so anything the preamble loads
+        # has to be there too.
+        if bank_root:
+            sty = os.path.join(bank_root, BANK_HELPERS_STY)
+            if os.path.isfile(sty):
+                shutil.copy(sty, os.path.join(tmp, BANK_HELPERS_STY))
         wrapper_tex = os.path.join(tmp, "figure.tex")
         with open(wrapper_tex, "w") as f:
             f.write(preamble)

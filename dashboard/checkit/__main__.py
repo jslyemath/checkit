@@ -38,7 +38,7 @@ def new(directory):
             f.write(static.read_resource(filename))
     # copy bank manifest, README, and the shared-helpers module every generator
     # in the bank can import (see bank_helpers.py's own docstring)
-    for filename in ["bank.xml","README.md","bank_helpers.py"]:
+    for filename in ["bank.xml","README.md","bank_helpers.py","bank_helpers.sty"]:
         with open(os.path.join(directory,filename),"w") as f:
             f.write(static.read_resource(filename))
     # copy gitignore

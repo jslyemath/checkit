@@ -1,0 +1,55 @@
+% Macros shared by this bank's LaTeX output.
+%
+% The .sty counterpart of bank_helpers.py, and yours to edit for the same
+% reason: it ships nearly empty so you have somewhere to put what your bank
+% needs, rather than discovering later that there was nowhere.
+%
+% WHAT BELONGS HERE
+%
+% Commands and packages your *content* cannot compile without. If a generator
+% emits \myNumeral{7}, or a template writes \degreesign, the definition goes
+% here. So does any \usepackage the content depends on.
+%
+% The test is whether the document breaks without it. \usepackage{hieroglf},
+% because an outcome sets Egyptian numerals, belongs here: without it the file
+% does not compile. \geometry{margin=1in} does not -- the document compiles
+% fine and merely looks different, which makes it a styling choice and the
+% business of whatever is producing the page.
+%
+% Keeping that line matters. This file is loaded by two very different
+% documents, and anything in it has to be safe in both.
+%
+% WHO LOADS IT
+%
+%   * Figure compilation. wrapper/tikz.py builds each .tikz into a PNG inside a
+%     standalone document. If you add a tikz_preamble.tex to your bank root, it
+%     replaces the default one, and it should \usepackage{bank_helpers} so your
+%     figures can use the same commands your prose does.
+%
+%   * Printing, if you use the print tool. Its theme loads this file alongside
+%     its own layout package.
+%
+% Because a figure is a borderless standalone with no page, page-level settings
+% put here will either do nothing or break the figure build. That is the
+% practical reason for the rule above, not just tidiness.
+%
+% Nothing loads this file for the HTML viewer: the browser renders maths with
+% KaTeX and never sees LaTeX macros. A command defined here has no effect on
+% screen, so content that needs to *look* different in each medium wants a
+% SpaTeXt element instead -- see <glyphs> and <nobreak> in CODEBASE_NOTES.md.
+
+\ProvidesPackage{bank_helpers}
+
+% ---------------------------------------------------------------------------
+% Packages your content needs.
+%
+% \RequirePackage rather than \usepackage: this is a package, not a document.
+% ---------------------------------------------------------------------------
+
+% \RequirePackage{amssymb}
+
+% ---------------------------------------------------------------------------
+% Commands your generators and templates emit.
+% ---------------------------------------------------------------------------
+
+% \newcommand{\halfstar}{$\star$}
