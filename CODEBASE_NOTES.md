@@ -3087,7 +3087,8 @@ Four properties worth keeping if this is ever touched:
 | mat-106 published and verified | done — 2026-08-27, no `checkit check` findings |
 | SpaTeXt elements for per-medium differences | done — `<glyphs>`, `<nobreak>` |
 | mat-206 | **not started, and not a port** — see below |
-| Print tool as its own package | **next** — designed, not started; see `PRINT_TOOL_DESIGN.md` |
+| Print tool as its own package | done — [checkit-printit](https://github.com/jslyemath/checkit-printit), stages 1-5 and 9; see `PRINT_TOOL_DESIGN.md` |
+| A real quiz printed from mat-106 | **next** — the tool has only ever printed its 2-outcome test fixture |
 | `skillcheckpoints.sty` drift between banks | none — byte-identical (2026-08-27) |
 
 Known open questions, none blocking:
