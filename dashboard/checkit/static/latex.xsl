@@ -178,8 +178,18 @@
                      screen but macros in print, so no font
                      wrapper can bridge them. Such an element carries both, and
                      the element still holds the decision rather than a
-                     generator branching on the output format. -->
+                     generator branching on the output format.
+
+                     Braced, always. A @latex value is written by a generator
+                     author and typically starts with a size or font switch such
+                     as \Large, which is a declaration, not a wrapper: without a
+                     group it stays in force to the end of the enclosing one. An
+                     unbraced \Large once made every page after the first
+                     Egyptian numeral enormous. The group costs nothing for a
+                     value that did not need it. -->
+                <xsl:text>{</xsl:text>
                 <xsl:value-of select="@latex"/>
+                <xsl:text>}</xsl:text>
             </xsl:when>
             <xsl:when test="@font='egyptian'">
                 <xsl:text>{\Large\textpmhg{</xsl:text>

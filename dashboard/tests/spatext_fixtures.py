@@ -82,6 +82,14 @@ GLYPHS = f"""<knowl mode="exercise" {NS}>
     <outtro><p>3,502</p></outtro>
 </knowl>"""
 
+# the same element carrying its own LaTeX, because no font bridges both media
+# (W1's Egyptian and Babylonian numerals). The @latex opens with a size switch,
+# which is the ordinary case and the one that has to stay contained.
+GLYPHS_LATEX = f"""<knowl mode="exercise" {NS}>
+    <content><p>Write <glyphs font="egyptian" latex="\\Large\\textpmhg{{\\Hone\\Hten}}">&#x13000;</glyphs> in modern numerals. This text is after it.</p></content>
+    <outtro><p>11</p></outtro>
+</knowl>"""
+
 # a run that must not break across lines, wrapping maths (W4's equations)
 NOBREAK = f"""<knowl mode="exercise" {NS}>
     <content><p>State the property: <nobreak><m>k + (j + u + 0) =</m></nobreak> <nobreak><m>k + (j + u)</m></nobreak></p></content>
@@ -97,6 +105,7 @@ ALL = {
     "MATH": MATH,
     "IMAGE": IMAGE,
     "GLYPHS": GLYPHS,
+    "GLYPHS_LATEX": GLYPHS_LATEX,
     "NOBREAK": NOBREAK,
 }
 
