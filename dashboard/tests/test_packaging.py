@@ -16,6 +16,7 @@ it, which is not something anyone does by accident.
 import ast
 import configparser
 import os
+import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -129,3 +130,50 @@ class PackagedFiles(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BankHelpersSty(unittest.TestCase):
+    """The .sty counterpart of bank_helpers.py.
+
+    It exists so a bank has somewhere to put the macros its *content* needs --
+    \babo, hieroglf -- separate from anything about how a page looks. Two
+    things have to hold or it is decoration: `checkit new` must create it, so
+    an author knows it is there; and figure compilation must load it, since a
+    figure emitting a bank macro has to be able to compile it.
+    """
+
+    def test_it_ships_in_the_package(self):
+        from checkit import static
+        source = static.read_resource("bank_helpers.sty")
+        if isinstance(source, bytes):
+            source = source.decode("utf-8")
+        self.assertIn("ProvidesPackage{bank_helpers}", source)
+
+    def test_checkit_new_creates_it(self):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        path = os.path.join(root, "checkit", "__main__.py")
+        with open(path, encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn('"bank_helpers.sty"', source,
+                      "checkit new does not scaffold bank_helpers.sty")
+
+    def test_figure_compilation_loads_it_when_present(self):
+        from checkit.wrapper import tikz
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertNotIn("bank_helpers", tikz._load_preamble(tmp),
+                             "a bank without the file should not load it")
+            with open(os.path.join(tmp, "bank_helpers.sty"), "w") as f:
+                f.write("\ProvidesPackage{bank_helpers}\n")
+            self.assertIn("bank_helpers", tikz._load_preamble(tmp))
+
+    def test_a_custom_tikz_preamble_still_wins(self):
+        """It carries its own \documentclass, so it replaces rather than adds --
+        which means a bank writing one takes responsibility for loading the
+        helpers itself. The demo bank's does exactly that."""
+        from checkit.wrapper import tikz
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, "bank_helpers.sty"), "w") as f:
+                f.write("\ProvidesPackage{bank_helpers}\n")
+            with open(os.path.join(tmp, "tikz_preamble.tex"), "w") as f:
+                f.write("\documentclass[tikz]{standalone}\n")
+            self.assertNotIn("bank_helpers", tikz._load_preamble(tmp))

@@ -3020,6 +3020,41 @@ terms of a sum by symbol name exactly as Sage does.
   *(Assessed, not tested.)*
 
 
+## Do not regenerate W1 or W1-E
+
+**mat-106's `W1` and `W1-E` seeds are frozen.** Students are working through
+them as homework right now, and a student half way through an assignment must
+not find the problems have changed underneath them.
+
+Practically, that means never running a bare `checkit generate -r` against
+mat-106. Regenerate per outcome:
+
+```
+python -m checkit generate -r -a 1000 -o SLUG --remote https://jslyemath.github.io/mat-106-checkit
+```
+
+`-o` regenerates only that outcome's `seeds.json` and re-renders everything else
+from data already on disk, so the other outcomes' versions are untouched. (That
+is only true since the `-o` fix; before it, `-o` also destroyed the rest of
+`bank.json`. See "Known platform bugs".)
+
+Verify rather than trust, when a change is near them:
+
+```
+md5sum assets/W1/generated/seeds.json assets/W1-E/generated/seeds.json
+```
+
+Take that before and after. It is what was done for the 2026-08-31 variant
+conversion, and it is two seconds against a fortnight of student work.
+
+**This is a note, not a mechanism.** Nothing in the platform enforces it, and a
+`-r` typed at the wrong moment is unrecoverable without the previous
+`seeds.json` from git. A `<frozen/>` flag in `bank.xml` that made
+`generate_exercises` skip an outcome unless explicitly forced would turn this
+paragraph into something that cannot be forgotten; it is unbuilt.
+
+---
+
 ## Where things stand (2026-08-27)
 
 | | |
@@ -3507,18 +3542,27 @@ genuinely read, and a fourth is read but unreachable:
 | `n3_n4_force_listing_method` | `N3`, `N4` | nothing, so `False` | the listing method is never forced |
 | `two_base_ten` | `W2`, `W3` | nothing, so `False` | **also absent from `pdfgenerator.py`'s settings dict, so it is unreachable from either path** |
 
-These are the real remainder of "convert the per-run settings to `variants`".
-All four are binary, so each is two variants, and the work is the same shape as
-`W4`'s: declare `variants`, derive the flag from `self.variant`.
+**Done 2026-08-31 for the first three.** Each is now a variant, dealt across
+the seed space by `build_variant_bag`, giving exactly 500/500 and recorded per
+seed as `__variant__` so the print tool can select on it:
 
-Doing it **changes generated content**, unlike the dead-argument cleanup, so it
-wants its own pass with its own before/after comparison -- and a regenerate,
-since half of every affected outcome's seeds will now carry the other setting.
+| outcome | variants |
+|---|---|
+| `W7` | `no_terminating`, `terminating` |
+| `D2` | `no_repeating`, `repeating` |
+| `N3`, `N4` | `any_method`, `listing_only` |
 
-It is not a blocker. Printing works today with the settings frozen where they
-are; converting them is what lets a printed quiz *ask* for the other case.
-`two_base_ten` should probably be deleted rather than converted unless it is
-wanted, since nothing has ever been able to set it.
+Both labels were checked to genuinely change output at the same seed -- 40/40
+seeds for `W7`, `N3` and `N4`, 37/40 for `D2`, whose other three pick the
+terminating branch either way. A variant that changes nothing is decoration,
+and that is worth a check rather than an assumption.
+
+**`two_base_ten` is deliberately left as it was.** `W2` and `W3` read it and the
+code behind it stays; it simply keeps its `kwargs.get(..., False)` default
+rather than becoming a variant. Nothing has ever been able to set it -- it is
+absent from `pdfgenerator.py`'s settings dict -- so making it a variant would
+double those outcomes' seed space for a case nobody has asked for. Deleting the
+code would throw away work that may yet be wanted.
 
 ### `R1` and `R2`'s legacy branches
 
@@ -3793,14 +3837,14 @@ They overlap in the macros the content needs, so the shape that avoids
 duplicating those is a third, shared file:
 
 ```
-bank.sty              macros the CONTENT needs: \babo, hieroglf, \rnc, \arc
+bank_helpers.sty      macros the CONTENT needs: \babo, hieroglf, \rnc, \arc
                       no \documentclass, no layout
 
 tikz_preamble.tex     \documentclass[tikz,border=4pt]{standalone}
-                      \usepackage{bank}        <- shared macros
+                      \usepackage{bank_helpers}   <- shared macros
                       \usepackage{pgfplots}    <- figure-only extras
 
-skillcheckpoints.sty  \usepackage{bank}        <- the same shared macros
+skillcheckpoints.sty  \usepackage{bank_helpers}   <- the same shared macros
                       ...layout, boxes, \stx* hooks
 ```
 
@@ -3808,7 +3852,7 @@ Both consumers import the shared piece rather than one importing the other. A
 figure compile must **not** inherit page geometry, `fancyhdr` or the `\stx*`
 hooks — it is a borderless standalone — and the print document cannot inherit
 `\documentclass{standalone}`. Override still works: `tikz_preamble.tex` is a
-whole file the bank controls, so it can load `bank.sty` and then change
+whole file the bank controls, so it can load `bank_helpers.sty` and then change
 anything.
 
 ### The escape hatch, and why it is not a failure

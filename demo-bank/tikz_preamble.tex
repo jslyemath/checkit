@@ -1,2 +1,8 @@
+% Replaces the default preamble for compiling this bank's figures to PNG.
+%
+% Because it carries \documentclass, it replaces the default wholesale rather
+% than adding to it -- so it must load everything the figures need, including
+% bank_helpers if you want figures to use the same commands your prose does.
 \documentclass[tikz,border=4pt]{standalone}
 \usepackage{tkz-euclide}
+\usepackage{bank_helpers}
