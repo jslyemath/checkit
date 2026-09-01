@@ -3488,15 +3488,44 @@ pregenerated seeds today: every axis that varies content is already either a
 `variant` (pregenerated across the seed space, filterable at print time) or a
 function of the seed itself.
 
-What remains is tidying, worth doing when those files are next open:
+**The dead arguments are gone** (2026-08-31). Twenty-two generators now call
+`generate()` with nothing; `mode='html'` is deleted everywhere, and
+`course_progress=6` everywhere it was ignored. Verified as a no-op by capturing
+every generator's `data()` across ten seeds and every variant before and after
+-- 350 samples, byte-identical -- and confirming the rebuilt `bank.json`
+differed only in `generated_on`.
 
-- delete the dead `course_progress = kwargs.get(...)` line from twenty
-  generators, and `mode='html'` from seventeen `data()` calls;
-- decide what happens to `R1`'s and `R2`'s legacy `course_progress` branches.
-  Both are reachable only from `pdfgenerator.py`, which passes the kwarg
-  directly; once the print tool selects variants instead, those branches become
-  dead too. `R1`'s also reads `assets/R1/used_versions.json`, which makes
-  generation stateful and is deliberately bypassed by the CheckIt path.
+### Four settings that are read and are not yet variants
+
+The audit above covered `course_progress`. Three other spreadsheet settings are
+genuinely read, and a fourth is read but unreachable:
+
+| setting | read by | `data()` passes | effect |
+|---|---|---|---|
+| `w7_allow_terminating` | `W7` | `True`, hardcoded | every pregenerated seed allows terminating decimals |
+| `d2_allow_repeating` | `D2` | `True`, hardcoded | every pregenerated seed allows repeating decimals |
+| `n3_n4_force_listing_method` | `N3`, `N4` | nothing, so `False` | the listing method is never forced |
+| `two_base_ten` | `W2`, `W3` | nothing, so `False` | **also absent from `pdfgenerator.py`'s settings dict, so it is unreachable from either path** |
+
+These are the real remainder of "convert the per-run settings to `variants`".
+All four are binary, so each is two variants, and the work is the same shape as
+`W4`'s: declare `variants`, derive the flag from `self.variant`.
+
+Doing it **changes generated content**, unlike the dead-argument cleanup, so it
+wants its own pass with its own before/after comparison -- and a regenerate,
+since half of every affected outcome's seeds will now carry the other setting.
+
+It is not a blocker. Printing works today with the settings frozen where they
+are; converting them is what lets a printed quiz *ask* for the other case.
+`two_base_ten` should probably be deleted rather than converted unless it is
+wanted, since nothing has ever been able to set it.
+
+### `R1` and `R2`'s legacy branches
+
+Both keep a `course_progress` path reachable only from `pdfgenerator.py`, which
+passes the kwarg directly. Once the print tool selects variants instead, those
+branches become dead. `R1`'s also reads `assets/R1/used_versions.json`, which
+makes generation stateful and is deliberately bypassed by the CheckIt path.
 
 > **Method note.** Three counts in this section were wrong before this audit,
 > each from a grep that matched a token rather than a use. `grep -l
@@ -3719,7 +3748,7 @@ theme being able to do anything:
 | | declares | lives in |
 |---|---|---|
 | **bank** | what the content says; response types; the macros it needs to compile (`\babo`, `hieroglf`); slug, description and colour | `template.xml`, `bank.xml`, and a new preamble declaration |
-| **theme** | how `\stxTasks`, `\stxTrueFalse`, `\stxBlank`, `\stxOuttro`, `\stxExercise` render — widths, colours, spacing, the skill box | `skillcheckpoints.sty`, shipped by the print tool, overridable |
+| **theme** | how `\stxTasks`, `\stxTrueFalse`, `\stxBlank`, `\stxOuttro`, `\stxExercise` render — widths, colours, spacing, the skill box | `skillcheckpoints.sty` — **shipped as the package default, replaced by a copy in the bank root if one exists** (decided 2026-08-31) |
 | **publication** | what *this run* wants: handout or key, which outcomes, how many versions, roster, seating, course/semester/professor | a file in the course repo |
 
 `bank.xml` already holds slug, description and colour, and `pdfgenerator.py`
@@ -3731,6 +3760,56 @@ its 610 lines — the boxes, the pgfplots styles, the fonts, the header/footer �
 are already pure theme and need no change at all. The parts that would move are
 the four answer commands, which become definitions of `\stx*` hooks rather than
 commands the templates call directly.
+
+### Where the theme lives (decided 2026-08-31)
+
+**The print package ships a default `skillcheckpoints.sty`; a bank may place its
+own in the bank root to replace it.** Exactly the convention `tikz.py` already
+uses for `tikz_preamble.tex`, so it is one rule rather than two.
+
+Why this rather than the alternatives: shipping it only in the package means a
+`pip install --upgrade` silently overwrites an instructor's edits; keeping it
+only in each bank means the two banks drift, and today they are byte-identical,
+which is worth preserving. Default-plus-override gives upgrades for free to
+anyone who has not customised, and full control to anyone who has.
+
+The consequence for the new repo: the 610 lines are **copied in once** as the
+package default, and the banks' copies are deleted rather than kept in sync.
+A bank re-adds one only when it actually wants to diverge.
+
+### The preamble files, and why there are two
+
+Both are LaTeX; neither has anything to do with HTML as such. They are
+different *kinds* of file, which is why they cannot be one:
+
+- **`tikz_preamble.tex`** must contain `\documentclass[tikz,border=4pt]{standalone}`
+  — it is a whole document preamble for compiling one figure to PNG, and so it
+  serves the **web**. Already supported by `wrapper/tikz.py`, read from the bank
+  root, defaulting to `standalone` + `pgfplots`. mat-106 has no custom one yet.
+- **The print preamble** is loaded *after* `\documentclass{article}`, which
+  makes it a package: a `.sty`.
+
+They overlap in the macros the content needs, so the shape that avoids
+duplicating those is a third, shared file:
+
+```
+bank.sty              macros the CONTENT needs: \babo, hieroglf, \rnc, \arc
+                      no \documentclass, no layout
+
+tikz_preamble.tex     \documentclass[tikz,border=4pt]{standalone}
+                      \usepackage{bank}        <- shared macros
+                      \usepackage{pgfplots}    <- figure-only extras
+
+skillcheckpoints.sty  \usepackage{bank}        <- the same shared macros
+                      ...layout, boxes, \stx* hooks
+```
+
+Both consumers import the shared piece rather than one importing the other. A
+figure compile must **not** inherit page geometry, `fancyhdr` or the `\stx*`
+hooks — it is a borderless standalone — and the print document cannot inherit
+`\documentclass{standalone}`. Override still works: `tikz_preamble.tex` is a
+whole file the bank controls, so it can load `bank.sty` and then change
+anything.
 
 ### The escape hatch, and why it is not a failure
 
