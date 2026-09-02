@@ -258,6 +258,34 @@ class NobreakElement(unittest.TestCase):
             self.assertIn('"nobreak"', f.read())
 
 
+class PretextMultiPart(unittest.TestCase):
+    """PreTeXt builds a multi-part exercise from "a sequence of <task>" that are
+    direct children of the <exercise>.
+
+    This stylesheet wrapped them in one more <task>. That outer part carries no
+    <statement> of its own, so the emitted document was not valid PreTeXt --
+    and nothing in this project renders PreTeXt, so nothing said so.
+    """
+
+    def tasks(self):
+        return etree.fromstring(
+            transform_as("pretext.xsl", fx.TASKS, "all").encode("utf-8"))
+
+    def test_tasks_are_children_of_the_exercise(self):
+        exercise = self.tasks().find(".//exercise")
+        self.assertEqual(len(exercise.findall("task")), 2)
+
+    def test_no_task_contains_another_task(self):
+        for task in self.tasks().iter("task"):
+            self.assertEqual(task.findall("task"), [],
+                             "a task wrapping the real tasks is not a part")
+
+    def test_every_task_has_a_statement(self):
+        """What made the old shape invalid rather than merely odd."""
+        for task in self.tasks().iter("task"):
+            self.assertIsNotNone(task.find("statement"))
+
+
 class _StubOutcome:
     """Enough of an Outcome for Exercise.spatext_ele() to render a template."""
 
