@@ -4054,6 +4054,80 @@ tidiness.
   to give distinct content models to later (a `truefalse` has no answer text
   beyond the value, a `short` does).
 
+## Upstream 0.2.9 merged: MCQ support (2026-09-02)
+
+Eleven upstream commits, one feature. Fork version is now **0.2.9.1**.
+
+### What MCQ is
+
+A distractor is an extra `<outtro>` carrying `distractor="true"`:
+
+```xml
+<outtro><p><m>2x</m></p></outtro>
+<outtro distractor="true"><p><m>5x</m></p></outtro>
+```
+
+`html.xsl` renders every outtro and stamps `data-distractor` on the wrong
+ones; the viewer lists them as lettered choices; the Canvas export builds a
+`multiple_choice_question`. `CheckIt.choices_from_list()` shuffles a list whose
+first element is correct.
+
+### It is experimental, and print is the gap
+
+Upstream's own UI says "(experimental)". Rendering an MCQ through each
+stylesheet shows why:
+
+| | |
+|---|---|
+| `html.xsl` | all choices, distractors marked |
+| `latex.xsl` | **choices dropped** -- `stx:outtro[not(@distractor='true')][1]` |
+| `pretext.xsl` | **choices dropped**, same selector |
+
+So a printed MCQ is the prompt plus the correct answer, with nothing to choose
+between. For the print tool the feature does not exist yet. Fixing it means
+deciding how a paper MCQ should look -- lettered list, blank for the letter --
+which is a `skillcheckpoints.sty` question as much as a stylesheet one.
+
+Smaller gaps, all upstream's and all worth sending back rather than diverging
+over:
+
+- `Knowl.svelte` tests `distractor='true'].length > 1`, so an MCQ with a single
+  distractor renders no choice list. `> 0` is presumably meant.
+- `choices_from_list` assigns a `letter` to each choice that no template uses.
+- Canvas only; the Brightspace and Moodle paths are untouched.
+
+### What the merge needed
+
+- **`choices_from_list` was Sage-only.** Ported to `wrapper.py`, or no
+  plain-Python generator could author an MCQ -- and plain Python is this fork's
+  default runtime.
+- **EX4 arrived as `generator.sage`**, the only `.sage` left in demo-bank.
+  Ported: `Add(a*x, b*x, evaluate=False)` for `(a*x).add(b*x, hold=True)`.
+- **`viewer/src/spatext/xsl/*` stayed deleted.** Upstream still transforms
+  SpaTeXt in the browser and edited its copies; this fork removed them in
+  August. Their edits are already in `dashboard/checkit/static/`, which merged
+  cleanly. **Expect this every time upstream touches a stylesheet** -- it is a
+  translation, not a conflict git can resolve.
+- **`html.xsl` took both sides**: this fork's `$subset` guard, and upstream
+  dropping `[1]` so every outtro renders.
+
+### Two traps worth remembering
+
+**`git stash` during a merge destroys `MERGE_HEAD`.** Committing afterwards
+produces an ordinary commit with one parent that *looks* finished: the tree is
+right, the tests pass, and git no longer knows upstream was merged -- so the
+next merge re-conflicts on all of it. Check `git log -1 --format=%P` shows two
+parents, or `git merge-base --is-ancestor upstream/main HEAD`. Recovered here
+with `git commit-tree <tree> -p <ours> -p <theirs>`.
+
+**`checks.py` `missing-data` is scope-blind.** It computes
+`referenced - set(exercise.data.keys())` against *top-level* keys, so any
+variable inside a Mustache section resolving to a nested dict is a false
+positive. The demo bank reports 10 findings for this reason -- IMG1's
+`{{slope}}` lives inside `{{#findfunction_line}}`, XML's `{{f}}` inside its own
+section. The banks are correct; the check is not. Nothing was wrong on mat-106,
+which has no section-scoped variables, so this never showed there.
+
 ## Local divergences from upstream StevenClontz/checkit
 
 This fork diverges from upstream in these deliberate ways. Recorded so an
