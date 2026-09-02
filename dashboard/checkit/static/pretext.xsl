@@ -37,11 +37,14 @@
         <xsl:apply-templates select="stx:intro[1]"/>
         <xsl:choose>
             <xsl:when test="stx:knowl">
-                <task>
-                    <xsl:for-each select="stx:knowl">
-                        <task><xsl:call-template name="knowl-content"/></task>
-                    </xsl:for-each>
-                </task>
+                <!-- One <task> per sub-knowl, as direct children of the
+                     <exercise>. PreTeXt's multi-part exercise is "a sequence of
+                     <task>" at that level; an extra <task> wrapping them, which
+                     is what this emitted before, adds a part that has no
+                     <statement> of its own and so is not valid PreTeXt. -->
+                <xsl:for-each select="stx:knowl">
+                    <task><xsl:call-template name="knowl-content"/></task>
+                </xsl:for-each>
             </xsl:when>
             <xsl:otherwise>
                 <statement>
