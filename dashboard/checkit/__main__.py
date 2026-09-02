@@ -110,8 +110,10 @@ def new(directory):
 @click.option(
     "-o",
     "--outcome",
-    default="ALL",
-    help="Outcome to generate. \"ALL\" generates all outcomes",
+    "outcome",
+    multiple=True,
+    help="Outcome to generate. Repeatable; omit to generate all of them. "
+         "\"ALL\" also generates all outcomes.",
 )
 @click.option(
     "--remote",
@@ -153,18 +155,30 @@ def generate(amount,regenerate,images,image_seeds,outcome,remote,thaw,no_precomp
         )
     b = bank.Bank()
     only = None
-    if outcome != "ALL":
+    wanted = {name for name in outcome if name.upper() != "ALL"}
+    if wanted and len(wanted) < len(outcome):
+        # "-o ALL -o W1" asks for two contradictory things.
+        raise click.BadParameter(
+            "\"ALL\" cannot be combined with named outcomes.",
+            param_hint="--outcome",
+        )
+    if wanted:
         # Resolve to slugs and hand them to generate_exercises, rather than
         # narrowing the Bank. write_json() serialises every outcome the Bank
         # holds, so a narrowed Bank writes a bank.json missing the others --
         # and skips the missing-`remote` preflight for them too.
-        only = {o.slug for o in b.outcomes() if o.slug.lower() == outcome.lower()}
-        if not only:
+        by_lower = {o.slug.lower(): o.slug for o in b.outcomes()}
+        only = {by_lower[name.lower()] for name in wanted if name.lower() in by_lower}
+        missing = sorted(n for n in wanted if n.lower() not in by_lower)
+        if missing:
             # Silently regenerating nothing on a typo'd slug looks exactly like
-            # a successful run.
+            # a successful run -- and before this option was repeatable, a
+            # second -o silently replaced the first, so the outcomes you did
+            # not name were regenerated at the default amount instead.
             raise click.BadParameter(
-                f"no outcome with slug {outcome!r} in this bank. "
-                "Available: " + ", ".join(o.slug for o in b.outcomes()),
+                f"no outcome with slug {', '.join(repr(m) for m in missing)} "
+                "in this bank. Available: "
+                + ", ".join(o.slug for o in b.outcomes()),
                 param_hint="--outcome",
             )
     frozen = {o.slug for o in b.outcomes() if o.frozen}

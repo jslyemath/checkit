@@ -102,6 +102,35 @@ class FilterStillFilters(OutcomeFilterTestCase):
         self.assertEqual(sorted(self.dispatched(only=None)), ["FIGURED", "PLAIN"])
 
 
+class RepeatedOutcome(OutcomeFilterTestCase):
+    """`-o` is repeatable, and `--thaw` beside it always was.
+
+    While it took a single value, `-o A -o B` kept only B -- and the outcomes
+    you thought you had named were regenerated anyway, at the default amount,
+    because nothing had narrowed them. Nothing failed and nothing said so.
+    """
+
+    def test_two_outcomes_are_both_selected(self):
+        result = self.run_cli("-o", "PLAIN", "-o", "FIGURED",
+                              "--remote", REMOTE, "--no-precompute")
+        self.assertEqual(result.exit_code, 0, result.output)
+
+    def test_a_typo_among_several_is_still_refused(self):
+        result = self.run_cli("-o", "PLAIN", "-o", "NOPE", "--remote", REMOTE)
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("NOPE", result.output)
+
+    def test_all_cannot_be_mixed_with_a_named_outcome(self):
+        result = self.run_cli("-o", "ALL", "-o", "PLAIN", "--remote", REMOTE)
+        self.assertNotEqual(result.exit_code, 0)
+
+    def test_no_outcome_flag_still_means_every_outcome(self):
+        result = self.run_cli("--remote", REMOTE, "--no-precompute")
+        self.assertEqual(result.exit_code, 0, result.output)
+        slugs = [o["slug"] for o in self.bank_json()["outcomes"]]
+        self.assertEqual(sorted(slugs), ["FIGURED", "PLAIN"])
+
+
 class PreflightStillRuns(OutcomeFilterTestCase):
     def test_missing_remote_is_caught_for_an_outcome_not_named(self):
         """FIGURED is not the outcome being regenerated, but its precomputed
