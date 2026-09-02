@@ -215,6 +215,54 @@ class TemplateFieldsWithoutData(unittest.TestCase):
         found = self.check("<!-- old --><p>{{{expl_text}}}</p>", {})
         self.assertEqual(len(found), 1)
 
+    # -- names inside a section resolve against that section's own value ----
+    #
+    # This check compared every reference against the top-level keys, so a
+    # field nested one level down looked absent. The demo bank reported ten
+    # findings on templates that were entirely correct.
+
+    def test_a_field_inside_a_section_may_live_in_that_section(self):
+        """IMG1's shape: {{slope}} inside {{#line}}, where the generator
+        returns {"line": {"slope": 3}}."""
+        self.assertEqual(
+            self.check(
+                "<!-- {{#line}} --><p>slope {{slope}}</p><!-- {{/line}} -->",
+                {"line": {"slope": 3}}),
+            [])
+
+    def test_a_field_in_neither_place_is_still_found(self):
+        """The fix must not make the check unable to fail."""
+        found = self.check(
+            "<!-- {{#line}} --><p>slope {{slope}}</p><!-- {{/line}} -->",
+            {"line": {"intercept": 1}})
+        self.assertEqual(len(found), 1)
+        self.assertIn("slope", found[0].detail)
+
+    def test_a_section_over_a_list_offers_each_item(self):
+        """XML's shape: the section value is a list, and the field lives on
+        the items rather than on the list."""
+        self.assertEqual(
+            self.check(
+                "<!-- {{#rows}} --><p>{{left}}</p><!-- {{/rows}} -->",
+                {"rows": [{"left": "a"}, {"left": "b"}]}),
+            [])
+
+    def test_an_outer_field_stays_visible_inside_a_section(self):
+        """Mustache falls back outward, so a top-level key is still in scope."""
+        self.assertEqual(
+            self.check(
+                "<!-- {{#line}} --><p>{{title}}</p><!-- {{/line}} -->",
+                {"title": "Lines", "line": {"slope": 3}}),
+            [])
+
+    def test_a_field_after_a_section_closes_is_top_level_again(self):
+        """A stack that never pops would hide real findings after the section."""
+        found = self.check(
+            "<!-- {{#line}} --><p>{{slope}}</p><!-- {{/line}} --><p>{{gone}}</p>",
+            {"line": {"slope": 3}})
+        self.assertEqual(len(found), 1)
+        self.assertIn("gone", found[0].detail)
+
 
 if __name__ == "__main__":
     unittest.main()

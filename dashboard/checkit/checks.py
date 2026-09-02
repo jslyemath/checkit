@@ -183,6 +183,64 @@ _MUSTACHE = re.compile(r"\{\{\{?\s*([#^/&]?)\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}?\}\
 _XML_COMMENT = re.compile(r"<!--.*?-->", re.S)
 
 
+def _references_with_sections(template):
+    """Every {{name}} in the template, paired with the sections enclosing it.
+
+    A name inside {{#outer}}...{{/outer}} does not have to be a top-level key:
+    Mustache looks it up in the section's own value first. So the enclosing
+    section names have to travel with the reference, or every nested field looks
+    absent.
+
+    Section tags are read from the template *including* its XML comments, which
+    is where banks put them -- `<!-- {{#lines}} -->` is how a section survives
+    an XML parser that would otherwise choke on it. Plain references inside a
+    comment are still skipped, since the stylesheets discard the comment and
+    nothing there can render.
+    """
+    commented = [(m.start(), m.end()) for m in _XML_COMMENT.finditer(template)]
+
+    def inside_comment(pos):
+        return any(start <= pos < end for start, end in commented)
+
+    references, stack = [], []
+    for match in _MUSTACHE.finditer(template):
+        sigil, name = match.group(1), match.group(2)
+        if sigil in ("#", "^"):
+            stack.append(name)
+        elif sigil == "/":
+            if stack and stack[-1] == name:
+                stack.pop()
+            elif name in stack:                            # pragma: no cover
+                # Crossed tags. Unwind to the one that closed rather than
+                # leaving the stack wrong for everything after.
+                while stack and stack.pop() != name:
+                    pass
+        elif name != "__seed__" and not inside_comment(match.start()):
+            references.append((name, tuple(stack)))
+    return references
+
+
+def _visible_contexts(data, sections):
+    """Every dict a name could resolve against inside `sections`, for lookup.
+
+    Deliberately generous: a list section offers each of its items, and outer
+    contexts stay in scope. This check exists to catch a name that is nowhere at
+    all, so anything short of certain absence should not be reported.
+    """
+    contexts = [data]
+    for section in sections:
+        value = None
+        for frame in reversed(contexts):
+            if isinstance(frame, dict) and section in frame:
+                value = frame[section]
+                break
+        if isinstance(value, dict):
+            contexts.append(value)
+        elif isinstance(value, list):
+            contexts.extend(item for item in value if isinstance(item, dict))
+    return contexts
+
+
 def template_fields_without_data(bank, seeds=4):
     """Template fields the generator never supplies.
 
@@ -190,9 +248,9 @@ def template_fields_without_data(bank, seeds=4):
     it survives and the value vanishes: "explaining the  to an elementary
     school student?". Nothing fails, and the exercise is unanswerable.
 
-    Section tags ({{#x}}, {{^x}}, {{/x}}) are excluded -- an absent key there
-    means "false", which is the whole point of them -- as is `__seed__`, which
-    the renderer injects.
+    Section tags ({{#x}}, {{^x}}, {{/x}}) are not themselves reported -- an
+    absent key there means "false", which is the whole point of them -- nor is
+    `__seed__`, which the renderer injects.
     """
     out = []
     hits = collections.Counter()
@@ -201,16 +259,14 @@ def template_fields_without_data(bank, seeds=4):
             template = outcome.template()
         except Exception:                                  # pragma: no cover
             continue
-        referenced = {
-            name for sigil, name in _MUSTACHE.findall(_XML_COMMENT.sub(" ", template))
-            if sigil not in ("#", "^", "/") and name != "__seed__"
-        }
+        referenced = _references_with_sections(template)
         if not referenced:
             continue
         for exercise in outcome.exercises()[:seeds]:
-            missing = referenced - set(exercise.data.keys())
-            for name in missing:
-                hits[(outcome.slug, name)] += 1
+            for name, sections in referenced:
+                contexts = _visible_contexts(exercise.data, sections)
+                if not any(isinstance(c, dict) and name in c for c in contexts):
+                    hits[(outcome.slug, name)] += 1
     for (slug, name), count in sorted(hits.items()):
         out.append(Finding("missing-data", slug,
                            "template uses {{%s}}, which the generator never sets; "
