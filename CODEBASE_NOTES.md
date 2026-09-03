@@ -3072,7 +3072,7 @@ Four properties worth keeping if this is ever touched:
 
 ---
 
-## Where things stand (2026-08-27)
+## Where things stand (2026-09-02)
 
 | | |
 |---|---|
@@ -3080,16 +3080,18 @@ Four properties worth keeping if this is ever touched:
 | TikZ image backend | done |
 | Browser XSLT migration (steps 1-3) | done — see "Browsers are removing XSLT" |
 | Viewer shows 50 versions, not 20 | done — `PUBLIC_SEEDS` |
-| Test suite | done — 97 tests, see "Tests" |
+| Test suite | done — **127** in checkit, **53** in checkit-printit |
 | Build verification | done — `checkit check`, see "Checking a build" |
-| Fork versioned and released as a wheel | done — **v0.2.8.4** |
+| Fork versioned and released as a wheel | **v0.2.8.5 is the newest wheel; source is 0.2.9.1.** See "The unreleased wheel" |
 | Port mat-106 off its Sage shims | done — 28 outcomes + 1 associate, `mode` retired |
 | mat-106 published and verified | done — 2026-08-27, no `checkit check` findings |
 | SpaTeXt elements for per-medium differences | done — `<glyphs>`, `<nobreak>` |
 | mat-206 | **not started, and not a port** — see below |
 | Print tool as its own package | done — [checkit-printit](https://github.com/jslyemath/checkit-printit), stages 1-5 and 9; see `PRINT_TOOL_DESIGN.md` |
 | A real quiz printed from mat-106 | done — 2026-09-01, 98 pages; all 28 outcomes build. See "The first real quiz" |
-| `skillcheckpoints.sty` drift between banks | none — byte-identical (2026-08-27) |
+| `skillcheckpoints.sty` drift between banks | **drifted 2026-09-02.** mat-106 and the printit package match; mat-206 is one colour fix behind and is being rebuilt from scratch, so it is deliberately not chasing |
+| Upstream merge | current — 0 behind, 97 ahead as of 2026-09-02 |
+| mat-106 typography pass | done — commas, spacing, entities; regenerated and republished |
 
 Known open questions, none blocking:
 
@@ -4127,6 +4129,167 @@ positive. The demo bank reports 10 findings for this reason -- IMG1's
 `{{slope}}` lives inside `{{#findfunction_line}}`, XML's `{{f}}` inside its own
 section. The banks are correct; the check is not. Nothing was wrong on mat-106,
 which has no section-scoped variables, so this never showed there.
+
+## Where we paused (2026-09-02)
+
+Everything below was decided in conversation and is not yet built. Recorded so
+picking it back up costs nothing.
+
+### The seating/records GUI: agreed shape, not started
+
+**A local web app with a Python backend**, not a desktop toolkit and not Godot.
+
+The privacy constraint that seemed to rule out a browser does not: it rules out
+*hosting*. A page served from `127.0.0.1` publishes nothing, and student data
+stays in local files exactly as it does now. Bind to `127.0.0.1` and never
+`0.0.0.0`, which would put names on the campus network.
+
+Reasons the browser wins here, in order of weight:
+
+1. The data model is already Python. `checkit_printit` reads banks, resolves
+   seeds, applies selection modes, orders seating around pins. A GUI in another
+   language reimplements that or talks to it over IPC.
+2. Draggable desks on a rearrangeable canvas is the hardest requirement, and
+   the browser is the best-documented environment for it.
+3. Editable tables are nearly free in HTML and painful in Qt.
+
+Rejected, with reasons: **Godot** solves the canvas and nothing else — no
+tables, no forms, no TOML, no access to the Python that reads the bank.
+**Tkinter** has no table widget and you write your own hit-testing. **PySide6**
+is the serious alternative and `QGraphicsScene` is genuinely good, but it costs
+a ~100MB dependency and Windows packaging pain. **Flet/NiceGUI** are web UIs
+underneath, so they are the same answer with the JavaScript hidden — until a
+custom drag canvas, where the abstraction thins and you write it anyway.
+
+**Storage, which is the part to get right:**
+
+| | |
+|---|---|
+| `publication.toml`, `roster.toml`, `seating.toml` | stay the source of truth; the GUI edits these files rather than replacing them |
+| desk x/y positions | new data, but it belongs in `seating.toml` |
+| tracking records | **SQLite** — append-heavy, machine-written, queried by date/student/skill |
+
+A GUI that writes TOML means the CLI and the GUI can never disagree and
+everything stays in git. A GUI with its own state file would break that.
+
+**Not a decision yet:** `pywebview` puts the same frontend in a native window
+with no browser chrome and no open port, for ~2MB and a few lines. So "local
+web app" and "desktop app" are not a fork in the road — the second wraps the
+first. Build the frontend; choose the shell later.
+
+**First slice, in order:** `checkit-printit gui` serves `seating.toml` as
+read-only desks; then drag-to-swap writes the file back; then confirm
+`checkit-printit build --preview` reads it unchanged. That last step is the
+real test — if the GUI's output is a file the CLI already understands, the
+whole thing is additive and nothing can drift.
+
+### Spacing: a `<workspace/>` element, designed but not built
+
+PreTeXt's answer is a `@workspace` **attribute** on an `<exercise>` inside a
+`<worksheet>`, in absolute units (`workspace="1.25in"`), treated as a minimum
+and distributed proportionally. It has **no `\vfill` equivalent** —
+[issue #2207](https://github.com/PreTeXtBook/pretext/issues/2207) is an open
+request for exactly the relative spacing mat-106 already uses everywhere.
+
+For SpaTeXt an **element** beats an attribute: an attribute means "this thing
+gets space after it" and cannot say "put space *here*, between these two items".
+
+```xml
+<workspace/>                  <!-- \vfill: take what is left -->
+<workspace height="1.5in"/>   <!-- \vspace: a minimum -->
+```
+
+Supporting both spellings puts this ahead of PreTeXt rather than behind it.
+
+**Make it block content, allowed wherever `<p>` is allowed.** That is the whole
+design decision. A direct child of `<knowl>` would have to sit *between*
+`<content>` and `<outtro>`, and all three stylesheets process those by fixed
+name in fixed order, so placing something between them means rewriting the
+knowl template three times to walk children in document order.
+
+Work, now that the code has actually been read:
+
+| | |
+|---|---|
+| `latex.xsl` | one template, plus `\|stx:workspace` in the select lists |
+| `html.xsl` | name it and emit nothing, so "dropped on purpose" is distinguishable from "forgotten" |
+| `pretext.xsl` | same. `@workspace` cannot be emitted meaningfully: this stylesheet produces a bare `<exercise>` with no `<worksheet>` around it, so whether the attribute is legal depends on where the author pastes it |
+| the viewer | **nothing.** `ContentNodes.svelte` is an `{#if}` chain with no `{:else}` and already ignores what it does not know |
+| subset filter | nothing, given the block-content decision |
+
+**Prototype on W2 first.** Its two templates differ by nothing but
+`\vspace{20pt}` and `\vfill`, so it either drops its print template cleanly or
+names what is missing, before twenty others are touched. The known gap is space
+*after* the answer, which W2's trailing `\vfill` provides today.
+
+### MCQ: leave it alone until upstream finishes
+
+Decided 2026-09-02. Upstream's MCQ is a first pass and its own UI says
+"experimental". The three gaps found — a two-choice MCQ rendering no choices,
+an unused `letter` field, Canvas-only export — are **not** to be fixed here.
+Wait to see the full implementation.
+
+The larger idea: the eventual move may be to **port MCQ's approach onto the
+true/false items**, which N1 and D3 already have in bespoke form via
+`\tfleft`. A distractor is just an extra `<outtro>`, and a true/false item is a
+two-choice MCQ, so one mechanism could serve both. Not started, and it depends
+on what upstream settles on.
+
+Note that **print is where MCQ stops**: `latex.xsl` and `pretext.xsl` both
+select `stx:outtro[not(@distractor='true')][1]`, so a printed MCQ is the prompt
+plus the correct answer with nothing to choose between.
+
+### Upstream contribution strategy
+
+Agreed posture: **build first, show later.** A previous feature request — that
+generators be able to see their seed — was refused on design grounds, and that
+refusal is diagnostic rather than arbitrary. It maps to one specific boundary,
+the **generator contract**: CheckIt rests on "any seed is as good as any other",
+which is what makes a seed range interchangeable and a version reproducible from
+a number. `self.seed` breaks that invariant invisibly. This fork sets it anyway
+(`roll_data()`), so the fork is *already* not back-portable in whole. The
+realistic goal is not "stay mergeable" but "keep sending back what is sendable".
+
+**Four unarguable bug fixes to send when convenient**, each with a reproducible
+failure and no design decision for the maintainer to make:
+
+- `pretext.xsl` wrapping tasks in an extra `<task>` — emits invalid PreTeXt for
+  every multi-part exercise
+- `latex.xsl` not bracing a `<glyphs>` `@latex`, so a `\Large` runs to the end
+  of the document
+- `-o` not repeatable, silently regenerating outcomes the user did not name
+- `update_viewer.py` assuming `python` and `npm` are literal executable names
+
+Two more are upstream's own, found in the MCQ merge: `Knowl.svelte`'s
+`> 1` off-by-one, and the unused `letter`.
+
+**The GUI is structurally the safest thing to build** with an eye to
+upstreaming: almost entirely new files, which never conflict on merge, and it
+goes nowhere near the generator contract. If it is ever proposed, keep the
+upstream half to exactly what the deprecated Jupyter dashboard did — preview,
+generate, generate with graphics, build bank, build viewer — because a narrow
+replacement is far easier to accept than a new feature. Note that
+`html_preview()` and `preview_exercises()` in `outcome.py` are used by nothing
+but that deprecated dashboard, so core already carries a GUI-support API with no
+live consumer.
+
+**History worth knowing:** the Jupyter GUI was built in 2021 (issue #30). On
+2026-05-20 four commits landed in one day — "setup devcontainer and start work
+on checkit cli" through "flexible cli commands" — and v0.2.7 the next day
+deprecated the dashboard with "we recommend using Codespaces/CLI". Read that as
+the GUI being collateral of adopting Codespaces rather than a verdict on GUIs.
+Two dashboard issues (#34, #49) are still open. Expect "Codespaces already
+handles onboarding" as the first objection, and answer it with the local-first
+instructor who has no GitHub account.
+
+### One loose end
+
+**The unreleased wheel.** Source is `0.2.9.1`; the newest published wheel is
+`v0.2.8.5`, and both banks' `requirements.txt` pin that URL. Local work is
+unaffected because this machine uses an editable install, but a fresh clone of
+mat-106 gets a CheckIt without the glyphs brace fix, the pretext task fix, the
+repeatable `-o`, the `missing-data` section fix, or MCQ. Cut a `v0.2.9.1` wheel
+and update both banks' `requirements.txt` when convenient.
 
 ## Local divergences from upstream StevenClontz/checkit
 
