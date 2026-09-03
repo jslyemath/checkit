@@ -577,12 +577,18 @@ Settled in review, recorded so they are not relitigated.
 
 ## 11. Still open
 
-1. Whether the interim seating file and the eventual GUI share a format from the
-   start. Recommended yes; it costs nothing now and avoids a migration.
+1. ~~Whether the interim seating file and the eventual GUI share a format from
+   the start.~~ **Settled 2026-09-02: yes.** The GUI is a local web app that
+   edits `seating.toml` in place, so there is only ever one format. Desk x/y
+   positions go in the same file. See "Where we paused" in `CODEBASE_NOTES.md`
+   for the full architecture.
 2. Which figure route to take for self-contained assessments (§6b): raise
    `--image-seeds`, publish `.tikz`, or base64. Recommended: publish `.tikz`.
-3. Whether the two banks' identical `skillcheckpoints.sty` copies are deleted in
-   favour of the package default, or kept until each course diverges.
+3. ~~Whether the two banks' identical `skillcheckpoints.sty` copies are deleted
+   in favour of the package default.~~ **Overtaken by events 2026-09-02.** They
+   are no longer identical: mat-106 and the printit package carry a colour fix
+   that mat-206 does not, and mat-206 is to be rebuilt from scratch rather than
+   kept in step. Revisit once that rebuild happens.
 4. What a hand-authored bank's `bank.xml` looks like, given the tool should keep
    `Skill Descriptions.tex` in step with it — MAT 206 has a real `bank.xml`
    already, so possibly nothing special is needed.
