@@ -4250,32 +4250,20 @@ mixed lists still carry three positives, matching the predicted (1/2)(19/20).
 An `assert` before the return now stops the build if any list ever repeats a
 value again, from this cause or another.
 
-### `checkit generate -o FCP` does not re-run the generator
+Regenerated with `generate -o FCP -r`, so FCP's versions have shifted.
 
-This nearly produced a false all-clear. Seeds are sticky on purpose -- students
-may be part-way through a version, so a rebuild reuses whatever was generated
-before and only fills in what is missing. Fixing a generator and running
-`generate` therefore changes nothing: the run prints "Generating 1000 exercises
-for outcome FCP" and writes the same seeds back out.
-
-**A generator fix needs `-r`/`--regenerate`.** The tell is the mtime: after a
-run without it, `assets/<SLUG>/generated/seeds.json` still carries yesterday's
-date. Checking the generated JSON rather than the function caught it here; 62
-duplicates were still sitting in the bank after the "fix".
-
-This is the same shape as the merge that lost its content -- verifying the
-thing you changed rather than the thing that ships.
-
-### Two traps while verifying this in the browser
+### Verifying a generator fix from the browser console
 
 KaTeX writes the minus sign as U+2212, not an ASCII hyphen, and `innerText`
 repeats every glyph on its own line before the readable form. A regex written
-with `-?\d+` matches nothing and reports a clean run. Read
-`annotation[encoding="application/x-tex"]` instead -- that holds the source
-LaTeX exactly as the generator emitted it.
+with `-?\d+` matches nothing and reports a clean run -- the same false-clean
+shape as a mangled regex in a heredoc. Read
+`annotation[encoding="application/x-tex"]` instead: it holds the source LaTeX
+exactly as the generator emitted it, so the values can be compared against
+`seeds.json` character for character.
 
-The published PDF also reads as password-protected to some tools while having
-no `/Encrypt` in it at all. `pdftoppm -png` renders it fine.
+Minor: printit's PDFs read as password-protected to some tools while carrying
+no `/Encrypt` at all. `pdftoppm -png` renders them fine.
 
 ## FCP: the Fundamentals Checkpoint becomes an outcome (2026-09-02)
 
