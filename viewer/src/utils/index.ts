@@ -1,4 +1,5 @@
-import type {Bank, Assessment, Outcome, Precomputed, DerivedBundle} from '../types';
+import type {Bank, Assessment, AssessmentFile, Outcome, Precomputed,
+    DerivedBundle, LatexSupport} from '../types';
 
 import {get} from 'svelte/store';
 import {bank as bankStore} from '../stores/banks';
@@ -9,6 +10,8 @@ import katex from 'katex';
 import Mustache from 'mustache';
 // @ts-ignore
 import assessmentTemplate from '../templates/assessmentTemplate.tex?raw'
+// @ts-ignore
+import themedAssessmentTemplate from '../templates/themedAssessmentTemplate.tex?raw'
 
 /**
  * How many exercise versions the viewer exposes to students.
@@ -150,6 +153,127 @@ export const ensureDerivedForSlugs = (bank:Bank, slugs:string[]):Promise<void[]>
         const o = getOutcomeFromSlug(bank,s)
         return o ? ensureDerived(o) : Promise.resolve()
     }))
+
+/**
+ * Every exercise's LaTeX ships with a preamble defining \stxKnowl, \stxTitle
+ * and \stxOuttro -- so a single exercise can be copied and pasted into any
+ * document and still compile. latex.xsl writes it, ending with this line.
+ *
+ * A whole document wants those definitions once, at the top, where a theme can
+ * override them. Pasting them per exercise also silently forces
+ * \renewcommand{\stxOuttro}[1]{} on every one, which throws every answer away
+ * -- so an answer key is impossible until they are hoisted out.
+ *
+ * checkit-printit strips exactly this marker for exactly this reason; see
+ * _SPATEXT_PREAMBLE_END in assemble.py. Keep the two in step.
+ */
+const SPATEXT_PREAMBLE_END = "%".repeat(28)
+
+export const stripSpatextPreamble = (latex:string):string => {
+    const at = latex.indexOf(SPATEXT_PREAMBLE_END)
+    if (at < 0) return latex.trim()
+    return latex.slice(at + SPATEXT_PREAMBLE_END.length).trim()
+}
+
+/** The bank's support files, in load order. Empty for a bank that ships none,
+ *  and for any bank generated before they were published. */
+export const latexSupport = (bank:Bank):LatexSupport[] => bank.latex_support ?? []
+
+export const bankHasTheme = (bank:Bank):boolean =>
+    latexSupport(bank).some((e)=>e.role=="theme")
+
+const loadedSupport:Record<string,string> = {}
+
+/**
+ * Fetch the support files' contents, so an assessment can inline them.
+ *
+ * Separate from bank.json on purpose: every visitor downloads that, and a
+ * theme only matters to an instructor who opens this tab.
+ */
+export const ensureLatexSupport = async (bank:Bank):Promise<void> => {
+    await Promise.all(latexSupport(bank).map(async (entry)=>{
+        if (loadedSupport[entry.filename] !== undefined) return
+        const url = `${siteBase()}/${entry.path}`
+        const response = await fetch(url)
+        if (!response.ok) {
+            throw new Error(
+                `Could not fetch ${entry.filename}: HTTP ${response.status} ` +
+                `from ${url}. bank.json lists it under latex_support, so the ` +
+                `bank was published without the file itself.`
+            )
+        }
+        loadedSupport[entry.filename] = await response.text()
+    }))
+}
+
+/**
+ * The file a theme expects its skill names and descriptions to arrive in.
+ *
+ * A theme defines \setskilldesc and then \input's this, so the descriptions
+ * land after the command exists and before \skillheader needs them. printit
+ * writes the same file beside main.tex; keeping the name identical means a
+ * theme works unmodified in both.
+ */
+export const DESCRIPTIONS_FILENAME = "Skill Descriptions.tex"
+
+const DESCRIPTIONS_INPUT = /^[ \t]*\\input\{Skill Descriptions\.tex\}[ \t]*$/m
+
+/**
+ * The support files as one preamble block.
+ *
+ * A .sty is read with @ counting as a letter, which is how packages keep
+ * internal names like \@acadclass private. Pasted into a document preamble
+ * that is no longer true, so the whole block goes between \makeatletter and
+ * \makeatother.
+ *
+ * Two edits are made to the source, and only these two:
+ *   - \ProvidesPackage is dropped; it means nothing outside a real package
+ *     file and warns when the name does not match.
+ *   - the \input of the descriptions file becomes the descriptions
+ *     themselves, since a standalone file has nothing to read from disk. A
+ *     theme without that line gets them appended instead, so a theme that
+ *     does not follow the convention still ends up with its descriptions.
+ */
+const inlinedSupport = (bank:Bank, descriptions:string):string => {
+    let placed = false
+    const parts = latexSupport(bank).map((entry)=>{
+        let source = (loadedSupport[entry.filename] ?? "")
+            .replace(/^\s*\\ProvidesPackage\{[^}]*\}.*$/m, "")
+        if (DESCRIPTIONS_INPUT.test(source)) {
+            source = source.replace(DESCRIPTIONS_INPUT,
+                `% ---- ${DESCRIPTIONS_FILENAME}, inlined\n${descriptions}`)
+            placed = true
+        }
+        return `% ---- ${entry.filename}, inlined\n${source.trim()}`
+    })
+    if (!parts.length) return ""
+    const block = parts.join("\n\n") + (placed ? "" : `\n\n${descriptions}`)
+    return `\\makeatletter\n${block}\n\\makeatother`
+}
+
+/** The same support files as \usepackage lines, for a multi-file project. */
+const loadedSupportPackages = (bank:Bank):string =>
+    latexSupport(bank)
+        .map((e)=>`\\usepackage{${e.filename.replace(/\.sty$/, "")}}`)
+        .join("\n")
+
+/**
+ * \setskilldesc for every skill on the assessment, from the bank manifest.
+ *
+ * The theme's \skillheader looks a slug up here for its title and colour;
+ * without these lines every box prints the theme's default. printit generates
+ * the same file from the same manifest -- see descriptions_tex in assemble.py.
+ */
+const skillDescriptions = (outcomes:Outcome[]):string =>
+    outcomes.map((o)=>{
+        const description = (o.description ?? "").split(/\s+/).join(" ").trim()
+        // The optional argument is the box colour, resolved by the platform
+        // from <color_map>. Omitting it leaves every skill in the theme's
+        // default, which is not what a bank declaring a colour map is asking
+        // for -- printit hit the same thing.
+        const prefix = o.color ? `\\setskilldesc[${o.color}]` : "\\setskilldesc"
+        return `${prefix}{${o.slug}}{${description}}`
+    }).join("\n")
 
 /**
  * One precomputed format for one exercise.
@@ -370,11 +494,15 @@ export const parseMath = (html:string) => {
     );
 }
 
-export const getRandomAssessmentFromSlugs = (bank:Bank,slugs:string[],template:string=assessmentTemplate) => {
-    let assessment: Assessment = {
-        "latex": "",
-        "exercises": [],
-    }
+/** The template a bank gets by default: themed when it publishes one. */
+export const defaultTemplateFor = (bank:Bank):string =>
+    bankHasTheme(bank) ? themedAssessmentTemplate : assessmentTemplate
+
+/** Pick one random version of each outcome. Separate from rendering, so the
+ *  same assessment can be re-rendered -- with an answer key, say -- without
+ *  quietly drawing a different set of exercises underneath the instructor. */
+export const pickAssessmentExercises = (bank:Bank, slugs:string[]) => {
+    const chosen: {outcome:Outcome, seed:number}[] = []
     slugs.forEach( (slug) => {
         let o = getOutcomeFromSlug(bank,slug)
         if (o) {
@@ -385,19 +513,73 @@ export const getRandomAssessmentFromSlugs = (bank:Bank,slugs:string[],template:s
             let seed = Math.floor(
                 Math.random() * (top-PUBLIC_SEEDS)
             )+PUBLIC_SEEDS;
-            assessment.latex = assessment.latex + "\n\n" + outcomeToLatex(o,seed)
-            assessment.latex = assessment.latex + "\n\n\\newpage\n\n"
-            assessment.exercises = [...assessment.exercises, {outcome:o,seed:seed}]
+            chosen.push({outcome:o, seed:seed})
         }
     })
-    assessment.latex = Mustache.render(
-        template,
-        {
-            "version": Date.now(),
-            "exercises": assessment.exercises.map((e)=>{
-                return {"latex": outcomeToLatex(e.outcome,e.seed)}
-            })
-        }
-    )
+    return chosen
+}
+
+export const renderAssessment = (
+    bank:Bank,
+    chosen:{outcome:Outcome, seed:number}[],
+    template:string=defaultTemplateFor(bank),
+    answerKey:boolean=false,
+) => {
+    const themed = bankHasTheme(bank)
+    // A themed document defines the SpaTeXt commands once in its preamble, so
+    // each exercise arrives without its own copy. The generic template has no
+    // preamble of its own and relies on them travelling with the exercise.
+    const body = (e:{outcome:Outcome,seed:number}) => {
+        const latex = outcomeToLatex(e.outcome, e.seed)
+        return themed ? stripSpatextPreamble(latex) : latex
+    }
+    const descriptions = skillDescriptions(chosen.map((e)=>e.outcome))
+    const context = {
+        "version": Date.now(),
+        "bankTitle": bank.title,
+        "answerKey": answerKey,
+        "exercises": chosen.map((e)=>({
+            "latex": body(e),
+            "slug": e.outcome.slug,
+            "seed": e.seed,
+            "title": e.outcome.title,
+        })),
+    }
+
+    const render = (theme:string) =>
+        Mustache.render(template, {...context, "theme": theme})
+
+    // Two shapes of the same document. The copy button and the preview carry
+    // the standalone one, because a clipboard holds one thing; Overleaf gets
+    // the project, because it can hold several and a real .sty reads better
+    // than 600 lines pasted into a preamble.
+    const assessment: Assessment = {
+        "exercises": chosen,
+        "latex": render(inlinedSupport(bank, descriptions)),
+        "files": [{"name": "main.tex", "content": render(loadedSupportPackages(bank))}],
+    }
+    latexSupport(bank).forEach((entry)=>{
+        assessment.files.push({
+            "name": entry.filename,
+            "content": loadedSupport[entry.filename] ?? "",
+        })
+    })
+    if (themed) {
+        // The theme reads this from disk. Shipped as its own file so the .sty
+        // travels unmodified -- the multi-file project is then exactly the
+        // file set printit writes.
+        assessment.files.push({
+            "name": DESCRIPTIONS_FILENAME,
+            "content": `% Generated from the bank. Do not edit -- edit the bank.\n${descriptions}\n`,
+        })
+    }
     return assessment
 }
+
+/** Pick and render in one step, which is what "Generate" does. */
+export const getRandomAssessmentFromSlugs = (
+    bank:Bank,
+    slugs:string[],
+    template:string=defaultTemplateFor(bank),
+    answerKey:boolean=false,
+) => renderAssessment(bank, pickAssessmentExercises(bank,slugs), template, answerKey)

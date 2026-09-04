@@ -16,6 +16,12 @@ export type Bank = {
     // different thing from "precomputed but missing this seed" -- the viewer
     // reports them differently, because the fixes differ.
     precomputed?: Precomputed;
+    // LaTeX support files this bank publishes, theme first. Absent on banks
+    // generated before the feature; an empty array means the bank genuinely
+    // ships none, and the assessment builder falls back to its generic
+    // template. The two cases behave the same here, but only one is a bank
+    // that could be rebuilt to gain a theme.
+    latex_support?: LatexSupport[];
 }
 /** What the emitter says it wrote. Declared so a consumer can ask rather than
  *  infer a gap from finding nothing. See checkit/__init__.py. */
@@ -41,6 +47,10 @@ export type Outcome = {
     ai_prompt?: string | null;
     template: string;
     exercises: Array<Exercise>;
+    // xcolor name for this skill's box in a themed LaTeX export, resolved by
+    // the platform from bank.xml's <color_map>. Absent means the theme's
+    // default -- which is also every bank that declares no map.
+    color?: string;
 }
 export type Exercise = {
     seed: number;
@@ -60,5 +70,23 @@ type AssessmentExercise = {
 }
 export type Assessment = {
     exercises: AssessmentExercise[]
+    /** One self-contained file: the theme inlined, nothing to fetch. What the
+     *  copy button and the source preview carry. */
     latex: string
+    /** The same document as a real project, for services that accept several
+     *  files. `main.tex` loads the support files by name instead of inlining
+     *  them, so what Overleaf opens looks like what printit writes to disk. */
+    files: AssessmentFile[]
+}
+export type AssessmentFile = {
+    name: string
+    content: string
+}
+/** A LaTeX support file the bank publishes, in the order it must be loaded.
+ *  See LATEX_SUPPORT in checkit/__init__.py. Absent on banks generated before
+ *  the feature, which is why every consumer treats it as optional. */
+export type LatexSupport = {
+    filename: string
+    role: string
+    path: string
 }

@@ -1,0 +1,108 @@
+{{=<% %>=}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%             Assessment, in this bank's own theme             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% This bank publishes a LaTeX theme, so an assessment is built to look like
+% the printed handouts rather than like a generic article.
+%
+% ABOUT THE FIRST LINE. It switches the field delimiters to angle-percent,
+% because LaTeX arguments are braces and the usual doubled-brace syntax
+% immediately inside one does not mean what it looks like -- it renders as a
+% stray closing brace and then fails somewhere else entirely. Angle-percent
+% lets a field sit directly inside braces, as in the skillheader lines below.
+% It has to be line one: anything above it is still read with the old
+% delimiters.
+%
+% This comment deliberately names fields in prose rather than writing them
+% out, because a field written here is a field, not an example -- and a
+% section written here opens a section. The body below is the example.
+%
+% Available:
+%
+%   theme          the bank's support packages. Copied from the page it
+%                  expands to the whole .sty inlined, so the file stands
+%                  alone; sent to Overleaf it becomes usepackage lines and
+%                  the .sty travels beside it as its own file.
+%   version        a version stamp
+%   bankTitle      the bank's title
+%   exercises      a section, once per exercise, each carrying: slug, seed,
+%                  title, and latex (the exercise itself)
+%   answerKey      a section rendered only when "Include answer key" is
+%                  ticked
+%
+% Wrap a field in braces yourself where LaTeX needs them. Use the brace form
+% shown below for anything containing LaTeX: the plain form escapes &, < and >
+% into HTML entities.
+%
+% Edits here are yours and are remembered in this browser. "Reset to default
+% template" brings this file back.
+
+\documentclass[12pt,twoside]{article}
+\usepackage[utf8]{inputenc}
+
+<%{theme}%>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                      Customize Header                       %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% The theme prints these across the top of every page, as
+% "class-section  bullet  date  bullet  author", and the separators are drawn
+% whether or not there is anything between them -- so blanks look stranded
+% rather than absent. The browser has no way to know your semester or name
+% (printit reads them from publication.toml), which is why they are
+% placeholders here. Replace them.
+% Keep the class short -- printit passes a course code like "MAT 106" here,
+% and this line shares the top of the page with the name rule. The bank's own
+% title is available as the bankTitle field if you want it.
+\acadclass{Course}
+\date{Semester}
+\author{Instructor}
+
+% Printed bottom-left on every page.
+\title{Assessment}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Skill names, descriptions and box colours are generated from the bank into
+% "Skill Descriptions.tex", which the theme reads for itself.
+
+% How SpaTeXt's structure maps onto the theme. providecommand throughout, so
+% a theme defining these wins. The outtro is the answer to an exercise: it
+% prints only when the key is switched on, which is what the checkbox does.
+\providecommand{\stxKnowl}[1]{#1}
+\providecommand{\stxTitle}[1]{#1}
+\providecommand{\stxOuttro}[1]{\ifanstoggle{\color{scCOLOR}#1}\fi}
+
+\begin{document}
+
+% ---- student copy
+\setname{Blank}
+\setsect{Blank}
+
+<%#exercises%>
+\setvseed{<%seed%>}
+\skillheader{<%slug%>}
+
+<%{latex}%>
+
+\newpage
+<%/exercises%>
+<%#answerKey%>
+% ---- answer key
+\setboolean{anstoggle}{true}
+\setname{Key}
+\setsect{Blank}
+
+<%#exercises%>
+\setvseed{<%seed%>}
+\skillheader{<%slug%>}
+
+<%{latex}%>
+
+\newpage
+<%/exercises%>
+<%/answerKey%>
+\end{document}
