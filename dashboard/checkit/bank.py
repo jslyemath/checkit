@@ -5,7 +5,7 @@ from . import static
 from .outcome import Outcome
 from .xml import CHECKIT_NS, optional_text, has_flag
 from . import (PUBLIC_SEEDS, BUNDLE_UNTIL, INLINE_FORMATS, BUNDLE_FORMATS,
-               BUNDLE_FILENAME, VERSION)
+               BUNDLE_FILENAME, LATEX_SUPPORT, VERSION)
 
 class Bank():
     def __init__(self, path="."):
@@ -84,6 +84,43 @@ class Bank():
         os.makedirs(p, exist_ok=True)
         return p
 
+    def latex_support(self):
+        """The LaTeX support files this bank actually has, in load order.
+
+        Returns the entries of LATEX_SUPPORT whose file exists in the bank
+        root, each as a dict naming the file and where the published site
+        serves it. Absent files are simply absent -- a bank with no theme is
+        the ordinary case, not a fault.
+        """
+        found = []
+        for filename, role in LATEX_SUPPORT:
+            if os.path.isfile(os.path.join(self.abspath(), filename)):
+                found.append({
+                    "filename": filename,
+                    "role": role,
+                    "path": f"assets/{filename}",
+                })
+        return found
+
+    def copy_latex_support(self):
+        """Put those files in assets/, so build_viewer publishes them.
+
+        Copied rather than referenced because the viewer only ever fetches
+        from the published site; the bank root is not served.
+
+        A file the bank no longer has is deleted from assets/ too. Leaving it
+        behind beside a bank.json that does not list it is the same trap a
+        stale derived.json sets: anything looking for the file instead of
+        reading the declaration would keep finding a theme that was removed.
+        """
+        published = {e["filename"] for e in self.latex_support()}
+        for filename, _role in LATEX_SUPPORT:
+            target = os.path.join(self.build_path(), filename)
+            if filename in published:
+                shutil.copy(os.path.join(self.abspath(), filename), target)
+            elif os.path.exists(target):
+                os.remove(target)
+
     def to_dict(self,regenerate=False,remote=None,precompute=True):
         olist = [
             o.to_dict(regenerate=regenerate,remote=remote,precompute=precompute)
@@ -102,6 +139,10 @@ class Bank():
             "checkit_version": VERSION,
             "outcomes": olist,
         }
+        # Declared for the same reason "precomputed" is: a consumer can ask
+        # what this bank ships instead of probing for files and reading a 404
+        # as "no theme". An empty list means the bank has none.
+        d["latex_support"] = self.latex_support()
         if precompute:
             # Declared, not implied. A consumer can ask "was this seed/format
             # emitted?" and get an answer, instead of discovering a hole by
@@ -131,6 +172,7 @@ class Bank():
                     "assets/, e.g. --remote https://jslyemath.github.io/checkit/demo . "
                     "Use --no-precompute to skip precomputation entirely."
                 )
+        self.copy_latex_support()
         build_path = os.path.join(self.build_path(),f"bank.json")
         with open(build_path,'w') as f:
             json.dump(self.to_dict(regenerate=regenerate,remote=remote,

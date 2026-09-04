@@ -62,3 +62,20 @@ BUNDLE_FILENAME = "derived.json"
 # bundles. Bounding the browser's range keeps a large seed pool for print
 # without paying to publish it.
 BUNDLE_UNTIL = 400
+
+# LaTeX support files a bank may keep in its root, published alongside the
+# bank so a browser can build a document that looks like the printed one.
+#
+# The order is the order they must be \usepackage'd: the theme decides the
+# layout, and the bank's own macros come after so they can build on it. That
+# is the order checkit-printit's main.tex already uses, and getting it
+# backwards fails in ways that look like a missing command rather than a
+# sequencing mistake -- so it is encoded here and published as a list, not
+# rediscovered by each consumer.
+#
+# Neither file is required. A bank with no theme gets the viewer's generic
+# assessment template, exactly as before.
+LATEX_SUPPORT = (
+    ("skillcheckpoints.sty", "theme"),
+    ("bank_helpers.sty", "helpers"),
+)
