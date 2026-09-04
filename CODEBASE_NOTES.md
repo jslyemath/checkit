@@ -4204,6 +4204,79 @@ disagrees with the URL, so setting `location.hash` to another version is
 silently bounced. Change the version the way a reader does -- set the version
 select's value and dispatch a `change` event.
 
+## The ordering problem could ask for the same number twice (2026-09-04)
+
+Found in class, on a checkpoint students were taking. Problems 17 and 18 ask a
+student to order six integers from least to greatest, and about one checkpoint
+in twenty printed a list with a number in it twice.
+
+### The cause
+
+`ordering_problems()` builds the mixed list in two separate draws:
+
+```python
+mixed = random.sample(range(-19, 1), 4)     # four distinct, all <= 0
+mixed[3] *= (-1) ** random.choice([0, 1])   # coin flip: maybe make it positive
+mixed.extend(random.sample(range(1, 20), 2))  # two distinct, both > 0
+```
+
+`random.sample` promises distinct values *within one call*. It knows nothing
+about the other call. So when the coin flip turns `mixed[3]` from -12 into 12,
+and the second draw happens to pick 12 as well, the list holds 12 twice.
+
+The odds work out to exactly 1 in 20: half the time the flip happens, the
+flipped value is non-zero 19 times in 20, and two draws from nineteen numbers
+hit that particular value 2 times in 19. Measured over 20,000 draws: 4.75%.
+
+### It is an old bug, not a port bug
+
+The original FundCheck script had the same three lines, so this has been
+printing for as long as the checkpoint has existed. Of 115 archived `.tex`
+files from that era, 9 contain a repeated value -- confirmed by reading only
+the integer lists out of them.
+
+### The fix
+
+Draw the two positives from a pool that excludes whatever the flip produced:
+
+```python
+mixed.extend(random.sample([n for n in range(1, 20) if n != mixed[3]], 2))
+```
+
+`mixed[3]` is negative or zero unless the flip fired, so the guard costs
+nothing in the common case. The distribution is otherwise untouched: 23.7% of
+mixed lists still carry three positives, matching the predicted (1/2)(19/20).
+
+An `assert` before the return now stops the build if any list ever repeats a
+value again, from this cause or another.
+
+### `checkit generate -o FCP` does not re-run the generator
+
+This nearly produced a false all-clear. Seeds are sticky on purpose -- students
+may be part-way through a version, so a rebuild reuses whatever was generated
+before and only fills in what is missing. Fixing a generator and running
+`generate` therefore changes nothing: the run prints "Generating 1000 exercises
+for outcome FCP" and writes the same seeds back out.
+
+**A generator fix needs `-r`/`--regenerate`.** The tell is the mtime: after a
+run without it, `assets/<SLUG>/generated/seeds.json` still carries yesterday's
+date. Checking the generated JSON rather than the function caught it here; 62
+duplicates were still sitting in the bank after the "fix".
+
+This is the same shape as the merge that lost its content -- verifying the
+thing you changed rather than the thing that ships.
+
+### Two traps while verifying this in the browser
+
+KaTeX writes the minus sign as U+2212, not an ASCII hyphen, and `innerText`
+repeats every glyph on its own line before the readable form. A regex written
+with `-?\d+` matches nothing and reports a clean run. Read
+`annotation[encoding="application/x-tex"]` instead -- that holds the source
+LaTeX exactly as the generator emitted it.
+
+The published PDF also reads as password-protected to some tools while having
+no `/Encrypt` in it at all. `pdftoppm -png` renders it fine.
+
 ## FCP: the Fundamentals Checkpoint becomes an outcome (2026-09-02)
 
 Twenty problems across the eleven fundamental skills, printed as a two-page
