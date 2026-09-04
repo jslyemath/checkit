@@ -152,6 +152,24 @@ class CheckIt:
             A.subdivide([],[columns-1])
         return A
 
+    @staticmethod
+    def choices_from_list(lst):
+        """
+        Given a list, return a list of choices in a canonical way,
+        in a random order.
+        The first item of the provided `lst` is correct, and all
+        other items are distractors.
+        """
+        choices = [
+            {"item": lst[i],"correct":(i==0)}
+            for i in range(len(lst))
+        ]
+        shuffle(choices)
+        for i in range(len(lst)):
+            choices[i]["letter"] = chr(ord('a')+i)
+        return choices
+
+
 # decorator to help authors avoid confusing .data() with .get_data() in a Generator
 def provide_data(func):
     return lambda self: func(self.get_data())

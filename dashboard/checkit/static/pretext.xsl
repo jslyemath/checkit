@@ -52,7 +52,7 @@
                 </statement>
             </xsl:otherwise>
         </xsl:choose>
-        <xsl:apply-templates select="stx:outtro[1]"/>
+        <xsl:apply-templates select="stx:outtro[not(@distractor='true')][1]"/>
     </xsl:template>
 
     <xsl:template match="stx:title">

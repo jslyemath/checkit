@@ -4,6 +4,7 @@
     import { Nav, NavItem, NavLink, Row, Col } from 'sveltestrap';
     import { outcomeToStx, outcomeToHtml, outcomeToLatex, outcomeToPtx } from '../utils';
     import Knowl from '../spatext/Elements/Knowl.svelte';
+    import { currentExercise } from '../stores/answers';
 
     export let embedded:Boolean = false;
 
@@ -39,6 +40,11 @@
     // statement depends on what the statement mentions, not on what the
     // function it calls happens to read.
     $: rendered = render(mode, outcome, seed)
+
+    // Told to the answer store rather than passed down: Knowl sits several
+    // layers of content and node components below here, and none of them has
+    // any other reason to know which skill or version it is rendering.
+    $: currentExercise.set({ slug: outcome.slug, seed })
 
     let embed:string
     $: embed = `<iframe title="Iframe CheckIt Outcome"
