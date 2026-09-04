@@ -4130,6 +4130,156 @@ positive. The demo bank reports 10 findings for this reason -- IMG1's
 section. The banks are correct; the check is not. Nothing was wrong on mat-106,
 which has no section-scoped variables, so this never showed there.
 
+## FCP: the Fundamentals Checkpoint becomes an outcome (2026-09-02)
+
+Twenty problems across the eleven fundamental skills, printed as a two-page
+sheet, ported from a standalone script in `../FundCheck`. The port is done and
+committed; what follows is what it cost and what it exposed.
+
+### Four bugs in the original, all measured
+
+Over 400 seeds of the original script:
+
+| | |
+|---|---|
+| Crashed outright, division by zero | 4 seeds |
+| Returned fewer than two problems, so the caller failed to unpack | 27 seeds |
+| Distinct order-of-operations problems | 445 of 764 produced |
+| Time | ~20 minutes; the port does 600 seeds in 24 seconds |
+
+**Subtraction produced negative answers.** The minuend and subtrahend were drawn
+independently -- digits weighted small and large respectively, so that borrowing
+would happen -- and a repair swapped their leading digits when the subtrahend
+came out bigger. It ran only on the whole-number pair and did nothing when the
+leading digits were equal. Now built backwards, the way `add_sub_triad` does it:
+the difference and the subtrahend are chosen first and added to get the minuend,
+so a negative is impossible rather than unlikely, and a column forced past ten
+sets the borrowing exactly.
+
+**Order of operations allowed fractions mid-way.** The test was on the final
+answer only, so `10 / 4 * 6` passed -- the student writes 2.5 and the answer is
+still whole. For one representative shape, 9,939 assignments passed the old rule
+and only 4,162 had no fraction at any step: **58% of what it could produce**.
+
+**And it could not tell a rare shape from an impossible one.** About one shape
+in seven -- `a / (b + c**2 * d) - e` and relatives, a small number over a large
+bracketed group -- has no whole answer at all. The old loop burned a million
+draws on those before giving up. Backtracking with the variables filled in one
+at a time, abandoning a branch as soon as a decided division goes fractional,
+settles every shape in milliseconds including the impossible ones.
+
+**Neighbouring seeds produced the same problems.** See the seeding note below.
+
+### A third of the problems were free marks
+
+Worth keeping because the reasoning generalises. An expression only tests the
+order of operations if getting the order *wrong* gives a different answer.
+Measured over 2,000 generated problems, before any filtering:
+
+| | |
+|---|---|
+| A left-to-right student still gets it right | **37.9%** |
+| Ignoring the brackets too still works | 18.8% |
+| The brackets could be deleted with no effect | 32.1% |
+| Catches every modelled mistake | 11.4% |
+
+The generator now rejects an assignment unless a left-to-right reading lands
+elsewhere **and** the brackets change the value. Both drop to 0%.
+
+One failure mode is not fixable by choosing better numbers: reading "PEMDAS" as
+an order -- every multiplication before every division -- only shows up when two
+same-tier operators **share an operand**. `12 / 4 * 3` punishes it; `12 / 4 - 6 * 3`
+cannot, because the two never compete. Since each operator appears exactly once
+and brackets often separate them, only about **35% of shapes** can express that
+mistake at all. Demanded of one of the two problems, chosen at random, so every
+student meets the trap once without the shapes becoming repetitive.
+
+### `set_next_seed`: what the original was compensating for
+
+The script reseeded the RNG before **every draw** -- `seed += 1; random.seed(seed)`.
+
+Seeding does not add randomness; it chooses where in the generator's fixed
+stream to start reading. Drawing is what advances it. Reseeding on every draw
+takes only the *first* value from each of thousands of nearby starting points,
+which is both a thinner source and, because the seeds walk upward one at a time,
+correlated between neighbouring quizzes: `int_pemdas(s)` and `int_pemdas(s+3)`
+walked over each other.
+
+The per-function offsets (`seed += 10`, `+= 20`, `+= 40`) were a correct fix for
+a real problem -- each function reseeding from the same value restarted the same
+stream -- but the answer was to seed **once**, which is what CheckIt does in
+`roll_data`. Removed in the port: 39 reseeding calls, 11 offsets.
+
+**numpy went with them.** `np.random` is a separate generator, and CheckIt's
+`set_random_seed` seeds `random` only. A numpy draw would be reseeded from
+system entropy at import, so the same seed would give a different paper on every
+run -- silently. `random.choices(population, weights=...)` covers the weighted
+digit draws.
+
+### The two skillcheckpoints.sty copies had diverged
+
+`../FundCheck` carried its own older copy. `\numprob` -- the counter for a sheet
+whose problems run across *and* down, where an enumerate would fight the
+alignment -- existed only there, and the first print of FCP failed on it. Now in
+the shared theme, with the counter reset left to the skill file: every student's
+paper is in one document, so a counter that only climbs numbers the second
+student's sheet 21 to 40.
+
+### Theme changes, and why each one is shaped the way it is
+
+All four exist because **the print tool puts every student's paper end to end in
+one document**. Anything that changes a running setting follows through to
+everyone printed afterwards.
+
+- **`\skillheader[Displayed Title]{SLUG}`.** The box title and the footer both
+  read `\currentskill`, which `\skillheader` set from its one argument. FCP is
+  the first skill needing them to differ -- box "Fundamentals Checkpoint",
+  footer "FCP". `\currentskill` keeps the slug, because the footer is what a
+  student writes on and what the grade is recorded against.
+
+- **`\fancypagestyle{skillcontinued}`** for the second sheet of a multi-page
+  skill: name line kept, footer gone, since repeating the version and the
+  grading box invites a second grade for one skill. Applied with
+  `\thispagestyle`, **never** by changing `\fancyfoot` -- which is what the old
+  standalone template did, correctly, when each quiz was its own document.
+
+- **`\setname` and `\setsect` now set a value, not a header.** Both used to
+  redefine `\fancyhead` directly, which patches the `fancy` style alone; a
+  continued sheet then came out with a blank name line and no section. They now
+  set `\scname` and `\scsection`, which every page style renders.
+
+### The colour map never reached print
+
+Separate from FCP but found by it. `bank.xml` declares
+`<category prefix="W" color="Violet"/>`, mat-106's own `pdfgenerator.py` has
+always honoured it, and **checkit-printit dropped it** -- `descriptions_tex`
+emitted `\setskilldesc{slug}{desc}` with no colour, so every printed box came
+out in the theme's default blue. Fixed, and matching is now on the **longest**
+prefix rather than the first letter, which is what lets one outcome claim a
+colour of its own.
+
+FCP's is **Sepia**, picked by measurement: 65 units from every colour in use in
+CIE Lab, where the closest existing pair (Orange and Red) is 40 apart, and
+11.3:1 contrast against white.
+
+### Verified
+
+29 outcomes, 120 pages, two students with keys: no page missing its section,
+exactly four pages without a footer (FCP's second sheet, twice for students and
+twice for keys), problem numbering restarting at 1 for each student.
+`checkit check` reports no findings. 57 tests in checkit-printit.
+
+### Still open on FCP
+
+- **The displayed title is written twice** -- `<title>` in `bank.xml` and
+  `\skillheader[Fundamentals Checkpoint]{FCP}` in the print template. Threading
+  it through `Skill Descriptions.tex` would fix that properly, and is worth
+  doing only if a second skill ever needs a different display name.
+- **`../FundCheck` is unchanged** and is not a git repository. It still holds
+  ~120 generated `.tex` files carrying real student names.
+- **`pdfgenerator.py` still matches colours on the first letter**, so the two
+  pipelines now disagree about FCP. Only matters if that script is still used.
+
 ## Where we paused (2026-09-02)
 
 Everything below was decided in conversation and is not yet built. Recorded so
