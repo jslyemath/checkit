@@ -5,7 +5,7 @@ from . import static
 from .outcome import Outcome
 from .xml import CHECKIT_NS, optional_text, has_flag
 from . import (PUBLIC_SEEDS, BUNDLE_UNTIL, INLINE_FORMATS, BUNDLE_FORMATS,
-               BUNDLE_FILENAME)
+               BUNDLE_FILENAME, VERSION)
 
 class Bank():
     def __init__(self, path="."):
@@ -95,6 +95,11 @@ class Bank():
             "url": self.url,
             "ai_prompt": self.ai_prompt,
             "generated_on": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            # Which CheckIt built this. The viewer's footer used to carry the
+            # number as literal text, so it said v0.2.8 long after the fork had
+            # moved on; nobody edits a footer when they cut a release. Sending
+            # it with the data is the only version that cannot go stale.
+            "checkit_version": VERSION,
             "outcomes": olist,
         }
         if precompute:

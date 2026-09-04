@@ -15,6 +15,12 @@
 
     import { querystring } from 'svelte-spa-router';
     import { bank } from '../stores/banks';
+
+    // generated_on is stored as UTC; both of these render it in the reader's
+    // own timezone and locale, so a student two zones away sees the moment the
+    // bank was built as it was for them. Minutes, no seconds -- the point is
+    // telling two builds on the same day apart, not stopwatch precision.
+    $: generatedOn = new Date(Date.parse($bank.generated_on));
 </script>
 
 <main>
@@ -34,7 +40,8 @@
             <p>
                 Bank generated on:
                 <date datetime={$bank.generated_on}>
-                    {new Date(Date.parse($bank.generated_on)).toDateString()}
+                    {generatedOn.toDateString()}, at
+                    {generatedOn.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})}
                 </date>
             </p>
         {/if}

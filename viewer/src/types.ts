@@ -6,6 +6,10 @@ export type Bank = {
     // so every consumer must tolerate undefined as well as null.
     ai_prompt?: string | null;
     generated_on: string;
+    // Which CheckIt built this bank. Absent on anything generated before the
+    // footer stopped carrying the number as literal text, so the footer falls
+    // back to naming no version rather than showing "undefined".
+    checkit_version?: string;
     outcomes: Array<Outcome>;
     // Absent on any bank generated before the viewer stopped transforming
     // SpaTeXt itself. Absent means "not precomputed at all", which is a

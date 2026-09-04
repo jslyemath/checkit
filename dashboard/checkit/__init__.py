@@ -1,17 +1,21 @@
-# Upstream 0.2.8, fork revision 1. Bump the last number whenever a wheel is cut
+# Upstream 0.2.9, fork revision 1. Bump the last number whenever a wheel is cut
 # for someone else to install.
 #
-# A distinct version matters because checkit-dashboard 0.2.8 also exists on
-# PyPI, published by Steven Clontz on 2026-08-01, and it is different code.
+# A distinct version matters because checkit-dashboard 0.2.9 also exists on
+# PyPI, published by Steven Clontz on 2026-08-22, and it is different code.
 # Without this, `pip show checkit-dashboard` could not tell you which you have.
 #
-# NOT a PEP 440 local version like '0.2.8+slye.1', which is what this means
+# NOT a PEP 440 local version like '0.2.9+slye.1', which is what this means
 # semantically and was tried first. GitHub Releases rewrites '+' to '.' in an
 # uploaded asset's filename, turning the wheel into
-# checkit_dashboard-0.2.8.slye.1-py3-none-any.whl -- which pip then refuses
+# checkit_dashboard-0.2.9.slye.1-py3-none-any.whl -- which pip then refuses
 # outright with "Invalid wheel filename (invalid version)". Anything that has
 # to survive a release asset name must stick to digits and dots.
-VERSION = '0.2.8.5'
+#
+# The viewer's footer reads this out of bank.json rather than carrying it as
+# text, so bumping it here is enough; it used to say v0.2.8 long after it was
+# not.
+VERSION = '0.2.9.1'
 
 # How many exercise versions the viewer exposes to students, and therefore the
 # range everything else measures itself against: `checkit preview` generates
