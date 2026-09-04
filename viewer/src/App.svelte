@@ -40,9 +40,9 @@
         <p class="text-center text-muted">
             <small>
                 <em>
-                    Randomized exericse bank powered by
-                    <a target="_blank" href="https://checkit.clontz.org">CheckIt</a>
-                    v0.2.8
+                    Randomized exercise bank powered by
+                    <a target="_blank" href="https://github.com/jslyemath/checkit">a fork</a>
+                    of <a target="_blank" href="https://checkit.clontz.org">CheckIt</a>{#if $bank.checkit_version}, v{$bank.checkit_version}{/if}
                 </em>
             </small>
         </p>

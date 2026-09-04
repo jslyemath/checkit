@@ -72,9 +72,9 @@ class InstallRequires(unittest.TestCase):
 class VersionString(unittest.TestCase):
     """The version has to survive being a GitHub release asset's filename.
 
-    '0.2.8+slye.1' is what this fork means semantically -- a PEP 440 local
+    '0.2.9+slye.1' is what this fork means semantically -- a PEP 440 local
     version -- but GitHub rewrites '+' to '.' on upload, producing
-    checkit_dashboard-0.2.8.slye.1-py3-none-any.whl, which pip rejects with
+    checkit_dashboard-0.2.9.slye.1-py3-none-any.whl, which pip rejects with
     "Invalid wheel filename (invalid version)". Measured, not assumed.
     """
 
@@ -85,11 +85,26 @@ class VersionString(unittest.TestCase):
         self.assertRegex(VERSION, r"^\d+(\.\d+)*$")
 
     def test_version_differs_from_upstream(self):
-        """checkit-dashboard 0.2.8 on PyPI is Steven Clontz's package and is
+        """checkit-dashboard 0.2.9 on PyPI is Steven Clontz's package and is
         different code; sharing its version makes them indistinguishable."""
         from checkit import VERSION
 
-        self.assertNotEqual(VERSION, "0.2.8")
+        self.assertNotEqual(VERSION, "0.2.9")
+
+    def test_bank_json_reports_the_version_that_built_it(self):
+        """The viewer's footer reads this rather than carrying the number as
+        text, which is how it came to say v0.2.8 for three releases after that
+        stopped being true. Nobody edits a footer when they cut a release."""
+        import inspect
+
+        from checkit import VERSION
+        from checkit import bank as bank_module
+
+        source = inspect.getsource(bank_module.Bank.to_dict)
+        self.assertIn('"checkit_version": VERSION', source,
+                      "bank.json must carry the version, or the footer has no "
+                      "source of truth to read")
+        self.assertRegex(VERSION, r"^\d+(\.\d+)*$")
 
 
 class GenerateAmountGuard(unittest.TestCase):
