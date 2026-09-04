@@ -4130,6 +4130,80 @@ positive. The demo bank reports 10 findings for this reason -- IMG1's
 section. The banks are correct; the check is not. Nothing was wrong on mat-106,
 which has no section-scoped variables, so this never showed there.
 
+## The 0.2.9 merge lost its content, and how that hid (2026-09-04)
+
+**Check the commit, not the working tree.** A merge is not finished when the
+tests pass; it is finished when the commit is diffed against what was meant to
+be merged. That sentence is the whole lesson and it cost two days of wrong
+reports.
+
+### What happened
+
+The MCQ merge recorded the ancestry and kept almost none of the content. Nine
+of the ten files upstream touched arrived with their changes missing -- from the
+commit *and* the working tree. Only `EX4/generator.py` survived, and that was
+written fresh rather than merged. This fork's own changes to the same files all
+survived, so the merge kept ours and took none of theirs.
+
+Also lost the same way: the version bump to 0.2.9.1, resolved and staged during
+that merge, along with the matching change to `test_packaging.py`. `VERSION`
+still read `0.2.8.5` while the merge message claimed otherwise.
+
+### Why nothing caught it
+
+Every check run during the merge looked at the **working tree**, and every one
+of them was true at the time. The content was there: grepping `Knowl.svelte`
+found `distractor`, the tests passed, `build_docs.py` succeeded. The gap is
+between "the files are right" and "the commit contains the files", and nothing
+in that list can see it.
+
+It surfaced weeks later, by accident, from a question about a box colour that
+happened to require reading a merged file.
+
+Worse than a lost merge, because upstream is an ancestor: `git merge
+upstream/main` reports "already up to date" and would never have brought it
+back. A lost merge that still claims to be merged does not heal.
+
+### What to do instead
+
+After any merge, before moving on:
+
+```
+git show --stat <merge>            # did the files you resolved appear at all?
+git diff <merge> <theirs> -- <path>   # for each file they changed
+```
+
+`dashboard/tests/` has no way to catch this and should not grow one -- the
+failure is in the commit, not the code. The check belongs in the hands.
+
+The restoration itself was written as a script asserting each anchor matches
+exactly once, so an edit that does not apply stops rather than doing nothing
+quietly. Two anchors were wrong and the script said so.
+
+## The answer toggle remembers per version (2026-09-04)
+
+`Knowl.svelte` kept `let showOuttro = false` locally. Switching versions swaps
+the `knowl` prop on the same component rather than building a new one, so the
+flag survived and the next version's answer was already showing before the
+reader had looked at the question.
+
+State now lives in `stores/answers.ts`, keyed `"<slug>/<seed>/<path>"` where
+path is the task's numbering -- `""` for the exercise, `"7"` for its seventh
+task, `"7.2"` for that task's second subtask. Keying on the seed is what makes
+the reveal stop following you forward; going back to a version finds its entries
+and reopens exactly what was open. The whole set is dropped when the slug
+changes, since carrying one skill's reveals into another is meaningless.
+
+`Exercise.svelte` tells the store which skill and version are on screen, rather
+than threading them down through every layer of content and node components in
+between.
+
+**Testing this from the console needs the select, not the hash.**
+`Outcome.svelte` holds `seed` locally and pushes the route back when it
+disagrees with the URL, so setting `location.hash` to another version is
+silently bounced. Change the version the way a reader does -- set the version
+select's value and dispatch a `change` event.
+
 ## FCP: the Fundamentals Checkpoint becomes an outcome (2026-09-02)
 
 Twenty problems across the eleven fundamental skills, printed as a two-page
