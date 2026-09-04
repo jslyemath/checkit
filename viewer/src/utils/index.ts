@@ -202,10 +202,12 @@ export const outcomeToLatex = (o:Outcome,seed:number) => derived(o,seed,"latex")
 
 export const outcomeToPtx = (o:Outcome,seed:number) => derived(o,seed,"pretext").trim()
 
-export const outcomeToHtml = (
+// Upstream split outcomeToHtml in two so the MCQ export could reach the
+// unfiltered element. Same split here, over precomputed HTML rather than a
+// browser-side XSLT transform.
+const stxToHtmlElement = (
     o:Outcome,seed:number,
-    mathMode:'default'|'canvas'|'brightspace'='default',
-    solutions:'show'|'hide'|'only'='show'
+    mathMode:'default'|'canvas'|'brightspace'='default'
 ) => {
     // The base rendering only: subset='all', consumer='basic'. The filtering
     // and MathML below are plain DOM work and KaTeX, neither of which the XSLT
@@ -241,6 +243,15 @@ export const outcomeToHtml = (
             )
         })
     }
+    return ele
+}
+
+export const outcomeToHtml = (
+    o:Outcome,seed:number,
+    mathMode:'default'|'canvas'|'brightspace'='default',
+    solutions:'show'|'hide'|'only'='show'
+) => {
+    let ele = stxToHtmlElement(o,seed,mathMode)
     if (solutions=="hide") {
         ele.querySelectorAll('[class~="stx-outtro"]').forEach((outtro)=>{
             outtro.parentElement.removeChild(outtro)
@@ -253,8 +264,34 @@ export const outcomeToHtml = (
         ele.querySelectorAll('[class~="stx-content"]').forEach((content)=>{
             content.parentElement.removeChild(content)
         })
+        // A distractor is a wrong answer. It belongs in the choices, never in
+        // the "answer only" view an LMS import uses as the correct response.
+        ele.querySelectorAll('[class~="stx-outtro"][data-distractor="true"]').forEach((outtro)=>{
+            outtro.parentElement.removeChild(outtro)
+        })
     }
     return ele.outerHTML.trim()
+}
+
+/**
+ * The MCQ choices for one exercise, for the LMS export.
+ *
+ * A distractor is an extra <outtro> carrying @distractor, which html.xsl turns
+ * into data-distractor. Read off the unfiltered element, because outcomeToHtml
+ * strips distractors for the "answer only" view.
+ */
+export const outcomeToMcqChoices = (
+    o:Outcome,seed:number,
+    mathMode:'default'|'canvas'|'brightspace'='default'
+) => {
+    const ele = stxToHtmlElement(o,seed,mathMode)
+    return Array.from(ele.querySelectorAll('[class~="stx-outtro"]')).map((outtro, i) => {
+        return {
+            "ident": `choice${i}`,
+            "html": outtro.innerHTML.trim(),
+            "correct": outtro.getAttribute('data-distractor') !== 'true'
+        }
+    })
 }
 
 // Used when neither the outcome nor the bank supplies an <ai-prompt>. Kept

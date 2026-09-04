@@ -353,6 +353,28 @@ class CheckIt:
         return sympy.StrictLessThan(rhs, lhs) if strict else sympy.Le(rhs, lhs)
 
     @staticmethod
+    def choices_from_list(lst):
+        """
+        Given a list, return a list of choices in a canonical way,
+        in a random order.
+        The first item of the provided `lst` is correct, and all
+        other items are distractors.
+
+        Ported from wrapper.sage, where upstream added it for MCQ support, so an
+        MCQ outcome can be authored against either runtime. `shuffle` there is
+        Sage's global; here it is random.shuffle, seeded identically by
+        set_random_seed, so the two runtimes agree seed for seed.
+        """
+        choices = [
+            {"item": lst[i], "correct": (i == 0)}
+            for i in range(len(lst))
+        ]
+        random.shuffle(choices)
+        for i in range(len(lst)):
+            choices[i]["letter"] = chr(ord('a') + i)
+        return choices
+
+    @staticmethod
     def latex_system_from_matrix(m, variables="x", alpha_mode=False, variable_list=None):
         if not isinstance(m, CheckItMatrix):
             m = CheckItMatrix(m)

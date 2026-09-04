@@ -51,7 +51,7 @@
                 <xsl:apply-templates select="stx:content[1]"/>
             </xsl:otherwise>
         </xsl:choose>
-        <xsl:apply-templates select="stx:outtro[1]"/>
+        <xsl:apply-templates select="stx:outtro[not(@distractor='true')][1]"/>
         <xsl:text>}</xsl:text>
         <xsl:text>&#xa;</xsl:text>
         <xsl:text>&#xa;</xsl:text>

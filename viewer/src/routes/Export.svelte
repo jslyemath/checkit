@@ -12,7 +12,8 @@
     import { bank } from '../stores/banks';
     import Mustache from 'mustache';
 
-    import {outcomeToHtml, ensureDerivedForSlugs, BUNDLE_UNTIL} from '../utils/index'
+    import {outcomeToHtml, outcomeToMcqChoices, ensureDerivedForSlugs,
+        BUNDLE_UNTIL} from '../utils/index'
 
     // The LMS bank starts above the versions students can browse and stops
     // where precomputation stops. It used to run to 999, which is now past the
@@ -35,7 +36,7 @@
 
     let selectedOutcomeSlugs:Array<string> = []
 
-    let questionType:"essay"|"upload"|"boolean"="upload"
+    let questionType:"essay"|"upload"|"boolean"|"mcq"="upload"
 
     let lms:"canvas"|"brightspace"|"moodle"="canvas"
 
@@ -58,12 +59,17 @@
             "id": id,
             "exercises": Array.from(Array(LMS_SEED_COUNT)).map((_, i) => {
                 let seed=i+LMS_FIRST_SEED
-                return {
+                let exercise:any = {
                     "seed": seed,
                     "generated_on": new Date(Date.now()).toISOString(),
                     "question": outcomeToHtml(o,seed,"canvas","hide"),
                     "answer": outcomeToHtml(o,seed,"canvas","only"),
                 }
+                if (questionType == "mcq") {
+                    exercise.choices = outcomeToMcqChoices(o,seed,"canvas")
+                    exercise.correctChoiceIdent = exercise.choices.find((c:any)=>c.correct)?.ident
+                }
+                return exercise
             })
         }
         ctx[questionType] = true
@@ -241,6 +247,9 @@ outcomes at a time is advised.
                         </option>
                         <option value="boolean">
                             True/false (for feedback support in New Quizzes)
+                        </option>
+                        <option value="mcq">
+                            Multiple choice (experimental)
                         </option>
                     </select>
                 </Col>
