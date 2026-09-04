@@ -147,11 +147,8 @@
                     {#if themed}
                         <p class="text-muted">
                             This bank publishes a LaTeX theme, so the default
-                            template below builds an assessment that looks like
-                            its printed handouts. It uses
-                            <code>&lt;% %&gt;</code> instead of
-                            <code>&#123;&#123; &#125;&#125;</code>, because a
-                            field has to be able to sit inside a LaTeX brace.
+                            template builds an assessment that looks like its
+                            printed handouts.
                         </p>
                     {/if}
                     {#if $assessmentTemplate !== null}

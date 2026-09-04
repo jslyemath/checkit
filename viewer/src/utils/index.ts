@@ -540,6 +540,10 @@ export const renderAssessment = (
         "answerKey": answerKey,
         "exercises": chosen.map((e)=>({
             "latex": body(e),
+            // Prebuilt, because a Mustache field cannot sit directly inside a
+            // LaTeX brace: \skillheader{{{slug}}} renders as \skillheader}.
+            // The two lines arrive assembled so the template never has to.
+            "header": `\\setvseed{${e.seed}}\n\\skillheader{${e.outcome.slug}}`,
             "slug": e.outcome.slug,
             "seed": e.seed,
             "title": e.outcome.title,
