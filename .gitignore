@@ -10,6 +10,8 @@ viewer.zip
 # demo bank
 demo-bank/**/generated
 demo-bank/assets/bank.json
+# Copied from the bank root at build time, and published via docs/.
+demo-bank/assets/*.sty
 demo-bank/dashboard.ipynb
 demo-bank/docs
 

@@ -33,8 +33,33 @@ class Bank():
             )
             for ele in xml.find(f"{CHECKIT_NS}outcomes").iter(f"{CHECKIT_NS}outcome")
         ]
+        # An optional <color_map> of <category prefix="W" color="Violet"/>.
+        # The platform does not draw anything with these; it resolves them so
+        # every consumer agrees on which colour a slug gets.
+        self._color_map = {
+            category.get("prefix"): category.get("color")
+            for category in xml.iter(f"{CHECKIT_NS}category")
+            if category.get("prefix") and category.get("color")
+        }
         for o in self._outcomes:
             o.load_exercises(strict=False)
+
+    def color(self, slug):
+        """The xcolor name for this outcome's box, or None for the default.
+
+        The LONGEST matching prefix wins, so "W" covers W1 and W4-E while a
+        single outcome can still claim its own -- "FCP" takes the entry for
+        "FCP" ahead of the one for "F".
+
+        Resolved here, once, rather than in each consumer: the rule is easy to
+        get subtly wrong, and a print handout and a browser export disagreeing
+        about a colour is exactly the kind of mismatch nobody notices until the
+        pages are side by side.
+        """
+        matches = [p for p in self._color_map if slug.startswith(p)]
+        if not matches:
+            return None
+        return self._color_map[max(matches, key=len)]
     
     def abspath(self):
         return self._abspath
@@ -122,10 +147,16 @@ class Bank():
                 os.remove(target)
 
     def to_dict(self,regenerate=False,remote=None,precompute=True):
-        olist = [
-            o.to_dict(regenerate=regenerate,remote=remote,precompute=precompute)
-            for o in self.outcomes()
-        ]
+        olist = []
+        for o in self.outcomes():
+            d = o.to_dict(regenerate=regenerate,remote=remote,precompute=precompute)
+            # Published resolved, so a browser building a themed document gets
+            # the same box colour the printed handout uses. Absent when the
+            # bank declares no <color_map>, which means "the theme's default".
+            color = self.color(o.slug)
+            if color:
+                d["color"] = color
+            olist.append(d)
         d = {
             "title": self.title,
             "slug": self.slug,

@@ -30,12 +30,29 @@ BANK_XML = """<?xml version='1.0' encoding='UTF-8'?>
     <title>Support Test</title>
     <slug>support-test</slug>
     <url>https://example.org</url>
+    <color_map>
+        <category prefix="F" color="Teal" />
+        <category prefix="FCP" color="Sepia" />
+        <category prefix="W" color="Violet" />
+    </color_map>
     <outcomes>
         <outcome>
             <title>Only</title>
             <slug>ONLY</slug>
             <path>outcomes/ONLY</path>
             <description>One outcome is enough to build a bank.</description>
+        </outcome>
+        <outcome>
+            <title>Checkpoint</title>
+            <slug>FCP</slug>
+            <path>outcomes/FCP</path>
+            <description>Claims a colour of its own, against the F prefix.</description>
+        </outcome>
+        <outcome>
+            <title>Family</title>
+            <slug>F2-E</slug>
+            <path>outcomes/F2-E</path>
+            <description>Covered by the F prefix.</description>
         </outcome>
     </outcomes>
 </bank>
@@ -63,10 +80,11 @@ HELPERS = "\\ProvidesPackage{bank_helpers}\n\\newcommand{\\bhmarker}{helpers}\n"
 class LatexSupportTestCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
-        outcome = os.path.join(self.tmp, "outcomes", "ONLY")
-        os.makedirs(outcome)
-        self.write(os.path.join(outcome, "template.xml"), TEMPLATE)
-        self.write(os.path.join(outcome, "generator.py"), GENERATOR)
+        for slug in ("ONLY", "FCP", "F2-E"):
+            outcome = os.path.join(self.tmp, "outcomes", slug)
+            os.makedirs(outcome)
+            self.write(os.path.join(outcome, "template.xml"), TEMPLATE)
+            self.write(os.path.join(outcome, "generator.py"), GENERATOR)
         self.write(os.path.join(self.tmp, "bank.xml"), BANK_XML)
         self.cwd = os.getcwd()
         os.chdir(self.tmp)
@@ -151,6 +169,26 @@ class LatexSupportTestCase(unittest.TestCase):
 
         self.assertFalse(os.path.exists(self.asset("skillcheckpoints.sty")))
         self.assertEqual(self.bank_json()["latex_support"], [])
+
+    def test_the_longest_matching_colour_prefix_wins(self):
+        """FCP must take its own entry, not the one for F.
+
+        The rule matters because a themed export in the browser and a printed
+        handout both colour a skill box from this map. If they resolved it
+        differently, the mismatch would only show up with the two side by side.
+        """
+        self.build()
+
+        colors = {o["slug"]: o.get("color") for o in self.bank_json()["outcomes"]}
+        self.assertEqual(colors["FCP"], "Sepia")
+        self.assertEqual(colors["F2-E"], "Teal")
+
+    def test_an_outcome_matching_no_prefix_has_no_colour(self):
+        """Absent, not empty -- absent means "the theme's default"."""
+        self.build()
+
+        only = next(o for o in self.bank_json()["outcomes"] if o["slug"] == "ONLY")
+        self.assertNotIn("color", only)
 
     def test_an_edited_theme_republishes(self):
         """The published copy tracks the bank's, not the first build's."""
