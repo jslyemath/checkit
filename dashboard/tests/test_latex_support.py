@@ -1,10 +1,17 @@
-"""Publishing a bank's LaTeX support files.
+r"""Publishing a bank's LaTeX support files.
 
-A bank that prints with checkit-printit keeps its look in a
-`skillcheckpoints.sty` at the bank root, and its own macros in a
-`bank_helpers.sty` beside it. Neither was ever published, so the viewer's
+Raw docstring: it names LaTeX commands, and \usepackage begins with \u, which
+Python otherwise reads as the start of a unicode escape.
+
+A bank that prints with checkit-printit keeps its look in `printit/printit.sty`,
+which that tool installs for the author to edit, and its own macros in a
+`bank_helpers.sty` at the bank root. Neither was published, so the viewer's
 Assessment export could not build a document that looked like the printed one
 -- it had no way to reach the theme.
+
+The theme's source path and its published name differ, which is the part most
+worth pinning down: it is installed in a folder, and published flat, because
+\usepackage takes a package name rather than a path.
 
 These tests cover what a consumer relies on: that the files reach `assets/`,
 that `bank.json` declares them in the order they must be loaded, that a bank
@@ -73,7 +80,7 @@ class Generator(BaseGenerator):
         return {"n": random.randint(0, 10**9)}
 """
 
-THEME = "\\ProvidesPackage{skillcheckpoints}\n\\newcommand{\\scmarker}{theme}\n"
+THEME = "\\ProvidesPackage{printit}\n\\newcommand{\\scmarker}{theme}\n"
 HELPERS = "\\ProvidesPackage{bank_helpers}\n\\newcommand{\\bhmarker}{helpers}\n"
 
 
@@ -97,6 +104,14 @@ class LatexSupportTestCase(unittest.TestCase):
         with open(path, "w", encoding="utf-8") as f:
             f.write(text)
 
+    def theme_path(self):
+        """Where checkit-printit installs a bank's theme."""
+        return os.path.join(self.tmp, "printit", "printit.sty")
+
+    def write_theme(self, text):
+        os.makedirs(os.path.dirname(self.theme_path()), exist_ok=True)
+        self.write(self.theme_path(), text)
+
     def build(self):
         result = CliRunner().invoke(main, ["generate", "-a", "50"])
         self.assertEqual(result.exit_code, 0, result.output)
@@ -110,18 +125,18 @@ class LatexSupportTestCase(unittest.TestCase):
         return os.path.join(self.tmp, "assets", filename)
 
     def test_theme_is_copied_and_declared(self):
-        self.write(os.path.join(self.tmp, "skillcheckpoints.sty"), THEME)
+        self.write_theme(THEME)
         self.build()
 
-        self.assertTrue(os.path.isfile(self.asset("skillcheckpoints.sty")))
-        with open(self.asset("skillcheckpoints.sty"), encoding="utf-8") as f:
+        self.assertTrue(os.path.isfile(self.asset("printit.sty")))
+        with open(self.asset("printit.sty"), encoding="utf-8") as f:
             self.assertEqual(f.read(), THEME)
 
         declared = self.bank_json()["latex_support"]
         self.assertEqual(declared, [{
-            "filename": "skillcheckpoints.sty",
+            "filename": "printit.sty",
             "role": "theme",
-            "path": "assets/skillcheckpoints.sty",
+            "path": "assets/printit.sty",
         }])
 
     def test_load_order_puts_the_theme_before_the_bank_macros(self):
@@ -130,7 +145,7 @@ class LatexSupportTestCase(unittest.TestCase):
         Declaring them as a list is what carries that; a consumer reading a
         dict would have to know the order from somewhere else.
         """
-        self.write(os.path.join(self.tmp, "skillcheckpoints.sty"), THEME)
+        self.write_theme(THEME)
         self.write(os.path.join(self.tmp, "bank_helpers.sty"), HELPERS)
         self.build()
 
@@ -155,20 +170,37 @@ class LatexSupportTestCase(unittest.TestCase):
         self.build()
 
         self.assertEqual(self.bank_json()["latex_support"], [])
-        self.assertFalse(os.path.exists(self.asset("skillcheckpoints.sty")))
+        self.assertFalse(os.path.exists(self.asset("printit.sty")))
 
     def test_removing_the_theme_removes_the_published_copy(self):
         """Otherwise the site keeps serving a theme the bank no longer has."""
-        theme_path = os.path.join(self.tmp, "skillcheckpoints.sty")
-        self.write(theme_path, THEME)
+        theme_path = self.theme_path()
+        self.write_theme(THEME)
         self.build()
-        self.assertTrue(os.path.isfile(self.asset("skillcheckpoints.sty")))
+        self.assertTrue(os.path.isfile(self.asset("printit.sty")))
 
         os.remove(theme_path)
         self.build()
 
-        self.assertFalse(os.path.exists(self.asset("skillcheckpoints.sty")))
+        self.assertFalse(os.path.exists(self.asset("printit.sty")))
         self.assertEqual(self.bank_json()["latex_support"], [])
+
+    def test_a_renamed_theme_stops_being_published(self):
+        """The case the first version of this cleanup missed.
+
+        It only removed files LATEX_SUPPORT still named, so renaming the theme
+        left the old copy served forever -- nothing named it any more, so
+        nothing swept it up. The sweep is by directory for that reason.
+        """
+        self.write_theme(THEME)
+        self.build()
+        stale = self.asset("skillcheckpoints.sty")
+        self.write(stale, "% a theme from a previous name\n")
+
+        self.build()
+
+        self.assertFalse(os.path.exists(stale))
+        self.assertTrue(os.path.isfile(self.asset("printit.sty")))
 
     def test_the_longest_matching_colour_prefix_wins(self):
         """FCP must take its own entry, not the one for F.
@@ -192,14 +224,14 @@ class LatexSupportTestCase(unittest.TestCase):
 
     def test_an_edited_theme_republishes(self):
         """The published copy tracks the bank's, not the first build's."""
-        theme_path = os.path.join(self.tmp, "skillcheckpoints.sty")
-        self.write(theme_path, THEME)
+        theme_path = self.theme_path()
+        self.write_theme(THEME)
         self.build()
 
-        self.write(theme_path, THEME + "\\newcommand{\\second}{edited}\n")
+        self.write_theme(THEME + "\\newcommand{\\second}{edited}\n")
         self.build()
 
-        with open(self.asset("skillcheckpoints.sty"), encoding="utf-8") as f:
+        with open(self.asset("printit.sty"), encoding="utf-8") as f:
             self.assertIn("second", f.read())
 
 

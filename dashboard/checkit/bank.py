@@ -118,8 +118,12 @@ class Bank():
         the ordinary case, not a fault.
         """
         found = []
-        for filename, role in LATEX_SUPPORT:
-            if os.path.isfile(os.path.join(self.abspath(), filename)):
+        for source, role in LATEX_SUPPORT:
+            if os.path.isfile(os.path.join(self.abspath(), source)):
+                # Published flat under its basename: a .sty has to sit beside
+                # the document that loads it, and \usepackage takes a package
+                # name, not a path.
+                filename = os.path.basename(source)
                 found.append({
                     "filename": filename,
                     "role": role,
@@ -133,18 +137,25 @@ class Bank():
         Copied rather than referenced because the viewer only ever fetches
         from the published site; the bank root is not served.
 
-        A file the bank no longer has is deleted from assets/ too. Leaving it
-        behind beside a bank.json that does not list it is the same trap a
-        stale derived.json sets: anything looking for the file instead of
-        reading the declaration would keep finding a theme that was removed.
+        Any other .sty in assets/ is deleted. Leaving one behind beside a
+        bank.json that does not list it is the same trap a stale derived.json
+        sets: anything looking for the file instead of reading the declaration
+        keeps finding a theme that is no longer the bank's.
+
+        The sweep is by directory rather than by the names in LATEX_SUPPORT,
+        because a file this list has stopped naming is exactly the one nothing
+        would clean up -- which is what happened when the theme was renamed and
+        the old copy went on being served.
         """
         published = {e["filename"] for e in self.latex_support()}
-        for filename, _role in LATEX_SUPPORT:
-            target = os.path.join(self.build_path(), filename)
+        for source, _role in LATEX_SUPPORT:
+            filename = os.path.basename(source)
             if filename in published:
-                shutil.copy(os.path.join(self.abspath(), filename), target)
-            elif os.path.exists(target):
-                os.remove(target)
+                shutil.copy(os.path.join(self.abspath(), source),
+                            os.path.join(self.build_path(), filename))
+        for name in os.listdir(self.build_path()):
+            if name.endswith(".sty") and name not in published:
+                os.remove(os.path.join(self.build_path(), name))
 
     def to_dict(self,regenerate=False,remote=None,precompute=True):
         olist = []
