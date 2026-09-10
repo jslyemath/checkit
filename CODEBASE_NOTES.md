@@ -4204,6 +4204,83 @@ disagrees with the URL, so setting `location.hash` to another version is
 silently bounced. Change the version the way a reader does -- set the version
 select's value and dispatch a `change` event.
 
+## The theme belongs to printit, and CheckIt does not know its name (2026-09-09)
+
+`skillcheckpoints.sty` became `printit.sty` and moved to `printit/printit.sty`
+inside the bank, where checkit-printit installs it. This supersedes the
+"shipped as the package default, replaced by a copy in the bank root" entries
+further down, which describe the arrangement before this.
+
+### Why it moved
+
+The default lived inside the printit package and was never written anywhere.
+So a bank that had not hand-written its own theme printed with a theme no other
+tool could see -- and the viewer's Assessment tab, which builds LaTeX from the
+bank's published files, had nothing to build with. Themed handouts, plain web
+export, and nothing saying why.
+
+Now the file always exists in the bank. `checkit-printit install` writes it,
+and `build` writes it the first time and says so, because putting a file in
+someone's repository should not be silent.
+
+### The ownership rule, and what it rules out
+
+**CheckIt holds no constant naming another tool's file.** It publishes what the
+bank declares:
+
+```xml
+<latex-support>
+    <file path="printit/printit.sty" role="theme"/>
+</latex-support>
+```
+
+printit's installer writes that declaration. CheckIt reads it, copies the file
+into `assets/`, and lists it in `bank.json` under `latex_support` -- without
+knowing what wrote it or what it is for.
+
+The first version of this did hardcode `printit/printit.sty` in CheckIt, on the
+reasoning that CheckIt already knows the names `bank_helpers.sty` and
+`tikz_preamble.tex`. That reasoning is wrong, and it is worth writing down why:
+those two are CheckIt's own files, scaffolded by `checkit new`. Naming a file
+belonging to a tool that may never be installed is a hook, not a convention.
+`OWN_LATEX_SUPPORT` now holds only CheckIt's own.
+
+Declared entries publish first, then CheckIt's own, because a bank's macros may
+build on whatever a theme defines.
+
+A declared path that is missing from disk is skipped rather than raising. The
+file is another tool's to install, and a bank cloned before that tool has run
+is a normal state.
+
+### Two bugs, both from a check that looked at the wrong thing
+
+**The cleanup was blind to a rename.** Publishing a theme means the site must
+stop serving one the bank no longer has, so the code deleted published copies
+of files that were no longer present. It did that by looping over the
+*known filenames* and asking, for each, "is this still in the bank?" Renaming
+the theme took `skillcheckpoints.sty` off that list -- so nothing ever asked
+about it again, and `docs/assets/skillcheckpoints.sty` was served indefinitely.
+A cleaner who only tidies rooms on a list will never tidy a room you renamed.
+It now lists what is actually in `assets/` and deletes any `.sty` that is not
+currently declared.
+
+**A path in a comment counted as a declaration.** `declare()` decided whether
+the manifest already named the theme with a substring search. mat-106's
+`bank.xml` mentions `printit/printit.sty` in a comment about `\skillheader`, so
+the search matched, the declaration was skipped, and the theme was never
+published. It parses the XML for a real `<file path="...">` now.
+
+Both were caught by looking at the result -- the directory listing, the written
+manifest -- rather than at the code that was supposed to produce it. Same shape
+as the merge that lost its content.
+
+### What the rename costs
+
+The archived quizzes in mat-106's `TeX Outputs/` and the hand-written course
+still say `\usepackage{skillcheckpoints}`. Recompiling one needs the old `.sty`,
+which is in git history. Accepted deliberately: only two people use this system,
+and moving forward was worth more than compatibility with the old name.
+
 ## The ordering problem could ask for the same number twice (2026-09-04)
 
 Found in class, on a checkpoint students were taking. Problems 17 and 18 ask a

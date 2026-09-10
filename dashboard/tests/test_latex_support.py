@@ -3,15 +3,21 @@ r"""Publishing a bank's LaTeX support files.
 Raw docstring: it names LaTeX commands, and \usepackage begins with \u, which
 Python otherwise reads as the start of a unicode escape.
 
-A bank that prints with checkit-printit keeps its look in `printit/printit.sty`,
-which that tool installs for the author to edit, and its own macros in a
-`bank_helpers.sty` at the bank root. Neither was published, so the viewer's
-Assessment export could not build a document that looked like the printed one
--- it had no way to reach the theme.
+A bank may carry LaTeX that the viewer's Assessment export needs in order to
+build a document resembling the printed handouts. Two sources:
 
-The theme's source path and its published name differ, which is the part most
-worth pinning down: it is installed in a folder, and published flat, because
-\usepackage takes a package name rather than a path.
+  - files another tool installed, which the bank declares in `bank.xml` under
+    <latex-support>. CheckIt publishes them without knowing what wrote them.
+  - `bank_helpers.sty`, which CheckIt scaffolds itself.
+
+The declaration is the part worth covering. CheckIt deliberately holds no
+constant naming another tool's file, so an undeclared file is not published no
+matter what it is called -- and a declared path that is missing from disk is
+skipped rather than raising, because installing it is the other tool's job and
+a fresh clone is a normal state.
+
+Source path and published name differ too: installed in a folder, published
+flat, because \usepackage takes a package name rather than a path.
 
 These tests cover what a consumer relies on: that the files reach `assets/`,
 that `bank.json` declares them in the order they must be loaded, that a bank
@@ -37,6 +43,9 @@ BANK_XML = """<?xml version='1.0' encoding='UTF-8'?>
     <title>Support Test</title>
     <slug>support-test</slug>
     <url>https://example.org</url>
+    <latex-support>
+        <file path="printit/printit.sty" role="theme"/>
+    </latex-support>
     <color_map>
         <category prefix="F" color="Teal" />
         <category prefix="FCP" color="Sepia" />
@@ -64,6 +73,16 @@ BANK_XML = """<?xml version='1.0' encoding='UTF-8'?>
     </outcomes>
 </bank>
 """
+
+# The declaration the fixture adds, and the same file without it -- one
+# test removes it to check an undeclared file stays unpublished.
+NEW_XML = """    <url>https://example.org</url>
+    <latex-support>
+        <file path="printit/printit.sty" role="theme"/>
+    </latex-support>
+    <color_map>"""
+OLD_XML = """    <url>https://example.org</url>
+    <color_map>"""
 
 TEMPLATE = """<?xml version='1.0' encoding='UTF-8'?>
 <knowl mode="exercise" xmlns="https://spatext.clontz.org" version="0.3">
@@ -201,6 +220,25 @@ class LatexSupportTestCase(unittest.TestCase):
 
         self.assertFalse(os.path.exists(stale))
         self.assertTrue(os.path.isfile(self.asset("printit.sty")))
+
+    def test_an_undeclared_file_is_not_published(self):
+        """CheckIt names no tool's file, so an undeclared one is invisible to
+        it however it is spelled. This is what keeps CheckIt free of hooks for
+        tools that may never be installed."""
+        self.write(os.path.join(self.tmp, "bank.xml"),
+                   BANK_XML.replace(NEW_XML, OLD_XML))
+        self.write_theme(THEME)
+        self.build()
+
+        self.assertEqual(self.bank_json()["latex_support"], [])
+        self.assertFalse(os.path.exists(self.asset("printit.sty")))
+
+    def test_a_declared_but_missing_file_is_skipped(self):
+        """A bank cloned before the installing tool has run. Normal, not
+        broken -- so the build carries on without it."""
+        self.build()
+
+        self.assertEqual(self.bank_json()["latex_support"], [])
 
     def test_the_longest_matching_colour_prefix_wins(self):
         """FCP must take its own entry, not the one for F.
