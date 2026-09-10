@@ -135,6 +135,28 @@ def _support_files(bank_root):
     return found
 
 
+def _log_errors(log_path, limit=8):
+    """Error lines from a pdflatex log.
+
+    LaTeX writes errors as a line beginning "! ", and carries on afterwards
+    whenever it can. That recovery is why checking for a PDF is not enough:
+    the file exists and the picture is wrong. Two silent cases reached
+    published images before this was checked -- an undefined colour drew black,
+    and an undefined \\dfrac dropped the fraction bar and printed "56".
+
+    Warnings are left alone. Overfull boxes and font substitutions are normal
+    in a figure and would make this too noisy to keep on.
+    """
+    if not os.path.isfile(log_path):
+        return []
+    with open(log_path, encoding="utf-8", errors="replace") as f:
+        lines = f.read().splitlines()
+    errors = [line.strip() for line in lines if line.startswith("!")]
+    if len(errors) > limit:
+        errors = errors[:limit] + [f"... and {len(errors) - limit} more"]
+    return errors
+
+
 def _compile_one(tikz_path, png_path, name, preamble, bank_root=None):
     with tempfile.TemporaryDirectory() as tmp:
         shutil.copy(tikz_path, os.path.join(tmp, f"{name}.tikz"))
@@ -150,8 +172,10 @@ def _compile_one(tikz_path, png_path, name, preamble, bank_root=None):
             f.write(f"\\input{{{name}.tikz}}\n")
             f.write("\\end{document}\n")
         # pdflatex can exit non-zero on RECOVERABLE errors while still
-        # producing a valid PDF, so we don't use check=True here. Instead we
-        # judge success by whether figure.pdf was actually written.
+        # producing a valid PDF, so we don't use check=True here. A PDF being
+        # written is necessary but NOT sufficient: the log is checked below,
+        # because "recovered" means pdflatex carried on drawing something --
+        # not that the something is right.
         # stdin=DEVNULL: some errors drop pdflatex to an interactive prompt even
         # under nonstopmode; feeding it empty input makes it exit instead of
         # hanging forever. Unfortunately this still doesn't work correctly.
@@ -178,6 +202,19 @@ def _compile_one(tikz_path, png_path, name, preamble, bank_root=None):
                 f"pdflatex failed to produce a PDF for {name} "
                 f"(from {tikz_path}).\n"
                 f"--- pdflatex output ---\n{result.stdout}\n{result.stderr}"
+            )
+        errors = _log_errors(os.path.join(tmp, "figure.log"))
+        if errors:
+            raise RuntimeError(
+                f"pdflatex reported errors while compiling {name} "
+                f"(from {tikz_path}). A PDF was still produced, but a figure "
+                f"drawn through an error is not the figure that was asked for "
+                f"-- an undefined colour silently draws black, an undefined "
+                f"\\dfrac silently drops the fraction bar.\n"
+                + "\n".join(f"  {line}" for line in errors)
+                + f"\n\nThe figure's preamble comes from tikz_preamble.tex in "
+                  f"the bank root, or CheckIt's default. Anything the figure "
+                  f"uses has to be loaded there."
             )
         # PDF -> PNG. This step has no recoverable-error quirk, so a non-zero
         # exit is a genuine failure; surface the output if it happens.
