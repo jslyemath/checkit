@@ -156,6 +156,7 @@ class LatexSupportTestCase(unittest.TestCase):
             "filename": "printit.sty",
             "role": "theme",
             "path": "assets/printit.sty",
+            "source": "printit/printit.sty",
         }])
 
     def test_load_order_puts_the_theme_before_the_bank_macros(self):

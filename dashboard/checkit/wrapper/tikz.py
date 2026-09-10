@@ -104,15 +104,45 @@ def _load_preamble(bank_root):
         return PREAMBLE + "\\usepackage{bank_helpers}\n"
     return PREAMBLE
 
+def _support_files(bank_root):
+    """Every .sty a figure's preamble may load, as (source, filename).
+
+    `bank_helpers.sty`, plus whatever the bank declares under <latex-support>.
+    A declared file is usually a theme installed by some other tool, and a
+    figure drawn against that theme is the point: it makes the picture on the
+    website and the picture in the printed handout the same picture, rather
+    than two drawings kept looking alike by hand.
+
+    Imported here rather than at module scope, because bank.py imports this
+    module.
+    """
+    from ..bank import Bank
+
+    found = []
+    helpers = os.path.join(bank_root, BANK_HELPERS_STY)
+    if os.path.isfile(helpers):
+        found.append((helpers, BANK_HELPERS_STY))
+    try:
+        declared = Bank(bank_root).latex_support()
+    except Exception:
+        # A figure build must not fail because the manifest is unreadable;
+        # `checkit generate` has already parsed it and reported anything wrong.
+        return found
+    for entry in declared:
+        source = os.path.join(bank_root, entry["source"])
+        if os.path.isfile(source):
+            found.append((source, entry["filename"]))
+    return found
+
+
 def _compile_one(tikz_path, png_path, name, preamble, bank_root=None):
     with tempfile.TemporaryDirectory() as tmp:
         shutil.copy(tikz_path, os.path.join(tmp, f"{name}.tikz"))
         # pdflatex runs in the temp directory, so anything the preamble loads
         # has to be there too.
         if bank_root:
-            sty = os.path.join(bank_root, BANK_HELPERS_STY)
-            if os.path.isfile(sty):
-                shutil.copy(sty, os.path.join(tmp, BANK_HELPERS_STY))
+            for source, filename in _support_files(bank_root):
+                shutil.copy(source, os.path.join(tmp, filename))
         wrapper_tex = os.path.join(tmp, "figure.tex")
         with open(wrapper_tex, "w") as f:
             f.write(preamble)

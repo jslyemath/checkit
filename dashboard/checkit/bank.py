@@ -145,6 +145,11 @@ class Bank():
                 "filename": filename,
                 "role": role,
                 "path": f"assets/{filename}",
+                # Where it lives in the bank. Needed by anything that has to
+                # put the file somewhere else -- figure compilation stages it
+                # into a temp directory -- and harmless in bank.json, which a
+                # browser reads for `path` alone.
+                "source": source,
             })
         return found
 
