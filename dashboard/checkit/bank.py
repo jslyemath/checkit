@@ -5,7 +5,7 @@ from . import static
 from .outcome import Outcome
 from .xml import CHECKIT_NS, optional_text, has_flag
 from . import (PUBLIC_SEEDS, BUNDLE_UNTIL, INLINE_FORMATS, BUNDLE_FORMATS,
-               BUNDLE_FILENAME, LATEX_SUPPORT, VERSION)
+               BUNDLE_FILENAME, OWN_LATEX_SUPPORT, VERSION)
 
 class Bank():
     def __init__(self, path="."):
@@ -41,6 +41,15 @@ class Bank():
             for category in xml.iter(f"{CHECKIT_NS}category")
             if category.get("prefix") and category.get("color")
         }
+        # Optional <latex-support> of <file path="..." role="..."/>. Written by
+        # whichever tool installed the file -- CheckIt publishes what is
+        # declared without knowing what any of it is for, which is what keeps a
+        # tool CheckIt does not ship from needing a mention in CheckIt's code.
+        self._declared_support = [
+            (ele.get("path"), ele.get("role") or "support")
+            for ele in xml.iter(f"{CHECKIT_NS}file")
+            if ele.get("path")
+        ]
         for o in self._outcomes:
             o.load_exercises(strict=False)
 
@@ -110,25 +119,33 @@ class Bank():
         return p
 
     def latex_support(self):
-        """The LaTeX support files this bank actually has, in load order.
+        """The LaTeX support files this bank has, in load order.
 
-        Returns the entries of LATEX_SUPPORT whose file exists in the bank
-        root, each as a dict naming the file and where the published site
-        serves it. Absent files are simply absent -- a bank with no theme is
-        the ordinary case, not a fault.
+        Two sources, in this order: whatever `bank.xml` declares under
+        <latex-support>, then CheckIt's own scaffolded files. A bank's macros
+        may build on a theme installed by another tool, so the declared ones
+        come first.
+
+        A path that is declared but missing from disk is skipped rather than
+        raising. The file is another tool's to install, and a bank cloned
+        before that tool ran is a normal state, not a broken one.
         """
         found = []
-        for source, role in LATEX_SUPPORT:
-            if os.path.isfile(os.path.join(self.abspath(), source)):
-                # Published flat under its basename: a .sty has to sit beside
-                # the document that loads it, and \usepackage takes a package
-                # name, not a path.
-                filename = os.path.basename(source)
-                found.append({
-                    "filename": filename,
-                    "role": role,
-                    "path": f"assets/{filename}",
-                })
+        seen = set()
+        for source, role in list(self._declared_support) + list(OWN_LATEX_SUPPORT):
+            if source in seen or not os.path.isfile(
+                    os.path.join(self.abspath(), source)):
+                continue
+            seen.add(source)
+            # Published flat under its basename: a .sty has to sit beside the
+            # document that loads it, and \usepackage takes a package name,
+            # not a path.
+            filename = os.path.basename(source)
+            found.append({
+                "filename": filename,
+                "role": role,
+                "path": f"assets/{filename}",
+            })
         return found
 
     def copy_latex_support(self):
@@ -147,10 +164,12 @@ class Bank():
         would clean up -- which is what happened when the theme was renamed and
         the old copy went on being served.
         """
-        published = {e["filename"] for e in self.latex_support()}
-        for source, _role in LATEX_SUPPORT:
+        entries = self.latex_support()
+        published = {e["filename"] for e in entries}
+        for source, _role in list(self._declared_support) + list(OWN_LATEX_SUPPORT):
             filename = os.path.basename(source)
-            if filename in published:
+            if filename in published and os.path.isfile(
+                    os.path.join(self.abspath(), source)):
                 shutil.copy(os.path.join(self.abspath(), source),
                             os.path.join(self.build_path(), filename))
         for name in os.listdir(self.build_path()):

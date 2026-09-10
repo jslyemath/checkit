@@ -63,24 +63,18 @@ BUNDLE_FILENAME = "derived.json"
 # without paying to publish it.
 BUNDLE_UNTIL = 400
 
-# LaTeX support files a bank may carry, published alongside it so a browser
-# can build a document that looks like the printed one. Paths are relative to
-# the bank root; each is published flat in assets/ under its own basename.
+# LaTeX support files CheckIt itself puts in a bank, published alongside it so
+# a browser can build a document that uses them.
 #
-# `printit/printit.sty` is written and owned by checkit-printit, which installs
-# it into a bank for the author to edit. CheckIt neither creates nor
-# interprets it -- it publishes the file so the viewer can reach it, the same
-# way it already knows the names `bank_helpers.sty` and `tikz_preamble.tex`
-# without owning those either.
+# Only CheckIt's own files belong here. Anything a *different* tool installs is
+# declared by the bank in `bank.xml`, under <latex-support>, and CheckIt
+# publishes it without knowing what wrote it or what it is for -- see
+# Bank.latex_support(). A constant here naming another tool would be a hook for
+# something that may never be installed.
 #
-# The order is the order they must be \usepackage'd: the theme decides the
-# layout, and the bank's own macros come after so they can build on it. Getting
-# that backwards fails as a missing command rather than as a sequencing
-# mistake, so it is encoded here and published as a list.
-#
-# Neither file is required. A bank with no theme gets the viewer's generic
-# assessment template, exactly as before.
-LATEX_SUPPORT = (
-    ("printit/printit.sty", "theme"),
+# Declared entries are published first, then these, because a bank's own macros
+# may build on whatever a theme defines. Getting that backwards fails as a
+# missing command rather than as a sequencing mistake.
+OWN_LATEX_SUPPORT = (
     ("bank_helpers.sty", "helpers"),
 )
