@@ -171,9 +171,22 @@ class Outcome():
         if not regenerate:
             try:
                 self.load_exercises()
-                return
             except RuntimeError:
                 pass # generation is necessary
+            else:
+                # The seeds are already here, so nothing needs generating --
+                # but the images might still be missing, and returning now
+                # ignored --images entirely. Asking for figures and silently
+                # getting none is how a bank ends up published with images for
+                # the first handful of versions and nothing after.
+                #
+                # The .tikz files were written during generation, so they can
+                # be rasterized without regenerating anything; figures whose
+                # PNG is already current are skipped, making this cheap when
+                # there is nothing to do.
+                if images:
+                    compile_tikz_for_outcome(self,image_seeds=image_seeds)
+                return
         run_generator(self,self.seeds_json_path(),preview=False,images=images,amount=amount,image_seeds=image_seeds)
         if images:
             compile_tikz_for_outcome(self,image_seeds=image_seeds)
