@@ -1,3 +1,4 @@
+import concurrent.futures
 import os, shutil, subprocess, tempfile
 
 PREAMBLE = r"""\documentclass[tikz,border=4pt]{standalone}
@@ -25,7 +26,9 @@ def compile_tikz_for_outcome(outcome, image_seeds=None):
     """
     generated = outcome.build_path()  # assets/<slug>/generated/
     preamble = _load_preamble(outcome.bank.abspath())
-    compiled = 0
+    bank_root = outcome.bank.abspath()
+
+    pending = []
     skipped = 0
     for entry in sorted(os.listdir(generated)):
         seed_dir = os.path.join(generated, entry)
@@ -33,7 +36,7 @@ def compile_tikz_for_outcome(outcome, image_seeds=None):
             continue
         if image_seeds is not None and _seed_number(seed_dir) >= image_seeds:
             continue
-        for fname in os.listdir(seed_dir):
+        for fname in sorted(os.listdir(seed_dir)):
             if not fname.endswith(".tikz"):
                 continue
             name = fname[:-5]
@@ -42,19 +45,55 @@ def compile_tikz_for_outcome(outcome, image_seeds=None):
             if _png_is_current(tikz_path, png_path):
                 skipped += 1
                 continue
-            _compile_one(
-                tikz_path=tikz_path,
-                png_path=png_path,
-                name=name,
-                preamble=preamble,
-                bank_root=outcome.bank.abspath(),
-            )
-            compiled += 1
+            pending.append((tikz_path, png_path, name))
+
+    # Each figure is an independent pdflatex in its own temp directory, and
+    # nearly all of the ~2s it takes is that process starting up and reading
+    # the preamble. Nothing is shared, so they run at once; threads are enough
+    # because the work happens in subprocesses.
+    #
+    # This matters at the scale a real bank reaches. mat-106's F2 alone is
+    # about 2,000 figures, which is over an hour one at a time.
+    compiled = 0
+    if pending:
+        workers = min(_worker_count(), len(pending))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [
+                pool.submit(_compile_one, tikz_path=t, png_path=p, name=n,
+                            preamble=preamble, bank_root=bank_root)
+                for t, p, n in pending
+            ]
+            for future in concurrent.futures.as_completed(futures):
+                # Raising here cancels what has not started. Figures already
+                # written stay on disk and are skipped next run, so a failure
+                # costs only the work in flight.
+                future.result()
+                compiled += 1
+
     if compiled or skipped:
         print(
             f"{outcome.slug}: compiled {compiled} TikZ figure(s), "
             f"skipped {skipped} already up to date"
         )
+
+
+def _worker_count():
+    """How many figures to compile at once.
+
+    One per core, capped: past a point the machine is waiting on disk rather
+    than doing more work, and a build should leave the laptop usable.
+    CHECKIT_TIKZ_WORKERS overrides it, and 1 restores the old serial order for
+    debugging a figure that only fails under load.
+    """
+    override = os.environ.get("CHECKIT_TIKZ_WORKERS")
+    if override:
+        try:
+            return max(1, int(override))
+        except ValueError:
+            raise RuntimeError(
+                f"CHECKIT_TIKZ_WORKERS must be a whole number, got {override!r}"
+            )
+    return max(1, min(8, (os.cpu_count() or 2) - 1))
 
 def _seed_number(seed_dir):
     """Seed directories are named for their seed (`f"{seed:04}"` in
