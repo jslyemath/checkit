@@ -498,10 +498,30 @@ export const parseMath = (html:string) => {
 export const defaultTemplateFor = (bank:Bank):string =>
     bankHasTheme(bank) ? themedAssessmentTemplate : assessmentTemplate
 
-/** Pick one random version of each outcome. Separate from rendering, so the
- *  same assessment can be re-rendered -- with an answer key, say -- without
- *  quietly drawing a different set of exercises underneath the instructor. */
-export const pickAssessmentExercises = (bank:Bank, slugs:string[]) => {
+/** A seeded PRNG, because JavaScript has no way to seed Math.random.
+ *
+ *  mulberry32: one 32-bit state word, good enough for choosing exercises and
+ *  short enough to read. The point is not statistical quality -- it is that
+ *  the same number always deals the same assessment, so an instructor can
+ *  rebuild the paper a student is holding. */
+export const mulberry32 = (a:number) => () => {
+    a |= 0
+    a = a + 0x6D2B79F5 | 0
+    let t = Math.imul(a ^ a >>> 15, 1 | a)
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t
+    return ((t ^ t >>> 14) >>> 0) / 4294967296
+}
+
+/** A fresh version number. Six digits: long enough not to collide across a
+ *  term, short enough to read off a page and type back in -- which a
+ *  millisecond timestamp was not. */
+export const newAssessmentVersion = () => Math.floor(Math.random() * 900000) + 100000
+
+/** Pick one version of each outcome, dealt from `version`. Separate from
+ *  rendering, so the same assessment can be re-rendered -- with an answer key,
+ *  say -- without quietly drawing a different set underneath the instructor. */
+export const pickAssessmentExercises = (bank:Bank, slugs:string[], version:number) => {
+    const random = mulberry32(version)
     const chosen: {outcome:Outcome, seed:number}[] = []
     slugs.forEach( (slug) => {
         let o = getOutcomeFromSlug(bank,slug)
@@ -511,7 +531,7 @@ export const pickAssessmentExercises = (bank:Bank, slugs:string[]) => {
             // published for the browser to read.
             const top = Math.min(o.exercises.length, BUNDLE_UNTIL)
             let seed = Math.floor(
-                Math.random() * (top-PUBLIC_SEEDS)
+                random() * (top-PUBLIC_SEEDS)
             )+PUBLIC_SEEDS;
             chosen.push({outcome:o, seed:seed})
         }
@@ -524,6 +544,7 @@ export const renderAssessment = (
     chosen:{outcome:Outcome, seed:number}[],
     template:string=defaultTemplateFor(bank),
     answerKey:boolean=false,
+    version:number=0,
 ) => {
     const themed = bankHasTheme(bank)
     // A themed document defines the SpaTeXt commands once in its preamble, so
@@ -535,7 +556,11 @@ export const renderAssessment = (
     }
     const descriptions = skillDescriptions(chosen.map((e)=>e.outcome))
     const context = {
-        "version": Date.now(),
+        // The number that deals this assessment, not the clock. It is printed
+        // in the header, so it can be typed back in to rebuild these same
+        // exercises -- and it no longer changes when the answer key is ticked,
+        // because it is passed in rather than read fresh on every render.
+        "version": version,
         "bankTitle": bank.title,
         "answerKey": answerKey,
         "exercises": chosen.map((e)=>({
@@ -586,4 +611,6 @@ export const getRandomAssessmentFromSlugs = (
     slugs:string[],
     template:string=defaultTemplateFor(bank),
     answerKey:boolean=false,
-) => renderAssessment(bank, pickAssessmentExercises(bank,slugs), template, answerKey)
+    version:number=newAssessmentVersion(),
+) => renderAssessment(
+    bank, pickAssessmentExercises(bank,slugs,version), template, answerKey, version)
