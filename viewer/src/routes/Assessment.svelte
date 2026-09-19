@@ -16,7 +16,7 @@
     import { bank } from '../stores/banks';
     import { getOutcomeFromSlug, pickAssessmentExercises, renderAssessment,
         ensureDerivedForSlugs, ensureLatexSupport, bankHasTheme,
-        defaultTemplateFor } from '../utils';
+        defaultTemplateFor, newAssessmentVersion } from '../utils';
     import type { Assessment, Outcome } from '../types';
     import Exercise from '../components/Exercise.svelte'
 
@@ -47,14 +47,26 @@
     // ticking the answer key re-renders these same versions. Re-picking would
     // hand back a key for an assessment the instructor never saw.
     let chosen: {outcome:Outcome, seed:number}[] = []
+
+    // The number that deals the assessment. Blank asks for a new one; typing
+    // a previous number back rebuilds that same paper, which is the whole
+    // reason it is printed in the header.
+    let version: number = 0
+    let versionEntry: string = ""
     const generate = async () => {
         generateError = ""
+        const asked = parseInt(versionEntry.trim())
+        if (versionEntry.trim() !== "" && !Number.isFinite(asked)) {
+            generateError = `"${versionEntry}" is not a version number.`
+            return
+        }
+        version = versionEntry.trim() === "" ? newAssessmentVersion() : asked
         try {
             await ensureDerivedForSlugs($bank,$assessmentOutcomeSlugs)
             await ensureLatexSupport($bank)
-            chosen = pickAssessmentExercises($bank,$assessmentOutcomeSlugs)
+            chosen = pickAssessmentExercises($bank,$assessmentOutcomeSlugs,version)
             generatedAssessment = renderAssessment(
-                $bank,chosen,effectiveTemplate,answerKey)
+                $bank,chosen,effectiveTemplate,answerKey,version)
         } catch (e) {
             generatedAssessment = undefined
             generateError = e instanceof Error ? e.message : String(e)
@@ -64,7 +76,7 @@
     // the preview never disagrees with what the buttons would export.
     $: if (chosen.length) {
         generatedAssessment = renderAssessment(
-            $bank,chosen,effectiveTemplate,answerKey)
+            $bank,chosen,effectiveTemplate,answerKey,version)
     }
 
     const copyToClipboard = (text:string) => () => {
@@ -175,6 +187,27 @@
                     Clicking "Generate" will choose a random exercise assessing
                     each outcome.
                 </p>
+                <FormGroup class="mb-2">
+                    <Label for="versionEntry">
+                        Version number
+                        <span class="text-muted">
+                            — leave blank for a new assessment, or enter the
+                            number printed on an earlier one to rebuild it
+                        </span>
+                    </Label>
+                    <Input
+                        type="text"
+                        id="versionEntry"
+                        style="max-width: 12em"
+                        placeholder="new"
+                        bind:value={versionEntry} />
+                </FormGroup>
+                {#if generatedAssessment}
+                    <p>
+                        This is version <strong>{version}</strong>, printed in
+                        the header. The same number rebuilds these exercises.
+                    </p>
+                {/if}
                 {#if themed}
                     <!-- Only offered on a themed bank: the key needs the
                          theme's \ifanstoggle to show answers, and the generic
