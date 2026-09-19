@@ -9,7 +9,7 @@ the long-form history is in `CODEBASE_NOTES.md` (5,000+ lines, not auto-loaded
 | path | what it is |
 |---|---|
 | `Projects/checkit` | the platform, a fork of StevenClontz/checkit. `dashboard/` is the Python package, `viewer/` the Svelte app, `docs/demo/` the demo site |
-| `Projects/mat-106-checkit` | the live bank. 28 outcomes, publishes to `docs/` |
+| `Projects/mat-106-checkit` | the live bank. 29 outcomes, publishes to `docs/` |
 | `Projects/checkit-printit` | the print tool. Separate repo, separate install |
 | `Projects/mat-206-checkit` | **frozen. Do not modify or push.** Being rebuilt from scratch later |
 | `Projects/FundCheck` | not a git repo. The pre-port FCP script and ~120 `.tex` files **with real student names** |
