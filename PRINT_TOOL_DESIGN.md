@@ -847,10 +847,47 @@ enable the Google Forms API in the Library, and create an OAuth client ID of
 type **Desktop app**.
 
 A Workspace admin can also restrict third-party app access domain-wide, which
-only shows up at the first token request. The fallback if any of that is
-closed: an **Apps Script bound to the form**, deployed as a web app. It runs as
-the instructor, needs no OAuth client, and printit POSTs to its URL. Worse in
-every way except that it works.
+only shows up at the first token request.
+
+**Settled 2026-09-20: the institutional account cannot create Cloud projects,
+so Apps Script is the primary path and the Forms API is the alternative.** The
+existing Control Center is already an Apps Script that writes this form, which
+is proof the permission exists and that the approach works.
+
+A **script bound to the form**, deployed as a web app executing as the
+instructor, needs no Cloud project, no OAuth client, no consent screen and no
+token. printit calls it over HTTPS.
+
+**Correcting a claim made while reaching that conclusion:** a CLI *can* do an
+interactive browser login. The OAuth installed-application flow opens the
+system browser and catches the redirect on `http://localhost:<port>`;
+`InstalledAppFlow.run_local_server()` is a dozen lines. What a CLI cannot do
+without a Cloud project is *have an OAuth client to log in with*. So the web
+app authenticates with a shared secret not because interactive login is
+impossible, but because the alternative needs the unavailable thing. If the
+access situation ever changes, this reverses.
+
+A web app that can rewrite the form is a capability URL. It must require a long
+shared secret in the request body and reject anything without it; the secret
+lives in the workspace's `secrets/` directory.
+
+**Deployment is not copy-and-paste.** `clasp`, Google's Apps Script CLI, clones
+a script to local files and pushes them back:
+
+```
+clasp clone <scriptId>   # once
+clasp push               # after every edit
+clasp deploy             # publish a new version of the web app
+```
+
+The script source then lives in the printit repository as ordinary files, in
+git and reviewable in a diff. `clasp login` uses clasp's own OAuth client, so
+it needs no Cloud project -- but it does need the Apps Script API switched on
+at `script.google.com/home/usersettings`, a per-user toggle an admin can lock.
+
+**The CSV fallback survives the Sheet.** Google Forms exports responses to CSV
+from the form itself, so the import path in 4.2 keeps working with no
+spreadsheet in the picture.
 
 **The CSV import path stays permanently.** Scopes lapse and admins change
 policy; the CSV path is the whole pipeline minus one adapter and it works
@@ -905,5 +942,86 @@ unchanged. That last step is the test that matters.
    the synonym table needs one real file to be checked against.
 3. `.xlsx` support needs a dependency (`openpyxl`). Small, but the tool has none
    beyond `click` and `jinja2` today.
-4. Whether `availability.toml` should also carry the "how many skills" wording
-   used in the form, or derive it from `choose` (three -> "THREE").
+4. ~~Whether `availability.toml` should carry the "how many skills" wording, or
+   derive it.~~ **Settled 2026-09-20: derive it**, reusing the Control Center's
+   own number-word table (0-40, where 0 means "any"). See 12.10.
+5. Whether the Apps Script API toggle is available on the institutional
+   account, which decides whether `clasp` can be used or the script really is
+   pasted by hand.
+
+### 12.10 The Control Center, and what replaces it
+
+The existing system is a Google Sheet with a bound Apps Script. **It is being
+retired.** Going forward there is a Google Form with a script attached to it,
+and printit does everything else the Sheet was doing.
+
+The script is the specification for the half that stays with Google, and a
+useful record of behaviour that exists nowhere else.
+
+| Apps Script function | what it does | where it goes |
+|---|---|---|
+| `coreCallSystem`, `refreshCallList` | rotating cold-call list with a per-student skip flag, re-inserting unchecked students at random positions | **GUI** -- a feature not previously on any list here |
+| `randomizeSeating` | shuffle the roster into seats, filtered by section and by dropped | GUI, writing `seating.toml` |
+| `shuffleSelectedStudents` | swap two selected seats, or shuffle more than two | GUI |
+| `importStudentChoices` | join seating + roster + responses + the three selection modes + extras | printit, built -- minus the response join |
+| `generateTexFile` | build `main.tex` | printit, built |
+| `printAndReset` | append the run to a Printed sheet, then clear the settings | printit: the manifest and `record.db`; "reset" becomes "a job is one-shot" |
+| `updateSelectionsForm` | push the week's slots into the form | the form-bound script, driven by printit |
+| `emailMissingStudents` | templated mail to non-responders, substituting `$FIRSTNAME`, `$ASSESSMENT`, `$DUEDATE` and friends | later; the variable set is the spec |
+
+**What `updateSelectionsForm` establishes:**
+
+1. **It locates items by type and index** -- `getItems(CHECKBOX)[0]` and `[1]`,
+   `getItems(SECTION_HEADER)[0]` and `[1]`. Inserting one section header above
+   them silently retargets every write. This is the concrete argument for
+   recording ids in `form.toml`; `FormApp` items expose `getId()`.
+
+2. **Number words 0-40, where 0 means "any"**, in both lower case (body text)
+   and upper case (the question title).
+
+3. **Three limiter modes, not one** -- "At Most", "At Least", and exactly --
+   each with a matching `requireSelectAtMost` / `AtLeast` / `Exactly`
+   validation and its own help text. So `availability.toml` carries a `limit`
+   alongside `choose`:
+
+   ```toml
+   [assessment]
+   choose = 3
+   limit  = "at most"     # at most | at least | exactly
+   ```
+
+4. **The no-skills-available state is deliberate.** One option reading "(No
+   skills are available yet. Check back later!)" plus
+   `requireSelectAtLeast(100)`, which makes the form unsubmittable. Preserve
+   it rather than rediscovering it.
+
+5. **The auto-attached explanation suffix is dead.** The script appends
+   "(X will be included on the back side automatically.)" to a skill with an
+   associated explanation. Section 10 deprecated that -- explanations are
+   standalone outcomes now -- so it is not carried forward.
+
+**What `importStudentChoices` establishes:**
+
+6. **Responses are scoped to an assessment by date, not by a time window.**
+   `filterArrayBySingleDateCriterion(responses, 0, 2, GetDate)` matches the
+   month and day of the response's date column against the assessment date.
+   That is what the "Confirm Skill Checkpoint Date" checkbox is *for*: it is
+   the scoping key, not merely a nudge. A form accumulates responses all term,
+   so `form pull` has to scope the same way.
+
+7. **Latest response wins** -- sorted by timestamp descending, first match per
+   student. This is what the 2026-09-18 run did by hand, so the tool inherits
+   existing semantics rather than inventing them.
+
+8. **Extras cycle through the version letters** (`allVariants[i % length]`).
+   printit shuffles instead, which is what section 10 chose. Noted so the
+   difference reads as intentional.
+
+**The Sheet also held state that now belongs to the workspace**: the roster
+with dropped flags, the seating charts, the available-skills list with its
+tick boxes, the Printed log, the email templates, and the run settings
+(title, date, key count, extras count, the three selection modes). Those map
+onto `roster.toml`, `seating.toml`, `availability.toml`, `record.db` and the
+job's `publication.toml` respectively -- which is what 12.1 through 12.4
+describe.
+
