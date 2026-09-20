@@ -933,21 +933,30 @@ unchanged. That last step is the test that matters.
 | Patch recorded item ids; never recreate form or question | responses are keyed to `questionId` |
 | Printed and attempted are different facts | the build cannot know who was in the room |
 | No retake cap | none exists in the course |
+| Workspaces live in `~/CheckItPrintIt/workspaces/<name>/` | beside the job folders and the output, all outside every repo; configurable later if anyone needs it |
+| `workspace init` offers to adopt the newest job's roster and seating | there are already three copies on disk and none of them should be retyped; it prints which files it read |
+| `openpyxl` is added as a dependency | Banner and the seating charts both arrive as `.xlsx`, and requiring a save-as-CSV first defeats an importer whose purpose is removing manual steps |
+| Responses stay scoped by the confirmed date | it is what the current system does, it survives a late submission that a timestamp window would miss, and the confirmation question already exists |
+| The cold-call system waits for the seating GUI | it belongs at the top of that window, and it is far down the road |
 
 ### 12.9 Still open
 
-1. Whether the Google Cloud path is open on the institutional account -- see
-   12.5. Decides API versus Apps Script, and nothing else can be written first.
-2. The exact Banner export shape. The importer is designed to be forgiving, but
-   the synonym table needs one real file to be checked against.
-3. `.xlsx` support needs a dependency (`openpyxl`). Small, but the tool has none
-   beyond `click` and `jinja2` today.
+1. ~~Whether the Google Cloud path is open on the institutional account.~~
+   **Settled 2026-09-20: it is not.** No Cloud projects on that account, so
+   Apps Script is the path. See 12.5.
+2. **The exact Banner export shape -- the one thing still blocking work.** The
+   importer is designed to be forgiving, but a synonym table built without
+   seeing a real export is guesswork, and whether SID is even in the file
+   decides whether it can be the join key at all.
+3. ~~Whether `.xlsx` support is worth a dependency.~~ **Settled 2026-09-20:
+   yes, `openpyxl`.** Banner and the seating charts both arrive as `.xlsx`.
 4. ~~Whether `availability.toml` should carry the "how many skills" wording, or
    derive it.~~ **Settled 2026-09-20: derive it**, reusing the Control Center's
    own number-word table (0-40, where 0 means "any"). See 12.10.
-5. Whether the Apps Script API toggle is available on the institutional
-   account, which decides whether `clasp` can be used or the script really is
-   pasted by hand.
+5. ~~Whether the Apps Script API toggle is available on the institutional
+   account.~~ **Settled 2026-09-20: it is, and it is now on.** `clasp` is the
+   deployment path; the script lives in this repo and pushes from the command
+   line.
 
 ### 12.10 The Control Center, and what replaces it
 
@@ -1016,6 +1025,24 @@ useful record of behaviour that exists nowhere else.
 8. **Extras cycle through the version letters** (`allVariants[i % length]`).
    printit shuffles instead, which is what section 10 chose. Noted so the
    difference reads as intentional.
+
+**Two more things the script settles, which were open questions here:**
+
+9. **Response validation is already on.** `updateSelectionsForm` builds a
+   `requireSelectAtMost(n)` validation and attaches it, so students cannot
+   over-select today. The push must keep setting it, since the limit and the
+   skill list change together.
+
+10. **Nothing caps a response on the way back in.** `importStudentChoices`
+    takes every choice in the response, appends the "append for everyone"
+    skills, de-duplicates, and prints the lot. If a response somehow carries
+    more than the limit -- a stale submission from a week when the limit was
+    higher, say -- the existing behaviour is to print all of it. Keep that,
+    and let the preview show the count rather than silently truncating.
+
+**The script is kept verbatim** at `reference/control_center.gs` in the
+`checkit-printit` repository, with a README saying what it is. It carries no
+student data; that was checked rather than assumed.
 
 **The Sheet also held state that now belongs to the workspace**: the roster
 with dropped flags, the seating charts, the available-skills list with its
