@@ -1,9 +1,11 @@
 # checkit-printit — design draft
 
-**Status: draft for review.** Nothing here is built. Written 2026-09-01 from
-reading `pdfgenerator.py`, `skillcheckpoints.sty`, `main_template.tex` and the
-30 `textemplate.tex` files in mat-106, plus the requirements given in
-conversation.
+**Status: stages 1-5 are built** (2026-09-20). Written 2026-09-01 from reading
+`pdfgenerator.py`, `skillcheckpoints.sty`, `main_template.tex` and the 30
+`textemplate.tex` files in mat-106, plus the requirements given in
+conversation. Sections 1-11 are that original draft, still accurate except
+where **section 12** revises them; 12 covers stages 6 and 7 and the GUI, and
+is the current plan.
 
 Companion to the "The print tool" sections of `CODEBASE_NOTES.md`, which this
 supersedes where they disagree.
@@ -449,6 +451,11 @@ committed to a repository** — it is a local record, not a published artefact.
 
 ## 7. Google integration
 
+> **Revised by section 12.5 (2026-09-20)**, which settles form ownership, the
+> question-id map, and how to find out whether the Google Cloud path is even
+> open on a university account. The sketch below still holds in outline.
+
+
 Two directions, and they are different problems.
 
 **Reading responses** replaces the CSV export step. Google Forms API or Sheets
@@ -594,3 +601,309 @@ Settled in review, recorded so they are not relitigated.
    already, so possibly nothing special is needed.
 5. Whether `Submission Cutoff:` is implemented or dropped. It is read and unused
    on both sides today.
+
+---
+
+## 12. Local state, Google Forms, and the GUI (2026-09-20)
+
+Stages 1-5 are built and in use: a real class set of 48 students printed on
+2026-09-18 from form responses. This section is stages 6 and 7 plus the GUI,
+and revises 7, 10 and 11 where they disagree.
+
+### 12.1 The workspace
+
+**The problem, concretely.** A job folder is self-contained: `publication.py`
+resolves `[roster] path` relative to the publication file, so every job carries
+its own copy of the roster and the seating chart. The 2026-09-13 run got its
+seating by copying the 2026-09-10 run's file. Three copies of the same 48
+students now exist on disk.
+
+A student drops. Which file is edited? The next job is made by copying the last
+one, so the fix has to be remembered and reapplied at copy time. Miss it and
+they get a paper. Nothing detects the drift, because three files that disagree
+are three valid files.
+
+**A workspace is the home for state that outlives a job.**
+
+```
+~/CheckItPrintIt/
+├── workspaces/
+│   └── MAT 106/
+│       ├── workspace.toml      name, semester, professor, bank path
+│       ├── roster.toml         last, first, preferred, sid, email, section, dropped
+│       ├── seating.toml        groups + desk x/y -- the GUI's file
+│       ├── availability.toml   skills open for retake + the next assessment
+│       ├── form.toml           form id, item ids, last pushed state
+│       ├── record.db           SQLite: what was printed, to whom, at which seed
+│       └── secrets/            OAuth client + token cache
+├── jobs/<job>/                 publication.toml only
+└── MAT 106/<title>/            output, unchanged
+```
+
+**A workspace is not a course.** One instructor runs both sections of MAT 106
+from a single workspace with one form and `section` as a roster field. Another
+wants each section separate, with its own seating and its own form. The
+directory is named by the instructor; nothing derives it from the course.
+
+**Resolution order in `publication.load()`:**
+
+1. an explicit `[roster] path` -- use it, so every existing job folder keeps
+   working unchanged;
+2. else `[workspace] name` -> `~/CheckItPrintIt/workspaces/<name>/roster.toml`;
+3. else an error naming both options.
+
+**Not a symlink.** `viewer/public/assets/bank.json` is a git symlink that
+Windows checks out as a 35-byte text file containing its own target, which is
+why the viewer dev server cannot load a bank on this machine. Resolution in the
+loader is explicit, cross-platform and greppable.
+
+Once roster and seating are shared, the manifest's existing `[inputs]` hashes
+start meaning "the course roster as it stood that day", which is worth more
+than a hash of a copy.
+
+### 12.2 Roster, and importing from Banner
+
+```toml
+[[student]]
+last      = "Brienza"
+first     = "Matthew"
+preferred = "Matt"          # what prints; falls back to first
+sid       = "806510955"
+email     = "mbrienza@oswego.edu"
+section   = "830"
+dropped   = false
+```
+
+**Legal and preferred names are different fields.** The seating chart says
+"Matt Brienza", "Seb Castrillon", "Kat Demars". A Banner export will not.
+Without both, every re-import overwrites the name on the printed page.
+
+**SID is the join key. Email is the fallback. Name is never a key.** SIDs do
+not change; emails and names do. The Google Form collects email, so the roster
+must carry both and a response maps email -> SID -> student.
+
+**`dropped` is a flag, never a deletion.** The print record has to survive.
+A dropped student is excluded from printing, from seating auto-fill and from
+form pushes, and stays in every query.
+
+**Importing is a merge, and absence is not deletion.** A student present in the
+workspace but missing from a fresh Banner export is marked `dropped = true`,
+not removed. A re-import must not clobber `preferred`, `section` overrides, or
+anything the seating chart references.
+
+The importer has to be forgiving, because Banner exports are not a format:
+
+- find the header row rather than assuming row 1 -- scan for the row where the
+  most known labels appear;
+- map columns by matching against a synonym table, e.g. `sid` from
+  `ID / Student ID / SID / Banner ID`, `last` from `Last Name / Last / Surname`,
+  `email` from `Email / Email Address / E-mail`;
+- print the mapping it chose and stop for confirmation before writing, with
+  flags to override any column;
+- accept `.csv` and `.xlsx`, because the exports that arrive are both.
+
+Report adds, drops and field changes as three counts. Never a silent merge.
+
+### 12.3 Availability
+
+Which skills are open for retake, and what the next assessment is. One file,
+because the form push and the print job both need exactly this:
+
+```toml
+[assessment]
+name   = "Skill Checkpoint Redo"
+date   = 2026-09-18
+due    = 2026-09-17T23:59:00
+choose = 3                       # at most N
+
+skills = ["W1", "W1-E", "D1", "D1-E"]
+```
+
+Descriptions are **not** stored here -- they come from `bank.xml`, which is
+already the single source for the printed skill headers and for
+`Skill Descriptions.tex`. Copying them into a second file is how they drift.
+
+Availability is **global, not per student**. The form shows one list to
+everyone; a student who has already passed W1 still sees W1. Per-student forms
+are not possible in Google Forms without one form per student.
+
+### 12.4 The print record
+
+**The rule: if a human is the author, TOML. If the tool is the author, SQLite.**
+
+Roster, seating, availability, workspace, form config and publication are all
+hand-edited or GUI-edited, bounded in size, and read by eye. The print record
+is none of those things:
+
+- it never stops growing -- 48 students times three papers times fifteen
+  assessments is about 2,000 rows a term;
+- every question asked of it is a query ("how many times has this student
+  attempted W1", "what did she get on 9/17", "which skills has nobody passed"),
+  which is one line of SQL or a hand-rolled index over TOML;
+- two processes write it -- the CLI at build time, the GUI when marking the
+  gradebook. SQLite takes a lock; two writers rewriting a TOML file race and
+  the loser's write vanishes silently;
+- `sqlite3` is in the standard library.
+
+```sql
+CREATE TABLE run (
+    run_id  TEXT PRIMARY KEY,      -- the output folder name
+    title   TEXT NOT NULL,
+    date    TEXT NOT NULL,
+    built   TEXT NOT NULL,
+    seed    INTEGER NOT NULL,      -- so a replay is findable from the record
+    output  TEXT NOT NULL
+);
+
+CREATE TABLE printed (
+    printed_id INTEGER PRIMARY KEY,
+    run_id     TEXT NOT NULL REFERENCES run(run_id),
+    sid        TEXT NOT NULL,      -- never the name
+    slug       TEXT NOT NULL,
+    seed       INTEGER NOT NULL,
+    version    TEXT NOT NULL,
+    variant    TEXT
+);
+CREATE INDEX printed_by_student ON printed(sid, slug);
+```
+
+Written at build time from the manifest, which already records seed, version
+and variant per paper -- the record is a second reader of a file that exists.
+
+**Printed is not attempted.** The build cannot know who was in the room.
+`SELECT COUNT(*) FROM printed WHERE sid=? AND slug=?` counts papers handed out,
+which over-counts anyone absent. The **gradebook** -- pass, no pass, absent --
+is a separate table added in a later stage, and until it exists the tool must
+say "printed N times", never "attempted N times".
+
+Tracking still does **not** feed back into printing (section 10). There is no
+retake cap to enforce.
+
+### 12.5 Google Forms
+
+**printit owns the slots it can derive, and nothing else.**
+
+| item in the form | owner |
+|---|---|
+| banner image, theme, title, description | instructor |
+| email collection, response receipt | instructor |
+| "You are selecting *three* skill(s)... on *NAME* on *DATE*" | **printit** |
+| "I understand that I am selecting skills for *DATE*" | **printit** |
+| "This form is due by *DUE*" | **printit** |
+| "How do I decide what to choose?" -- grade cutoffs, syllabus links | instructor |
+| "Choose At Most *THREE* Skills" and its options and validation | **printit** |
+
+The "How do I decide" block holds grade cutoffs, a link to the skill list and a
+link to the syllabus. No field in printit knows any of it, and it changes on the
+instructor's schedule. A push that regenerated the form would delete it every
+week.
+
+If a slot printit owns has been deleted from the form, push **stops and says
+so** rather than recreating it -- because recreating changes an id.
+
+**Responses are stored against `questionId`.** That single fact drives the rest:
+
+- recreating the *form* changes the `formId`, so the URL dies and every response
+  already collected is stranded on a form nobody can reach, along with the
+  banner image and every per-form setting;
+- deleting and recreating a *question* changes its `questionId`, so answers
+  already given stay attached to the old question. The skills question changes
+  its options every week; recreating it weekly would leave fifteen half-empty
+  columns in the export by December.
+
+So the ids are recorded once and patched forever after:
+
+```toml
+[form]
+id  = "1FAIpQLSc..."
+url = "https://docs.google.com/forms/d/e/.../viewform"
+
+[items]
+selecting_for = "3f8a1b2c"
+confirm_date  = "7d2e4a91"
+due_notice    = "1a9c3e70"
+choose_skills = "5b6f8d22"   # options rewritten weekly, id never
+```
+
+A push is one `batchUpdate` of `updateItem` requests. No creates, no deletes.
+
+**Two entry paths.** *Adopt* reads an existing form, lists its items and asks
+once which is which -- that is how an instructor's banner and wording survive.
+*Create* builds one when there is no form yet and records the ids it gets back.
+
+**To verify against the API reference before implementing**, rather than guess:
+the exact shape of `updateItem` and its `updateMask`; whether `forms.create`
+accepts only `info.title` at creation with everything else needing a follow-up
+`batchUpdate`; and how "at most N" validation on a checkbox question is
+expressed.
+
+**Whether the Google Cloud path is open at all** is a university question, and
+worth answering before writing any of it. Signed in on the institutional
+account: create a project at `console.cloud.google.com`; then under
+APIs & Services -> OAuth consent screen, check whether **Internal** is offered
+as a user type. Internal apps in a Workspace skip Google's verification review
+entirely, which is the difference between an afternoon and a fortnight. Then
+enable the Google Forms API in the Library, and create an OAuth client ID of
+type **Desktop app**.
+
+A Workspace admin can also restrict third-party app access domain-wide, which
+only shows up at the first token request. The fallback if any of that is
+closed: an **Apps Script bound to the form**, deployed as a web app. It runs as
+the instructor, needs no OAuth client, and printit POSTs to its URL. Worse in
+every way except that it works.
+
+**The CSV import path stays permanently.** Scopes lapse and admins change
+policy; the CSV path is the whole pipeline minus one adapter and it works
+today.
+
+### 12.6 The GUI
+
+Unchanged from "Where we paused (2026-09-02)" in `CODEBASE_NOTES.md`: a local
+web app with a Python backend, bound to `127.0.0.1` and never `0.0.0.0`,
+editing the same TOML files the CLI reads. One correction to that note --
+it says "everything stays in git", which is wrong. These files carry names,
+SIDs and emails and live outside every repository.
+
+First slice, in order: serve `seating.toml` as read-only desks; then
+drag-to-swap writes the file back; then confirm `build --preview` reads it
+unchanged. That last step is the test that matters.
+
+### 12.7 Staging
+
+| stage | ends with |
+|---|---|
+| 6a workspace + roster | one roster, jobs resolving it, Banner import merging on SID |
+| 6b availability | a list the form push and the print job both read |
+| 6c print record | SQLite written from the manifest; queries read-only |
+| 7a form write | create-or-adopt, then push the derived slots |
+| 7b form read | responses pulled to the day's skills; CSV kept |
+| 8 GUI | seating drag-and-drop writing the file the CLI reads |
+| 9 gradebook | pass / no pass / absent, and the table editor for it |
+
+### 12.8 Decisions taken
+
+| | |
+|---|---|
+| Persistent state lives in a workspace outside every repo | student data must never enter a repository, and copies drift |
+| A workspace is named by the instructor, not derived from the course | one instructor wants both sections together, another wants them apart |
+| A job names a workspace; an explicit path still wins | one place to fix a name, and no existing job folder breaks |
+| TOML for human-authored state, SQLite for the print record | unbounded, machine-written, queried, and written by two processes |
+| Legal name and preferred name are separate fields | the seating chart uses preferred names; Banner will not |
+| SID joins, email is the fallback, name is never a key | SIDs do not change |
+| `dropped` is a flag; a missing row in an import sets it | the print record has to survive |
+| Availability is global, not per student | one form for everyone; per-student would mean per-student forms |
+| printit owns only the form slots it can derive | the rest is pedagogy the tool cannot regenerate |
+| Patch recorded item ids; never recreate form or question | responses are keyed to `questionId` |
+| Printed and attempted are different facts | the build cannot know who was in the room |
+| No retake cap | none exists in the course |
+
+### 12.9 Still open
+
+1. Whether the Google Cloud path is open on the institutional account -- see
+   12.5. Decides API versus Apps Script, and nothing else can be written first.
+2. The exact Banner export shape. The importer is designed to be forgiving, but
+   the synonym table needs one real file to be checked against.
+3. `.xlsx` support needs a dependency (`openpyxl`). Small, but the tool has none
+   beyond `click` and `jinja2` today.
+4. Whether `availability.toml` should also carry the "how many skills" wording
+   used in the form, or derive it from `choose` (three -> "THREE").
