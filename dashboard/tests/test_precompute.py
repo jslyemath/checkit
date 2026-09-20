@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from checkit import (
     BUNDLE_FILENAME,
     BUNDLE_FORMATS,
+    BUNDLE_UNTIL,
     INLINE_FORMATS,
     PUBLIC_SEEDS,
 )
@@ -56,7 +57,7 @@ BANK_XML = """<?xml version='1.0' encoding='UTF-8'?>
 SEED_COUNT = PUBLIC_SEEDS + 10  # enough to populate both tiers
 
 
-def build_bank(root):
+def build_bank(root, seed_count=SEED_COUNT):
     """A two-outcome bank on disk, one with images and one without."""
     for slug, template in (("PLAIN", fx.MATH), ("FIGURED", fx.IMAGE)):
         odir = os.path.join(root, "outcomes", slug)
@@ -67,7 +68,7 @@ def build_bank(root):
         gen = os.path.join(root, "assets", slug, "generated")
         os.makedirs(gen)
         seeds = {
-            "seeds": [{"seed": i, "data": {}} for i in range(SEED_COUNT)],
+            "seeds": [{"seed": i, "data": {}} for i in range(seed_count)],
             "generated_on": "2026-08-21T00:00:00+00:00",
         }
         with open(os.path.join(gen, "seeds.json"), "w", encoding="utf-8") as f:
@@ -100,6 +101,55 @@ class PrecomputeTestCase(unittest.TestCase):
     def exercises(self, doc, slug):
         outcome = next(o for o in doc["outcomes"] if o["slug"] == slug)
         return {e["seed"]: e for e in outcome["exercises"]}
+
+
+class PrintOnlyTier(unittest.TestCase):
+    """Seeds at or above BUNDLE_UNTIL exist only to be printed.
+
+    Nothing published can render one -- the inlined formats stop at
+    PUBLIC_SEEDS and the bundle stops at BUNDLE_UNTIL -- but their raw data
+    used to be inlined anyway, and that data carries the answers. A student
+    reading the version number off a printed footer could look the paper up.
+    """
+
+    REMOTE = "https://example.org/test-bank"
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        # far enough past BUNDLE_UNTIL to have a print-only tier at all
+        self.bank = build_bank(self.tmp, seed_count=BUNDLE_UNTIL + 5)
+        self.bank.write_json(remote=self.REMOTE)
+        with open(os.path.join(self.tmp, "assets", "bank.json"),
+                  encoding="utf-8") as f:
+            doc = json.load(f)
+        outcome = next(o for o in doc["outcomes"] if o["slug"] == "PLAIN")
+        self.exs = {e["seed"]: e for e in outcome["exercises"]}
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_print_only_seeds_publish_no_data(self):
+        for seed in (BUNDLE_UNTIL, BUNDLE_UNTIL + 4):
+            with self.subTest(seed=seed):
+                self.assertEqual(sorted(self.exs[seed].keys()), ["seed"])
+
+    def test_the_bundle_tier_keeps_its_data(self):
+        """The Assessment builder renders its preview browser-side from this,
+        so dropping it one tier lower would break the builder."""
+        for seed in (PUBLIC_SEEDS, BUNDLE_UNTIL - 1):
+            with self.subTest(seed=seed):
+                self.assertIn("data", self.exs[seed])
+
+    def test_the_public_tier_is_untouched(self):
+        for fmt in INLINE_FORMATS:
+            self.assertIn(fmt, self.exs[0])
+        self.assertIn("data", self.exs[0])
+
+    def test_every_seed_still_has_an_entry(self):
+        """The viewer indexes exercises[seed] by position, so entries stay
+        even when their data does not."""
+        self.assertEqual(len(self.exs), BUNDLE_UNTIL + 5)
+        self.assertEqual(sorted(self.exs), list(range(BUNDLE_UNTIL + 5)))
 
 
 class InlineTier(PrecomputeTestCase):
