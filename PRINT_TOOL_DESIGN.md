@@ -944,10 +944,17 @@ unchanged. That last step is the test that matters.
 1. ~~Whether the Google Cloud path is open on the institutional account.~~
    **Settled 2026-09-20: it is not.** No Cloud projects on that account, so
    Apps Script is the path. See 12.5.
-2. **The exact Banner export shape -- the one thing still blocking work.** The
-   importer is designed to be forgiving, but a synonym table built without
-   seeing a real export is guesswork, and whether SID is even in the file
-   decides whether it can be the join key at all.
+2. ~~The exact Banner export shape.~~ **Settled 2026-09-20 against three real
+   exports**, and it changed the model. There are *two* id systems -- a Banner
+   student id (`806...`) and a Global id the LMS calls OrgDefinedId (`20...`)
+   -- and an export carries one, the other, or both, so a student record keeps
+   both and a merge matches on whichever it has. An LMS export also contains
+   an instructor and a mentor row, so role filtering is not optional. A Banner
+   summary workbook puts its header on row fifteen under a course-information
+   block. And **email is only a weak key**: one student appears under two
+   different addresses in two exports downloaded the same day, and the Google
+   Form only ever saw the first -- so addresses accumulate rather than
+   replace. Implemented in `classlist.py`.
 3. ~~Whether `.xlsx` support is worth a dependency.~~ **Settled 2026-09-20:
    yes, `openpyxl`.** Banner and the seating charts both arrive as `.xlsx`.
 4. ~~Whether `availability.toml` should carry the "how many skills" wording, or
