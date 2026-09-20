@@ -64,6 +64,16 @@ class Outcome():
             # will ever request.
             if precompute and e.seed < PUBLIC_SEEDS:
                 d.update(e.derived(remote=remote, formats=INLINE_FORMATS))
+            # A print-only version keeps its seed and loses its data.
+            #
+            # Nothing published can render one: the inlined formats stop at
+            # PUBLIC_SEEDS and the bundle stops at BUNDLE_UNTIL. The raw data
+            # was shipped anyway, and it carries the answers -- so a student
+            # who read the version number off a printed footer could look it
+            # up. The entry itself stays, because the viewer indexes
+            # `exercises[seed]` by position.
+            if e.seed >= BUNDLE_UNTIL:
+                d.pop("data", None)
             exercises.append(d)
         return {
             "title": self.title,

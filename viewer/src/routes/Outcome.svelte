@@ -12,12 +12,21 @@
 
     const versionStringToInt = (vs:string) => parseInt(vs)-1
 
+    /* A version in the address bar is whatever someone typed, and only the
+       public range is published: bank.json renders below PUBLIC_SEEDS, the
+       bundle stops at BUNDLE_UNTIL, and the print-only versions are not
+       published at all. Clamp into the range that exists -- the redirect
+       below then rewrites the address to the version actually on screen, so
+       a made-up number lands somewhere real instead of on an error. */
+    const clampSeed = (s:number) =>
+        Math.max(0, Math.min(PUBLIC_SEEDS-1, Number.isFinite(s) ? s : 0))
+
     $: outcome = $bank.outcomes.find((o)=>o.slug==params.outcomeSlug);
     $: version = versionStringToInt(params.exerciseVersion);
-    let seed = versionStringToInt(params.exerciseVersion);
+    let seed = clampSeed(versionStringToInt(params.exerciseVersion));
     let outcomeSlug = params.outcomeSlug;
     $: if (outcomeSlug !== params.outcomeSlug) {
-        seed = version;
+        seed = clampSeed(version);
         outcomeSlug = params.outcomeSlug;
     }
     $: if (seed !== version) {
