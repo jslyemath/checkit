@@ -5274,3 +5274,334 @@ literal text once the content is no longer inside one.
    > kwarg and never read it. See "The state of `variants` versus
    > `course_progress`".
 5. Check LaTeX literals are raw strings: `"rac"` makes `` a formfeed.
+
+
+---
+
+## The fortnight the notes were not kept (2026-09-09 to 2026-09-21)
+
+`CLAUDE.md` was added on 2026-09-11 so a compacted context would still know
+the shape of the repos. From that commit until this one, everything went into
+`CLAUDE.md` and `PRINT_TOOL_DESIGN.md` and nothing came here -- eleven commits
+to checkit and fifteen to checkit-printit, including a live data exposure
+whose only record was a commit message.
+
+Three documents, three jobs, and none of them redundant:
+
+| | |
+|---|---|
+| `CLAUDE.md` (one per repo) | the **map**. Loaded automatically. What exists, which Python, the footguns |
+| `PRINT_TOOL_DESIGN.md` | the **plan** for printit. Decisions, rationale, what is next |
+| this file | the **history**. What changed and why, dated |
+
+A commit message is not the record. What follows is the reasoning that was
+missing.
+
+---
+
+## Print-only exercise data was being published (2026-09-19)
+
+The worst thing found this fortnight, and it had been true for months.
+
+### What was wrong
+
+`bank.json` carried the raw `data` for **every** seed of every outcome. Only
+the *derived* formats were tiered:
+
+```python
+if precompute and e.seed < PUBLIC_SEEDS:
+    d.update(e.derived(remote=remote, formats=INLINE_FORMATS))
+```
+
+`d = e.to_dict()` above it already included `data`, unconditionally. So the
+600 print-only versions per outcome -- 17,400 exercises on mat-106 -- were
+served to anyone who fetched a 28.6 MB public file, **with their answers**:
+`pv_ans_text`, `blocks_ans_text_a`, `p1_ans`.
+
+And the viewer would *render* one. `Outcome.svelte` took its seed straight
+from the address bar with no clamp; only the prev/next buttons clamped. So
+`#/bank/W1/512/` drew a print-only exercise client-side from that data --
+and `printit.sty` prints `v<seed>` in the footer, so a student holding the
+paper knows exactly which number to type.
+
+### How it was found
+
+Not by looking for it. The question on the table was whether an Assessment
+builder version number could reproduce a printed paper, which meant checking
+which seed ranges each surface draws from. Reading that revealed `bank.json`
+inlines 1000 exercises rather than 50, and pulling the thread went from
+"inefficient" to "the answers are public" in about three minutes.
+
+### The fix, and why the boundary is where it is
+
+`data` is dropped at or above `BUNDLE_UNTIL`, and the route clamps. The entry
+itself stays, because the viewer indexes `exercises[seed]` by position.
+
+The bundle tier (50-399) **keeps** its data, which was not obvious: the
+Assessment builder renders its preview browser-side through
+`outcomeToStxDocument`, which runs Mustache over `exercises[seed].data`. Drop
+it one tier lower and the builder breaks. That was checked before the change,
+after an earlier claim that "nothing in the browser needs it" turned out to be
+wrong.
+
+28.6 MB to 16.5 MB on the live bank. Print is unaffected: it reads
+`assets/<slug>/generated/seeds.json` from the bank repo, which is gitignored
+and never copied into `docs/`.
+
+### Verifying a regenerate that must not change anything
+
+The deploy had to prove that *only* the intended thing moved. Fingerprints
+before and after, of every `seeds.json`, every published bundle, and
+`bank.json` split by tier:
+
+```
+seeds.json (29 files)    0 changed
+published bundles (29)   0 changed
+bank.json public tier    0 changed
+bank.json bundle tier    0 changed
+bank.json print tier     600 entries with data -> 600 with just a seed
+```
+
+`generate` without `-r` loads existing seeds and returns before generating, so
+regeneration is a no-op for content -- though it still prints "Generating 1000
+exercises for outcome X" before that early return, which reads alarmingly and
+means nothing.
+
+**`checkit viewer` does not build the viewer.** It extracts a prebuilt
+`viewer.zip` from the installed package. The first deploy therefore shipped
+the data fix without the route clamp, which lives in Svelte source. `viewer.zip`
+has to be rebuilt (the npm-build-and-zip half of `update_viewer.py`; its first
+step regenerates the demo bank with `-r` and is not wanted) before
+`checkit viewer` carries a viewer-side change.
+
+---
+
+## Reproducing a print run (2026-09-19)
+
+### What was broken
+
+`[seeds]` in a publication pinned a **version letter** with no way to name a
+skill, because `choose_seeds` looked it up as `publication.seeds.get(version)`
+inside the per-skill loop without consulting the slug. Pinning `A = 755` to
+reproduce one paper therefore asked every skill for seed 755 -- and since
+seeds run to 999 for all of them, the range guard passed and three of four
+papers came out silently wrong.
+
+`--seed` defaulted to `None`, so `random.Random(None)` seeded from the OS.
+`build --preview` and `build` are separate processes and drew differently,
+which means the preview's seed table looked like a prediction and was not.
+This was discovered by validating the preview's seeds for collisions and then
+shipping a build with different ones.
+
+### The shape of the answer
+
+Two different jobs were being conflated:
+
+- **reproduce a whole run** -- common; wants one handle
+- **force one specific paper** -- rare; wants a surgical override
+
+`[seeds.<skill>]` is the second, and the flat form is now refused above one
+skill. The first is `manifest.toml`, written beside the papers, recording the
+**result** rather than the process. `build --replay <folder>` pins every paper
+from it and draws nothing, so a reprint survives edits a seed would not --
+fixing a misspelt name must not redraw the class.
+
+A run seed is now always generated, reported, and reusable, which makes a
+preview binding when you carry the number across.
+
+### What the manifest records beyond the seed, and why
+
+Generation is a pure function of generator and seed: rolling seeds 400, 401,
+500, 755 and 999 for D2, W1 and FCP under Python 3.12.7 and 3.14.5 gave
+byte-identical data. So two instructors who each run `checkit generate` on the
+same commit get the same paper for the same version number, without sharing
+`seeds.json` -- which matters, because it is gitignored.
+
+What is *not* stable is the seed-to-variant mapping. `build_variant_bag` seeds
+`random.seed(0)` -- the master seed, hard-coded -- and deals variant labels
+into a shuffle bag. Adding a case to a generator re-deals 654 of 1000 seeds;
+reordering the list re-deals all 1000. So the manifest records the variant as
+a **checksum**, and a replay refuses when it no longer matches. Likewise a
+hash of each generator's source.
+
+A side effect of that bag worth knowing: with exactly two variants the
+anti-run rule forces strict alternation, so seven of mat-106's eight variant
+outcomes are **parity-locked** -- even seeds are one case, odd the other. The
+footer prints the seed.
+
+---
+
+## The Assessment builder's version number (2026-09-20)
+
+`\assessmentVersion` in the exported LaTeX carried `Date.now()` --
+`1789847211668`, a millisecond timestamp. It identified *when the button was
+pressed*, not what came out: two exports a millisecond apart with different
+exercises got near-identical numbers, and the same exercises exported twice
+got different ones. Worse, `renderAssessment` read the clock on every render,
+so ticking the answer key changed the number on a paper whose exercises had
+not moved.
+
+It now carries the number that dealt the assessment. `pickAssessmentExercises`
+takes a version and draws from mulberry32 seeded with it, since JavaScript
+cannot seed `Math.random`. Six digits, because it is meant to be read off a
+page and typed back in.
+
+**It does not interoperate with print, and cannot.** The builder draws
+`PUBLIC_SEEDS..BUNDLE_UNTIL` (50-399) and printit draws `BUNDLE_UNTIL`+ (400+)
+-- disjoint by design, because 100-399 is the LMS export range and a printed
+paper must be one nothing has served. printit refuses a sub-400 pin outright.
+
+---
+
+## Class lists, and what three real exports taught (2026-09-20)
+
+`classlist.py` was written against three files the instructor actually
+receives, and every one of its rules comes from a disagreement between them.
+
+| | Banner detail CSV | LMS classlist CSV | Banner summary XLSX |
+|---|---|---|---|
+| header row | first | first | **fifteenth**, under a preamble |
+| name | three columns | `Last, First` | `Last, First M.` |
+| id | `Student ID` `806...` | `OrgDefinedId` `20...` | `ID` `806...` |
+| second id | `Global ID` `20...` | -- | -- |
+| email | yes | yes | **none** |
+| section | yes | no | no |
+| non-students | -- | an instructor and a mentor row | `Registration Status` |
+
+**Two id systems, not one.** A student carries both, and a merge matches on
+whichever an export has. The detail CSV is the only file with both, which
+makes it the one that ties the other two together.
+
+**Email is a weak key.** One student appears as `mcliffo4@oswego.edu` in
+Banner and `m.clifford@clasnet.sunyocc.edu` in the LMS, downloaded the same
+day -- and the Google Form only ever sees the first. Merging the LMS export
+over the Banner one would have overwritten her address and silently stopped
+her responses matching. Addresses accumulate; the primary never moves.
+
+**Legal and preferred names are separate fields**, because the seating chart
+says "Matt Brienza" and the registrar says "Brienza, Matthew C.". Matching
+tries exact display name, then surname-plus-initial, and both derive from
+`name` when the registrar's fields are absent -- without which, two of
+twenty-five students imported as duplicates of themselves.
+
+**Absence only counts inside the sections a file covers.** A class list is
+usually one section; without scoping, importing 820 marked all 23 of 830 as
+dropped. The hole in inferring coverage from the file is that an emptied
+section cannot appear in its own class list, hence `--covers`.
+
+---
+
+## Where course state lives (2026-09-20)
+
+Three job folders each held their own copy of the same 48 students, because a
+job resolves its roster relative to its own `publication.toml`. The 09-13 run
+got its seating by copying the 09-10 run's file. A student who dropped had to
+be remembered and re-applied at the next copy, and nothing detected the drift.
+
+So a **workspace** at `~/CheckItPrintIt/workspaces/<name>/` holds what
+outlives a job, and a job names it. An explicit `[roster] path` still wins.
+
+A workspace is not a course: one instructor runs both sections together with
+one form, another wants them apart, so the directory is named by whoever makes
+it.
+
+**Dropping.** The seating chart is the print list, so there is deliberately no
+filter at print time -- dropping empties the seat, and the build *checks* the
+two files agree rather than filtering. A filter would hide a divergence; a
+check names it. The seat is emptied and not removed, because version letters
+come from position and deleting the entry re-letters that student's tablemates.
+
+A drop records who made it. An instructor's drop is sticky, because the
+registrar is usually behind the room; a drop inferred from absence is undone
+by a later import that disagrees.
+
+**TOML or SQLite.** If a human is the author, TOML -- diffable, hand-fixable,
+and the same file the eventual GUI writes. If the tool is, SQLite. The print
+record is unbounded, queried rather than read, and written by two processes;
+rewriting a file to change one field races and the loser's write vanishes.
+
+---
+
+## Google, without a Cloud project (2026-09-20 to 2026-09-21)
+
+The institutional account cannot create Google Cloud projects, which rules out
+an OAuth client of our own and therefore the Forms API.
+
+**A claim that was wrong twice.** "A CLI cannot sign in to Google" was
+asserted, conceded to be wrong, and then asserted again as justification for
+the design. The browser loopback flow works fine. What was actually missing
+was a *client to log in with* -- and `clasp` ships its own, which is why
+`form create` is one command with one browser sign-in.
+
+The existing Control Center is an Apps Script that already drives this form,
+which is proof both that the permission exists and that the approach works. It
+is kept verbatim at `checkit-printit/reference/control_center.gs` as the
+specification for wording and behaviour, because students have been reading
+that wording all term.
+
+What the old script settles, and printit now reproduces: a number-word table
+where zero means "any"; three limiter modes with matching validations; and an
+unsubmittable state when nothing is open, so a student opening the form early
+cannot submit an empty choice that later reads as real. What it does *not*
+keep is addressing items by type and index -- `getItems(CHECKBOX)[1]` means
+inserting one header above it silently retargets every write. Ids, recorded
+once.
+
+Responses are scoped to an assessment **by the date the student confirms**,
+not a timestamp window. That is what the confirmation checkbox is for. Latest
+response per student wins.
+
+---
+
+## Packaging, and an install that never worked (2026-09-20)
+
+`checkit-printit` imports checkit but never declared it: `pyproject.toml`
+listed click, jinja2 and openpyxl and stopped. So `pip install git+...`
+succeeded and failed at the first command with an import error.
+
+It could not declare the bare name, because `checkit-dashboard` on PyPI is the
+upstream project and is different code -- installing the wrong thing is worse
+than installing nothing. It is declared by URL instead, which PyPI forbids for
+uploaded packages and which costs nothing when installing from GitHub.
+
+That URL needed a release to point at, and **the one the README already named
+did not exist**: `v0.2.8.5` had a tag but no release, so the documented second
+install command had been a 404 for anyone who tried it. It went unnoticed
+because the author's machine has both packages installed editable.
+
+`v0.2.9.1` now exists with a wheel, printit is `0.2.0`, and one command
+installs both -- verified in a throwaway environment, then run against the
+real bank to confirm it does more than install.
+
+Two things learned: `setup.cfg`'s `version = attr: checkit.VERSION` freezes
+the number at install time, so an editable install runs current code while
+reporting whatever it said when pip last ran. And `gh` addresses a fork's
+*parent* by default -- a release command aimed itself at
+`StevenClontz/checkit` until `gh repo set-default` was set on both clones.
+
+---
+
+## Mutation testing, as a habit (2026-09-19 onward)
+
+The most useful practice picked up this fortnight, and the one worth keeping.
+
+A test that passes proves nothing until it has been watched to fail. So: break
+the code on purpose, run the test, and check it notices. If it still passes,
+the test was watching nothing.
+
+Applied to every feature built this fortnight, it caught, on the first pass
+each time:
+
+- a fixture with an unquoted name in a comment, so the guard under test was
+  never reached
+- an ordering test that passed by luck, because `GROUP BY` sorted the same way
+  as the dates it was checking
+- dead code -- an explicit `DELETE` before an insert that the foreign key
+  cascade already handled, so removing either left the test green
+- **three separate cases of nothing covering the thing most recently fixed**:
+  email as a match key, the preferred-name rule, and `assemble` populating the
+  student id the entire print record depends on
+
+That last is the pattern. The test for the bug just fixed is the likeliest to
+be vacuous, because it gets written while thinking about the fix rather than
+about what could still be wrong.

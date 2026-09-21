@@ -1,8 +1,11 @@
 # Working in this project
 
-Loaded automatically every session. Keep it short enough that it stays true;
-the long-form history is in `CODEBASE_NOTES.md` (5,000+ lines, not auto-loaded
-— find a section with `grep -n "^## " CODEBASE_NOTES.md`).
+Loaded automatically every session. Keep it short enough that it stays true.
+
+This is the **map**, not the record. The long-form history is
+`CODEBASE_NOTES.md` (5,600+ lines, not auto-loaded — find a section with
+`grep -n "^## " CODEBASE_NOTES.md`), and it has to be kept up: see "Three
+documents" below.
 
 ## The repos
 
@@ -87,6 +90,25 @@ A template that documents its own syntax will have that documentation parsed as 
   repo, because they hold names, student ids and email addresses.
 - Never paste a student name into chat. Mask output that might contain one.
 
+## Three documents, and which one you are supposed to write to
+
+| | job | read it |
+|---|---|---|
+| `CLAUDE.md` (one per repo) | the **map**: what exists, which Python, the footguns | automatically, every session |
+| `PRINT_TOOL_DESIGN.md` | the **plan** for printit: decisions, rationale, what is next | on request |
+| `CODEBASE_NOTES.md` | the **history**: what changed and why, dated | `grep -n "^## " CODEBASE_NOTES.md` |
+
+**A change with reasoning behind it gets a dated `##` section in
+`CODEBASE_NOTES.md`. The commit message is not the record.** Put the reasoning
+that would not survive being summarised: what was actually wrong, how it was
+found, what was ruled out, and what was verified rather than assumed.
+
+This rule already existed, in the first paragraph of `CODEBASE_NOTES.md`, and
+was followed for weeks and then silently dropped the day `CLAUDE.md` was
+added -- twenty-six commits, including a live data exposure whose only record
+was a commit message. `CLAUDE.md` did not replace it; they do different jobs.
+See "The fortnight the notes were not kept".
+
 ## Checks that have failed silently here
 
 Each of these shipped something wrong while reporting success. They are not
@@ -127,6 +149,10 @@ writes one anyway. Fixed in `wrapper/tikz.py`; the habit generalises.
 
 **Counting seeds is not counting figures.** "400 seeds imaged" was true while
 nine figures were missing.
+
+**Writing to `CLAUDE.md` is not writing to `CODEBASE_NOTES.md`.** Twenty-six
+commits went unrecorded because the notes felt superseded by the map. They are
+not; see the table above.
 
 **`gh` defaults to a fork's parent.** Both clones now have
 `gh repo set-default` pointing at `jslyemath/...`, but before that a release
