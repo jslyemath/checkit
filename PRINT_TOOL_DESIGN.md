@@ -907,15 +907,49 @@ unchanged. That last step is the test that matters.
 
 ### 12.7 Staging
 
-| stage | ends with |
-|---|---|
-| 6a workspace + roster | one roster, jobs resolving it, Banner import merging on SID |
-| 6b availability | a list the form push and the print job both read |
-| 6c print record | SQLite written from the manifest; queries read-only |
-| 7a form write | create-or-adopt, then push the derived slots |
-| 7b form read | responses pulled to the day's skills; CSV kept |
-| 8 GUI | seating drag-and-drop writing the file the CLI reads |
-| 9 gradebook | pass / no pass / absent, and the table editor for it |
+| stage | state | ends with |
+|---|---|---|
+| 6a workspace + roster | **done** | one roster, jobs resolving it, class lists merging on id |
+| 6b availability | **done** | a list the form push and the print job both read |
+| 6c print record | **done** | SQLite written from the manifest; queries read-only |
+| 7a form write | **built, unverified** | create-or-attach, then push the derived slots |
+| 7b form read | next | responses pulled to the day's skills; CSV kept |
+| 8 GUI | | seating drag-and-drop writing the file the CLI reads |
+| 9 gradebook | | pass / no pass / absent, and the table editor for it |
+
+### 7a is built but has never spoken to Google
+
+`appsscript/Code.gs` and `src/checkit_printit/clasp.py` were written from the
+retired Apps Script and the API reference, not from a round trip. Twenty tests
+run against a local server impersonating the deployment, which covers this
+side of the wire and nothing beyond it.
+
+**Do first, on a throwaway form, not the live one:**
+
+1. `checkit-printit form create -w <test workspace> --title "Scratch"` --
+   exercises clasp login, form creation, push, deploy, and item creation in
+   one go. Everything that can be wrong is wrong here first.
+2. `form push --dry-run`, then `form push`, then look at the form.
+3. Only then `form attach --script-id ...` against the real form, which
+   changes nothing on it, followed by `form map` and a `--dry-run` push.
+
+**Most likely to need fixing:** `clasp._deployment_id` parses clasp's output
+for an id, and that wording has changed between versions -- it matches on
+shape (`AKfycb...`, over 30 characters) rather than position for that reason,
+but it is still parsing chatter. Second most likely: whether
+`clasp create-script --type form` leaves `.clasp.json` where `script_id()`
+expects it.
+
+### What 7b needs
+
+Responses are scoped to an assessment **by the date the student confirms**,
+not by a timestamp window -- see 12.10. The confirmation checkbox exists for
+that. Latest response per student wins. Both behaviours come from the retired
+script and are already matched by hand in the 2026-09-18 run.
+
+The script needs a `responses` op returning email, timestamp and choices;
+printit maps email to a student through `Student.all_emails()`, which is why
+addresses accumulate rather than replace.
 
 ### 12.8 Decisions taken
 
@@ -940,6 +974,10 @@ unchanged. That last step is the test that matters.
 | The cold-call system waits for the seating GUI | it belongs at the top of that window, and it is far down the road |
 
 ### 12.9 Still open
+
+0. **Nothing in stage 7 has run against a real Google account.** See the
+   staging table above for the order to test it in, and what is likeliest to
+   break.
 
 1. ~~Whether the Google Cloud path is open on the institutional account.~~
    **Settled 2026-09-20: it is not.** No Cloud projects on that account, so
