@@ -5782,3 +5782,134 @@ Same root as five stale `-w` flags in next-step hints: the rename replaced
 tool would have told the user to run commands that no longer parse. **Nothing
 tests the wording of a hint**, so all six were found by reading rather than by
 running, while looking for something else.
+
+## Stage 7a, against a real Google account (2026-09-21)
+
+It works. `form attach`, `form add-items`, `form push --dry-run` and
+`form push` all ran end to end against a scratch form on the instructor's
+institutional account, and the four slots printit owns were written. Seven
+bugs surfaced, in code that had 220 passing tests.
+
+The single most useful decision was **interrogating clasp before signing in to
+anything** -- `--version`, `--help`, and one deliberately invalid argument.
+That found three of the seven for free.
+
+### The two that the tests could never have caught
+
+`--type form` is not a script type; clasp reports `standalone, webapp, api,
+docs, forms, sheets, slides`. It is `forms`, plural. And `push-files` is not a
+command at all -- it is `push`.
+
+Neither was catchable, because the existing tests assert on what the
+*deployment replies* and never on the argv handed to clasp. A wrong subcommand
+name was invisible by construction. `TestTheCommandNamesClaspActuallyHas` now
+records argv and pins the names.
+
+`push-files` nearly survived the check that found it. Running
+`clasp push-files --help` prints clasp's **global** help and exits 0, which
+reads exactly like an ordinary help page. The tell was comparative: every real
+subcommand prints its own `Usage: clasp create-deployment|deploy ...` line,
+and this one printed `Usage: clasp <command> [options]`. Reading one output in
+isolation confirmed the wrong thing; comparing several exposed it.
+
+### clasp's exit code lies
+
+    $ clasp create-script --type bogus --title x
+    Invalid script type "bogus". ...
+    $ echo $?
+    0
+
+So `run(..., check=True)` passed the refusal through, and the failure surfaced
+two calls later as "no .clasp.json, so clasp did not leave a project behind" --
+true, useless, and pointing at the wrong thing. `run()` now raises on clasp's
+own refusal phrases whatever the exit code says, and the message states that
+the code was 0. Same family as `command | tail`: a success code that was never
+a success.
+
+### The 404 that was a missing manifest
+
+First real deploy answered 404, with a well-formed URL and a deployment id
+that parsed cleanly -- so `_deployment_id`, the failure everyone predicted,
+was never the problem.
+
+**`clasp create-script` overwrites `appsscript.json` in `--rootDir` with its
+own default**, which has no `webapp` block. We staged a manifest declaring
+`executeAs: USER_DEPLOYING` and `access: ANYONE_ANONYMOUS`; clasp replaced it;
+push sent clasp's version; the deployment had no web app entry point at all.
+
+`form attach` was already immune: it calls `_stage_script` *again* over the
+cloned files. Attach was right and create had the gap, which is what confirmed
+the diagnosis rather than just fitting it. `create_form` now snapshots the
+staged manifest and restores it.
+
+### 404 -> 403 -> authorization, and the question that answered
+
+After the fix the same deployment answered 403 with Google **Drive's** "Access
+Denied" page rather than an Apps Script authorization prompt. Two candidates,
+with very different consequences:
+
+1. the script had never been authorized -- a one-time fix;
+2. the domain restricts anonymous Apps Script web apps -- architectural,
+   because the entire open-with-a-secret design assumes a terminal holding no
+   Google credential can call it.
+
+Opening the `/exec` URL in a browser settled it: an authorization prompt,
+requesting exactly one scope, **"View and manage your forms in Google Drive"**
+-- narrow, and matching what `Code.gs` actually touches (`FormApp` and
+`PropertiesService`, with no `UrlFetchApp`, so the script cannot make outbound
+calls at all).
+
+After granting, the browser showed `Script function not found: doGet`. That is
+a **success**: a browser visit is a GET, `Code.gs` defines only `doPost`, and
+only a live deployment could produce that error. The anonymous POST from the
+terminal then returned `{"ok":true}` in 2.5s.
+
+**Candidate 2 is dead. Anonymous POST from a terminal works on this domain**,
+so the architecture holds. Recorded because it was the largest open risk in
+the whole design and it is now closed.
+
+The authorization step is a real gap in `form create`, though: the manual path
+deploys through the Apps Script *editor*, which prompts for authorization as
+part of its flow, and the clasp path never does. A freshly created form will
+need one browser visit before the first call succeeds.
+
+### Apps Script 404s a live deployment at random
+
+Three identical `form add-items` calls, one live deployment, clasp listing it
+throughout, minutes after it had served a `push`:
+
+    attempt 1: added 0: nothing was missing
+    attempt 2: Error: the web app answered 404 ...
+    attempt 3: added 0: nothing was missing
+
+Not a configuration problem and not reproducible on demand -- which is exactly
+why it would have been diagnosed as one at 8am on an assessment day. `call()`
+now retries 404 and timeout, twice, with a widening pause. **A 401 or 403 is
+never retried**: those are real configuration errors and retrying only buries
+the sentence explaining them.
+
+Six consecutive real calls after the change: 6/6.
+
+### Two smaller ones
+
+`TimeoutError` escaped `call()` as a forty-line traceback. It is an `OSError`
+subclass but **not** a `urllib.error.URLError`, so neither handler saw it. The
+default timeout also rose from 30s to 60s, because the first call after a
+deployment is the slow one.
+
+And `clasp create-script --type forms --title X` names the **script project**,
+not the form. `ping` returned `{"ok":true,"form":""}` -- the script could
+reach its form and the form had no name -- so `form create --title` never
+reached anything a student sees. Fixed with a `rename` op called once at
+creation, deliberately **not** part of `push`: the form's title belongs to the
+instructor, like the banner and the syllabus links.
+
+### What this says about the testing
+
+Every one of the seven lived in code with passing tests. The tests were not
+weak; they were mocked at the wrong seam. They described what a cooperating
+deployment would say, and every bug was in what we said to clasp, what clasp
+did to our files, or what Google does when it is not cooperating.
+
+All fixes are mutation-checked -- each bug put back individually is caught,
+and the four retry behaviours are caught one test each. 232 tests.

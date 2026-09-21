@@ -915,33 +915,45 @@ unchanged. That last step is the test that matters.
 | 6a course + roster | **done** | one roster, jobs resolving it, class lists merging on id |
 | 6b availability | **done** | a list the form push and the print job both read |
 | 6c print record | **done** | SQLite written from the manifest; queries read-only |
-| 7a form write | **built, unverified** | create-or-attach, then push the derived slots |
-| 7b form read | next | responses pulled to the day's skills; CSV kept |
+| 7a form write | **done, verified** | create-or-attach, then push the derived slots |
+| 7b form read | **next** | responses pulled to the day's skills; CSV kept |
 | 8 GUI | | seating drag-and-drop writing the file the CLI reads |
 | 9 gradebook | | pass / no pass / absent, and the table editor for it |
 
-### 7a is built but has never spoken to Google
+### 7a ran against a real account on 2026-09-21
 
-`appsscript/Code.gs` and `src/checkit_printit/clasp.py` were written from the
-retired Apps Script and the API reference, not from a round trip. Twenty tests
-run against a local server impersonating the deployment, which covers this
-side of the wire and nothing beyond it.
+`form attach`, `form add-items`, `form push --dry-run` and `form push` all
+work end to end against a scratch form on the institutional account. Seven
+bugs were found, in code that had 220 passing tests. Full account in
+`CODEBASE_NOTES.md`, "Stage 7a, against a real Google account".
 
-**Do first, on a throwaway form, not the live one:**
+**The largest open risk in this design is now closed.** An anonymous POST
+from a terminal holding no Google credential is accepted, so the
+open-with-a-secret transport works on this domain. The 403 that suggested
+otherwise was an unauthorized script, not a policy block.
 
-1. `checkit-printit form create -c <test course> --title "Scratch"` --
-   exercises clasp login, form creation, push, deploy, and item creation in
-   one go. Everything that can be wrong is wrong here first.
-2. `form push --dry-run`, then `form push`, then look at the form.
-3. Only then `form attach --script-id ...` against the real form, which
-   changes nothing on it, followed by `form map` and a `--dry-run` push.
+Neither predicted failure happened. `_deployment_id` parsed correctly first
+time, and `.clasp.json` landed where `script_id()` expects. What actually
+broke was elsewhere:
 
-**Most likely to need fixing:** `clasp._deployment_id` parses clasp's output
-for an id, and that wording has changed between versions -- it matches on
-shape (`AKfycb...`, over 30 characters) rather than position for that reason,
-but it is still parsing chatter. Second most likely: whether
-`clasp create-script --type form` leaves `.clasp.json` where `script_id()`
-expects it.
+- `--type form` is not a type; it is `forms`. And `push-files` is not a
+  command; it is `push`. Untestable at the old seam, because the tests
+  assert on what the deployment replies and never on the argv.
+- **clasp exits 0 on a refusal**, so `check=True` passed an invalid `--type`
+  straight through.
+- **`clasp create-script` overwrites `appsscript.json` in `--rootDir`**,
+  dropping the `webapp` block, so the deployment had no entry point. `attach`
+  was already immune because it re-stages over the cloned files.
+- **Apps Script 404s a live deployment at random** -- measured at one in
+  three. `call()` retries 404 and timeout, never 401/403.
+- `--title` names the script project, not the form. A `rename` op fixes it at
+  creation only; a push must never touch the title.
+
+**Still to do in 7a:** `form create` has not been run to completion, only
+`form attach`. A newly created form needs **one browser visit to authorize
+the script** before any call succeeds -- the manual path gets this free from
+the editor's deploy flow, and the clasp path does not. `form create` should
+print the URL and wait.
 
 ### What 7b needs
 
@@ -979,9 +991,10 @@ addresses accumulate rather than replace.
 
 ### 12.9 Still open
 
-0. **Nothing in stage 7 has run against a real Google account.** See the
-   staging table above for the order to test it in, and what is likeliest to
-   break.
+0. ~~Nothing in stage 7 has run against a real Google account.~~
+   **Settled 2026-09-21: 7a works.** One thing remains open --
+   `form create` needs to prompt for the one-time browser authorization that
+   the editor's deploy flow does automatically. See the staging table.
 
 1. ~~Whether the Google Cloud path is open on the institutional account.~~
    **Settled 2026-09-20: it is not.** No Cloud projects on that account, so
