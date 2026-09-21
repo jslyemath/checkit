@@ -42,13 +42,19 @@ mat-106's venv has checkit installed **editable**, pointing at `Projects/checkit
 - `--remote URL` — required when the bank has images
 - `--thaw SLUG` — regenerate an outcome marked `<frozen/>`
 
-`checkit-printit`: `init`, `install`, `build`, `import`. `build --preview` writes nothing and reports what would print — read its "versions N distinct" line.
+`checkit-printit` has grown a lot: `build`, `init`, `install`, plus
+`workspace`, `roster`, `skills`, `record` and `form` groups. Its own
+`CLAUDE.md` lists them all — read that before touching it.
 
 ## Seed tiers
 
 - `0 .. 49` (`PUBLIC_SEEDS`) — students; inlined in `bank.json`
 - `50 .. 399` (`BUNDLE_UNTIL`) — instructors; per-outcome `derived.json`
-- `400+` — print only; data in `seeds.json`, nothing precomputed or published
+- `400+` — print only. Data lives in `seeds.json`, which is **not** published;
+  as of 0.2.9.1 `bank.json` drops the `data` for these too. It used to carry
+  it, so 17,400 print-only exercises were served publicly with their answers,
+  and the viewer would render one from a hand-typed URL. Both are fixed; the
+  fix only reaches a bank on its next `generate` and deploy.
 
 Images are rasterized to 400, because nothing past that can consume one: the viewer shows 50, bundles stop at 400, LMS export runs 100–399, and **print uses no PNGs at all** — it `\input`s the `.tikz`, written for all 1000 seeds.
 
@@ -76,14 +82,53 @@ A template that documents its own syntax will have that documentation parsed as 
 
 - **mat-206: do not modify, do not push.**
 - Real student names live in `mat-106-checkit/TeX Outputs/` (gitignored), `../FundCheck`, and every print run under `~/CheckItPrintIt`. Never commit them, never paste them into chat unless asked.
-- Print output goes to `~/CheckItPrintIt/<course>/<title>/`, deliberately outside every repo.
+- Print output goes to `~/CheckItPrintIt/<course>/<title>/`, and course state
+  to `~/CheckItPrintIt/workspaces/<name>/` — both deliberately outside every
+  repo, because they hold names, student ids and email addresses.
+- Never paste a student name into chat. Mask output that might contain one.
 
 ## Checks that have failed silently here
 
-Each of these shipped something wrong while reporting success:
+Each of these shipped something wrong while reporting success. They are not
+hypothetical and several have recurred after being written down.
 
-- **A merge is not done when tests pass.** Diff the commit against what you meant to merge — the 0.2.9 merge kept ancestry and lost nine files' content, and every check looked at the working tree, where it was genuinely present.
-- **A PDF existing is not a clean compile.** pdflatex recovers from errors and writes one anyway. Fixed in `wrapper/tikz.py`, but the habit generalises.
-- **`command | tail` reports tail's exit code.** Redirect a build to a file instead, or a failure reads as success.
-- **Counting seeds is not counting figures.** "400 seeds imaged" was true while nine figures were missing.
-- Bash heredocs eat backslashes, and `sed` treats `\u` as an escape. Write LaTeX-bearing scripts as files, with raw strings.
+**Write patch scripts with the Write tool, never a heredoc.** A heredoc
+mangles backslashes, so `\n` in a Python string becomes a real newline and the
+find-and-replace matches nothing. This has cost time five times in a single
+session. `sed` is worse: `\u` is an escape, which breaks every `\usepackage`.
+Put `assert old in text` in the script so a missed match writes nothing.
+
+**`command | tail` reports tail's exit code.** Redirect to a file, check `$?`
+alone, then read the file. Done again this week despite being listed here.
+
+**A test that passes proves nothing until you have watched it fail.** Break
+the code deliberately and confirm the test notices. Doing that found four
+vacuous tests in one session — and three of them were the test for the thing
+most recently fixed, written while thinking about the fix rather than about
+what could still be wrong.
+
+**Run it on real data.** Three bugs this week lived in code whose tests all
+passed and appeared only against the instructor's actual files.
+
+**Verify the artifact, not the dry run.** `build --preview` and `build` draw
+independently without a shared `--seed`, so checking the preview proved
+nothing about what shipped.
+
+**Do not declare something impossible without checking.** "A CLI cannot sign
+in to Google" was asserted twice, wrong both times, and sent a design down a
+worse path.
+
+**A merge is not done when tests pass.** Diff the commit against what you
+meant to merge — the 0.2.9 merge kept ancestry and lost nine files' content,
+and every check looked at the working tree, where it was genuinely present.
+
+**A PDF existing is not a clean compile.** pdflatex recovers from errors and
+writes one anyway. Fixed in `wrapper/tikz.py`; the habit generalises.
+
+**Counting seeds is not counting figures.** "400 seeds imaged" was true while
+nine figures were missing.
+
+**`gh` defaults to a fork's parent.** Both clones now have
+`gh repo set-default` pointing at `jslyemath/...`, but before that a release
+command aimed itself at `StevenClontz/checkit`. Check `--repo` on anything
+that writes.
