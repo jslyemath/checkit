@@ -5699,3 +5699,86 @@ have to be rewritten by hand, and they are the sentences most worth keeping.
   of them.
 - Nothing needed migrating on disk: no course folder existed yet, and no job
   file referenced one. This was the last moment the rename was free.
+
+## First contact with clasp (2026-09-21)
+
+Stage 7a was written from the retired Apps Script and the clasp reference, and
+had never been executed. Twenty tests passed against a local server
+impersonating the deployment. Before spending the instructor's Google account
+on it, clasp 3.4.1 was interrogated directly -- `--version`, `--help`, and one
+deliberately invalid argument -- which found three bugs without signing in to
+anything.
+
+### `--type form` is not a script type
+
+    $ clasp create-script --type bogus --title x
+    Invalid script type "bogus". Valid types are: standalone, webapp, api,
+    docs, forms, sheets, slides.
+
+`forms`, plural. `create_form` passed the singular.
+
+### `push-files` is not a command
+
+    $ clasp push-files
+    Unknown command "clasp push-files"
+
+It is `push`. Worth noting how this hid: running `clasp push-files --help`
+prints clasp's *global* help and exits 0, which looks so much like a normal
+help page that a first check read it as confirmation. The tell was that every
+real subcommand prints its own `Usage: clasp create-deployment|deploy ...`
+line, and this one printed `Usage: clasp <command> [options]`. Comparing the
+shape of several outputs is what exposed it; reading one in isolation did not.
+
+### The exit code lies, which is what made the other two dangerous
+
+`create-script --type bogus` prints "Invalid script type" **and exits 0**. So
+`run(..., check=True)` passed it straight through, and the failure surfaced
+two calls later as:
+
+    no .clasp.json in ..., so clasp did not leave a project behind.
+
+True, and pointing at entirely the wrong thing. `run()` now scans output for
+clasp's own refusal phrases -- "invalid script type", "unknown command",
+"unknown option" -- and raises whatever the exit code claims, saying in the
+message that the exit code was 0. This is the same shape as the entry in
+CLAUDE.md about `command | tail`: a success code that was never a success.
+
+### Why no test caught any of it
+
+All 220 tests passed before these fixes and after. They mock at the wrong
+seam: they assert on what the *deployment* replies, and never on the argv
+handed to clasp. So a wrong subcommand name was invisible by construction.
+
+`TestTheCommandNamesClaspActuallyHas` now records argv and pins
+`create-script --type forms`, `push` and `create-deployment` against
+`clasp --help` on 3.4.1. All three fixes were mutation-checked: each bug put
+back individually is caught, by one test each.
+
+### Two more, from running `course init` for the first time
+
+Not Google's fault, ours, and both only visible on real use.
+
+**`--adopt=` could not work.** The help said "--adopt= for none" and the
+handler distinguished `None` (unset, adopt the newest job) from `""`
+(explicitly none) -- but the option was `type=click.Path(exists=True)`, so
+Click rejected the empty string before the handler ran. There was therefore no
+way to create a course without adopting a job folder. On this machine the
+newest job holds 48 real students, so a scratch course for testing Google
+would have silently adopted all of them. Now `click.Path()` with the existence
+check done by hand.
+
+**`course init` printed the pre-rename key.** Its closing hint said to write
+
+    [course]
+    name = "Scratch"
+
+which after the rename earlier the same day resolves nothing and reports no
+error -- precisely what `test_the_header_name_is_not_a_folder` exists to
+prevent. The CLI was handing the user the exact mistake the test guards
+against. It now prints both keys with the distinction spelled out.
+
+Same root as five stale `-w` flags in next-step hints: the rename replaced
+`"-w"` in option definitions but not ` -w ` inside message strings, so the
+tool would have told the user to run commands that no longer parse. **Nothing
+tests the wording of a hint**, so all six were found by reading rather than by
+running, while looking for something else.
