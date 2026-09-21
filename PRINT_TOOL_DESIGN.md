@@ -610,7 +610,7 @@ Stages 1-5 are built and in use: a real class set of 48 students printed on
 2026-09-18 from form responses. This section is stages 6 and 7 plus the GUI,
 and revises 7, 10 and 11 where they disagree.
 
-### 12.1 The workspace
+### 12.1 The course
 
 **The problem, concretely.** A job folder is self-contained: `publication.py`
 resolves `[roster] path` relative to the publication file, so every job carries
@@ -623,13 +623,13 @@ one, so the fix has to be remembered and reapplied at copy time. Miss it and
 they get a paper. Nothing detects the drift, because three files that disagree
 are three valid files.
 
-**A workspace is the home for state that outlives a job.**
+**A course folder is the home for state that outlives a job.**
 
 ```
 ~/CheckItPrintIt/
-├── workspaces/
+├── courses/
 │   └── MAT 106/
-│       ├── workspace.toml      name, semester, professor, bank path
+│       ├── course.toml         name, code, semester, professor, bank path
 │       ├── roster.toml         last, first, preferred, sid, email, section, dropped
 │       ├── seating.toml        groups + desk x/y -- the GUI's file
 │       ├── availability.toml   skills open for retake + the next assessment
@@ -640,16 +640,19 @@ are three valid files.
 └── MAT 106/<title>/            output, unchanged
 ```
 
-**A workspace is not a course.** One instructor runs both sections of MAT 106
-from a single workspace with one form and `section` as a roster field. Another
-wants each section separate, with its own seating and its own form. The
-directory is named by the instructor; nothing derives it from the course.
+**One course folder need not be one course.** An instructor may run both
+sections of MAT 106 from a single folder with one form and `section` as a
+roster field. Another may make "MAT 106 820" and "MAT 106 830" and keep
+them wholly apart, each with its own roster, seating chart, form,
+availability list and print record. Both are supported and neither is the
+default. The directory is named by the instructor; nothing derives it from
+the course code, and `course init` will make as many as you like.
 
 **Resolution order in `publication.load()`:**
 
 1. an explicit `[roster] path` -- use it, so every existing job folder keeps
    working unchanged;
-2. else `[workspace] name` -> `~/CheckItPrintIt/workspaces/<name>/roster.toml`;
+2. else `[course] folder` -> `~/CheckItPrintIt/courses/<name>/roster.toml`;
 3. else an error naming both options.
 
 **Not a symlink.** `viewer/public/assets/bank.json` is a git symlink that
@@ -687,7 +690,7 @@ A dropped student is excluded from printing, from seating auto-fill and from
 form pushes, and stays in every query.
 
 **Importing is a merge, and absence is not deletion.** A student present in the
-workspace but missing from a fresh Banner export is marked `dropped = true`,
+course but missing from a fresh Banner export is marked `dropped = true`,
 not removed. A re-import must not clobber `preferred`, `section` overrides, or
 anything the seating chart references.
 
@@ -731,7 +734,7 @@ are not possible in Google Forms without one form per student.
 
 **The rule: if a human is the author, TOML. If the tool is the author, SQLite.**
 
-Roster, seating, availability, workspace, form config and publication are all
+Roster, seating, availability, course config, form config and publication are all
 hand-edited or GUI-edited, bounded in size, and read by eye. The print record
 is none of those things:
 
@@ -869,7 +872,7 @@ access situation ever changes, this reverses.
 
 A web app that can rewrite the form is a capability URL. It must require a long
 shared secret in the request body and reject anything without it; the secret
-lives in the workspace's `secrets/` directory.
+lives in the course's `secrets/` directory.
 
 **Deployment is not copy-and-paste.** `clasp`, Google's Apps Script CLI, clones
 a script to local files and pushes them back:
@@ -909,7 +912,7 @@ unchanged. That last step is the test that matters.
 
 | stage | state | ends with |
 |---|---|---|
-| 6a workspace + roster | **done** | one roster, jobs resolving it, class lists merging on id |
+| 6a course + roster | **done** | one roster, jobs resolving it, class lists merging on id |
 | 6b availability | **done** | a list the form push and the print job both read |
 | 6c print record | **done** | SQLite written from the manifest; queries read-only |
 | 7a form write | **built, unverified** | create-or-attach, then push the derived slots |
@@ -926,7 +929,7 @@ side of the wire and nothing beyond it.
 
 **Do first, on a throwaway form, not the live one:**
 
-1. `checkit-printit form create -w <test workspace> --title "Scratch"` --
+1. `checkit-printit form create -c <test course> --title "Scratch"` --
    exercises clasp login, form creation, push, deploy, and item creation in
    one go. Everything that can be wrong is wrong here first.
 2. `form push --dry-run`, then `form push`, then look at the form.
@@ -955,9 +958,10 @@ addresses accumulate rather than replace.
 
 | | |
 |---|---|
-| Persistent state lives in a workspace outside every repo | student data must never enter a repository, and copies drift |
-| A workspace is named by the instructor, not derived from the course | one instructor wants both sections together, another wants them apart |
-| A job names a workspace; an explicit path still wins | one place to fix a name, and no existing job folder breaks |
+| Persistent state lives in a course folder outside every repo | student data must never enter a repository, and copies drift |
+| A course folder is named by the instructor, not derived from the course code | one instructor wants both sections together, another wants them apart, and `course init` will make as many as they like |
+| A job names a course; an explicit path still wins | one place to fix a name, and no existing job folder breaks |
+| The job's pointer is `[course] folder`, a key, not a `[course]` table | a publication file already has a `[course]` table for the printed header, and TOML refuses a duplicate. `name` prints, `folder` resolves |
 | TOML for human-authored state, SQLite for the print record | unbounded, machine-written, queried, and written by two processes |
 | Legal name and preferred name are separate fields | the seating chart uses preferred names; Banner will not |
 | SID joins, email is the fallback, name is never a key | SIDs do not change |
@@ -967,8 +971,8 @@ addresses accumulate rather than replace.
 | Patch recorded item ids; never recreate form or question | responses are keyed to `questionId` |
 | Printed and attempted are different facts | the build cannot know who was in the room |
 | No retake cap | none exists in the course |
-| Workspaces live in `~/CheckItPrintIt/workspaces/<name>/` | beside the job folders and the output, all outside every repo; configurable later if anyone needs it |
-| `workspace init` offers to adopt the newest job's roster and seating | there are already three copies on disk and none of them should be retyped; it prints which files it read |
+| Courses live in `~/CheckItPrintIt/courses/<name>/` | beside the job folders and the output, all outside every repo; configurable later if anyone needs it |
+| `course init` offers to adopt the newest job's roster and seating | there are already three copies on disk and none of them should be retyped; it prints which files it read |
 | `openpyxl` is added as a dependency | Banner and the seating charts both arrive as `.xlsx`, and requiring a save-as-CSV first defeats an importer whose purpose is removing manual steps |
 | Responses stay scoped by the confirmed date | it is what the current system does, it survives a late submission that a timestamp window would miss, and the confirmation question already exists |
 | The cold-call system waits for the seating GUI | it belongs at the top of that window, and it is far down the road |
@@ -1089,7 +1093,7 @@ useful record of behaviour that exists nowhere else.
 `checkit-printit` repository, with a README saying what it is. It carries no
 student data; that was checked rather than assumed.
 
-**The Sheet also held state that now belongs to the workspace**: the roster
+**The Sheet also held state that now belongs to the course**: the roster
 with dropped flags, the seating charts, the available-skills list with its
 tick boxes, the Printed log, the email templates, and the run settings
 (title, date, key count, extras count, the three selection modes). Those map

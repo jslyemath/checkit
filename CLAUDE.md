@@ -46,7 +46,7 @@ mat-106's venv has checkit installed **editable**, pointing at `Projects/checkit
 - `--thaw SLUG` — regenerate an outcome marked `<frozen/>`
 
 `checkit-printit` has grown a lot: `build`, `init`, `install`, plus
-`workspace`, `roster`, `skills`, `record` and `form` groups. Its own
+`course`, `roster`, `skills`, `record` and `form` groups. Its own
 `CLAUDE.md` lists them all — read that before touching it.
 
 ## Seed tiers
@@ -86,7 +86,7 @@ A template that documents its own syntax will have that documentation parsed as 
 - **mat-206: do not modify, do not push.**
 - Real student names live in `mat-106-checkit/TeX Outputs/` (gitignored), `../FundCheck`, and every print run under `~/CheckItPrintIt`. Never commit them, never paste them into chat unless asked.
 - Print output goes to `~/CheckItPrintIt/<course>/<title>/`, and course state
-  to `~/CheckItPrintIt/workspaces/<name>/` — both deliberately outside every
+  to `~/CheckItPrintIt/courses/<name>/` — both deliberately outside every
   repo, because they hold names, student ids and email addresses.
 - Never paste a student name into chat. Mask output that might contain one.
 
