@@ -5605,3 +5605,97 @@ each time:
 That last is the pattern. The test for the bug just fixed is the likeliest to
 be vacuous, because it gets written while thinking about the fix rather than
 about what could still be wrong.
+
+## Workspaces became courses (2026-09-21)
+
+The name was wrong and had been since it was coined. "Workspace" means "the
+folder my editor has open" to anyone who has used VS Code, and
+`mat-106-checkit.code-workspace` is a real file sitting in the bank, so the
+collision was already on disk. The thing it named holds a roster, a seating
+chart, an availability list, a Google Form's item ids, and a record of every
+paper handed out -- one instructor's teaching context for a term.
+
+### Why not the alternatives
+
+`binder` was proposed first and rejected. `class` was seriously considered and
+is *not* blocked the way a first pass claimed: Click accepts `--class` with no
+alias at all, because it stores the parameter under the literal string
+`'class'`, a dict key rather than an identifier, and `[class]` is a valid TOML
+table. Only three things genuinely break, all of them places where the word
+would become a bare Python name -- a module called `class.py`, `def cmd(class)`,
+and a dataclass field `class: str`. So the cost is not a wall but a permanent
+tax: the code could never say the word, and would read `klass` or `class_` in
+roughly 120 places forever.
+
+`course` was rejected earlier in the design on the grounds that "a workspace is
+not a course". That objection conflated two claims. The one worth keeping is
+that the *directory name* must not be derived from the course code -- an
+instructor may want one folder for both sections, or one per section. Calling
+the *concept* a course does not force the derivation. The folder is still named
+by whoever makes it, and `course init` makes as many as you like. Both guides
+and 12.1 now say this explicitly, because it is the thing the old name was
+protecting and the new name could be read as discarding.
+
+### The collision that made this more than a rename
+
+`publication.toml` already had a `[course]` table -- the printed header: name,
+semester, professor, title, date. A blind rename would have produced a second
+`[course]` table in the same file for the job's pointer at its state folder,
+and **TOML rejects a duplicate table outright**, so every job file would have
+stopped parsing.
+
+Resolved by making the pointer a *key* in the existing table rather than a
+table of its own:
+
+    [course]
+    name   = "MAT 106"        # what prints in the header
+    folder = "MAT 106 820"    # which course directory to read
+
+`name` prints, `folder` resolves. In the code the same split is
+`Publication.course` (header string, unchanged) and `Publication.course_folder`
+(the pointer, renamed from `Publication.workspace`).
+
+This is additive. A job with no `folder` key resolves nothing from a course,
+which is exactly what the six job folders on this machine do, so all six keep
+working untouched -- verified by loading every one of them after the change.
+
+### The test that was quietly vacuous
+
+`test_an_explicit_path_still_wins` passed before and after. It passed for the
+wrong reason: its fixture named no course, so `space` was empty, nothing was
+ever resolved from a course, and "explicit wins" was never exercised. Given a
+course to win against, it now tests what its name says.
+
+A second gap had nothing asserting it at all: that `[course] name` is never
+read as a directory. Six real job folders say `name = "MAT 106"` meaning the
+header, and a course folder called `MAT 106` is precisely what an instructor
+would create -- so a fallback from `folder` to `name` would have silently
+pulled in a roster nobody asked for. `test_the_header_name_is_not_a_folder`
+covers it, and was mutation-checked: adding
+`course.get("folder", course.get("name", ""))` makes it fail, and only it.
+
+### What a blind pass would have destroyed
+
+Two lines in `PRINT_TOOL_DESIGN.md` say "Workspace" meaning **Google**
+Workspace -- the admin console, verification review, domain-wide app
+restrictions. A case-preserving global replace would have turned Google's
+product into "Course" and quietly corrupted the one section explaining why
+there is no OAuth client. They are listed as allowed exceptions in the patch
+and left alone.
+
+The blind pass also produced, in `course.py`, the sentence **"A course is not a
+course."** -- the old paragraph's argument, rendered into nonsense by its own
+rename. That is the general shape of the hazard: a mechanical rename is safe
+for code and unsafe for any sentence that was *arguing about the name*. Those
+have to be rewritten by hand, and they are the sentences most worth keeping.
+
+### Verified, not assumed
+
+- 220 tests pass (219 before, plus the new one).
+- All six real job folders in `~/CheckItPrintIt/jobs/` load, each reporting
+  `course='MAT 106'` and `folder=''`.
+- `checkit-printit --help` lists `course`; `course init` is there.
+- `-c` was free; the old `-w` appeared 13 times and was the course flag in all
+  of them.
+- Nothing needed migrating on disk: no course folder existed yet, and no job
+  file referenced one. This was the last moment the rename was free.
