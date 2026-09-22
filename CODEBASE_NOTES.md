@@ -5913,3 +5913,40 @@ did to our files, or what Google does when it is not cooperating.
 
 All fixes are mutation-checked -- each bug put back individually is caught,
 and the four retry behaviours are caught one test each. 232 tests.
+
+## The script is not the form (2026-09-21)
+
+A URL handed to the instructor to look at the new scratch form returned
+"the file you have requested does not exist." It had been built from the
+**script** id, and an Apps Script bound to a form is a separate Drive file
+from the form it drives.
+
+The mistake was not the URL. `Connection.form_id` had never once held a form
+id: both call sites assigned the script's id to it, and `form.toml` wrote it
+as `[form] id` under a comment reading "Which form, and which item in it
+holds each thing printit writes." Nothing in printit knew which form it was
+talking to, and nothing noticed, because nothing had ever needed to say.
+
+Now `script_id` and `form_id` are separate fields. Only `ping` can supply the
+second -- clasp reports the script, and the script id cannot be turned into a
+form id -- so `ping` and `rename` return `formId`, `editUrl` and `liveUrl`
+from an `identity_()` helper, and the CLI prints where it landed. A
+`form.toml` written before the split still loads, with the legacy `id` read
+back as a *script* id; reading it as a form id would silently rebuild the
+broken URL, so that is mutation-checked.
+
+### The same block existed twice
+
+Adding the URL to the output appeared to do nothing. `form attach` does not
+call `_deploy_and_record` -- it carries its own inline copy of deploy, ping
+and echo -- so patching the shared helper left attach unchanged while looking
+like a fix. That is the second time in one day a change landed in one of two
+copies: the `workspace` rename replaced `"-w"` in option definitions and left
+five ` -w ` strings in the messages telling the user what to run next.
+
+Both are now one function, `_report_identity`.
+
+**The pattern worth keeping:** when a change to shared output does not show
+up, the question is not "did the code deploy" but "is there a second copy".
+Both times the first instinct was a stale deployment, and both times the
+deployment was fine.
