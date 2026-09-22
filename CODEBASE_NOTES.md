@@ -5950,3 +5950,91 @@ Both are now one function, `_report_identity`.
 up, the question is not "did the code deploy" but "is there a second copy".
 Both times the first instinct was a stale deployment, and both times the
 deployment was fine.
+
+## The audit after the rename (2026-09-21)
+
+Asked to double-check the day's work, on the grounds that a lot of it had
+gone wrong the first time. Rather than reread everything, the check was
+written as a script aimed at the shapes this session actually produced --
+`tools`-adjacent, kept in the scratchpad, and worth rewriting rather than
+preserving. It looked for: leftovers of the rename, commands named in strings
+or docs that do not exist, options in help text that are not real, duplicated
+logic, parameters declared and never used, and whether every CLI command
+parses.
+
+Thirteen findings, four of them real.
+
+### Nine stale flags, in a third hiding place
+
+`checkit-printit/CLAUDE.md`'s command table still said `-w` in nine rows. The
+rename had replaced `"-w"` in option definitions and, later, ` -w ` in the
+message strings that tell a user what to run next. This was `` `-w` `` in a
+markdown table -- a third spelling, missed by both passes.
+
+The lesson is not "grep harder". It is that **a rename has as many hiding
+places as the token has spellings**, and the only way to be sure is to check
+against the thing itself: the audit derives the real flags by running
+`--help` on all twenty-one commands, so it cannot go stale the way the table
+did.
+
+### An error message naming a command that never existed
+
+`clasp.py`'s "you do not have Node" error said to run
+`checkit-printit form manual`. There has never been such a command; it is
+`form setup`. That message fires precisely when somebody is already stuck
+with no way forward, which is the worst possible moment to be sent to a
+command that does not exist.
+
+Found by extracting every `checkit-printit X Y` from every source file and
+document and checking each against the live CLI.
+
+### The manual path never got the day's fixes
+
+`form connect` -- the last step of the hand-deployment route, for when clasp
+is not an option -- still pinged directly. So it skipped the authorization
+walk-through, did not record the form id, and did not print the form's URL:
+everything the clasp path gained today, the hand path did not. It now goes
+through `_ping_authorized` and `_report_identity` like the others.
+
+This is the third instance in one day of the same thing: **a fix applied to
+one of several paths that do the same job.** First the `-w` strings, then
+`form attach` carrying its own copy of deploy/ping/echo, now `form connect`.
+The audit checks for it by counting call sites against a commented,
+deliberate allowance.
+
+### A replay recorded a seed it had never used
+
+The strongest regression check after the rename was replaying a real print
+run: the 2026-09-21 W2/W3 set, forty-eight students. Twelve of thirteen files
+came back byte-identical, and `manifest.toml` differed only in `built` and
+`seed`.
+
+The seed difference was the bug. `--replay` draws nothing -- every version
+comes from the manifest -- but `run_seed` was generated unconditionally and
+written to both `manifest.toml` and `record.db`. The replayed run was
+therefore logged under `seed = 65131431`, a number that had chosen nothing
+and that would produce *different* papers if anyone passed it to `--seed`.
+`record.db` outlives the output folder, so the wrong number would have
+outlived the evidence.
+
+`_choose_run_seed` now carries the replayed run's seed, and the report says
+"carried from the run being replayed; it drew nothing here" rather than
+"repeat this draw with --seed". It was extracted from the middle of a
+120-line command to be testable at all, which is why nothing had covered the
+branch that mattered.
+
+### What the audit confirmed rather than found
+
+- Both suites pass: 239 printit, 152 plus 96 subtests in checkit.
+- All 21 CLI commands parse, and every documented option exists.
+- The shipped 2026-09-21 run still passes all seven checks in
+  `verify_run.py`, including 104 pages and a clean compile.
+- Replay reproduces that run's papers byte for byte.
+- No dead parameters. `retries=` had been one for about twenty minutes
+  earlier in the day -- declared in a signature and never implemented -- and
+  the check exists because of it.
+
+The four real findings were all documentation or plumbing, not the print
+path. That is the reassuring part: the thing that produces papers for
+forty-eight students was unaffected, and was verified against its own output
+rather than assumed.

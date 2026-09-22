@@ -150,6 +150,13 @@ writes one anyway. Fixed in `wrapper/tikz.py`; the habit generalises.
 **Counting seeds is not counting figures.** "400 seeds imaged" was true while
 nine figures were missing.
 
+**A fix applied to one path is not applied to the others.** Three times in
+one day: a rename that caught `"-w"` but not ` -w ` or `` `-w` ``, a
+`form attach` carrying its own copy of a helper that had just been fixed, and
+a hand-deployment path that missed every improvement the automated one got.
+When a change to shared behaviour does not show up, ask "is there a second
+copy", not "did it deploy".
+
 **Writing to `CLAUDE.md` is not writing to `CODEBASE_NOTES.md`.** Twenty-six
 commits went unrecorded because the notes felt superseded by the map. They are
 not; see the table above.
