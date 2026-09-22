@@ -935,7 +935,7 @@ command that already does the work.
 | **Skills** | toggle which skills are open for retake; set the assessment's name, date, due time, and the choose/limit rule; see the exact wording the form will show; push it | `skills open`, `skills set`, `skills preview`, `form push` |
 | **Responses** | who has answered, who has not, what they chose; the addresses that matched nobody; pull into the roster | `form pull` |
 | **Seating** | drag students between seats; randomise; swap two; see version letters and empty seats | *(none -- see below)* |
-| **Print job** | choose skills and per-skill variant, extras, keys, names; preview the draw; build; open the PDF | `build`, `build --preview` |
+| **Assessment** | the staging area for one sitting: each student's choices with a manual override, skills appended for everyone, defaults for non-responders, per-skill variant, title and date, extras, keys, names; preview the draw; build; open the PDF | `build`, `build --preview` |
 | **Record** | what has been printed, to whom, when, at which seed; per-student and per-skill views | `record runs`, `record student`, `record skills` |
 | **Cold call** | pick a random student, pick several, refresh the call list with its skip flags | *(none)* |
 | **Setup** | create or attach the form, map items, course settings, bank path | `course init`, `form create`, `form attach`, `form map`, `form add-items`, `form connect` |
@@ -945,6 +945,24 @@ code that exists and is tested. The two rows with no CLI are the genuinely new
 work, and **seating is one of them** -- `randomizeSeating` and
 `shuffleSelectedStudents` were Control Center features that have no printit
 equivalent at all. That is worth knowing before estimating.
+
+#### The roster is the course; choices belong to one sitting
+
+Decided 2026-09-22, on seeing the first roster table. It had a "Chose" column
+showing each student's current selections, which was wrong twice over: what a
+student picked belongs to *one assessment*, and the roster outlives every
+assessment. A column that changes meaning each week does not belong in the
+table that holds who is enrolled.
+
+So the **Roster** view is the course overall -- who exists, what they are
+called, which section, who has left -- and never mentions an assessment.
+
+Choices live in the **Assessment** view instead, which is a staging area for
+one sitting rather than a form with a Build button on it: each student's
+choices shown with a manual override, skills appended for everyone, defaults
+for whoever did not respond, the per-skill variant, the title and date, the
+extras. It is where an instructor assembles the paper before printing it,
+which is what `importStudentChoices` did in the Control Center.
 
 #### What the GUI needs that the CLI does not
 
@@ -1005,7 +1023,7 @@ on its own:
 | 8a | **done** -- the shell: serve a course, switch views, read-only everywhere | proves the backend reads what the CLI reads |
 | 8b | **done** -- **Roster** table, editable, with drop and restore | the most-wanted, and write-round-trip is the thing to get right early |
 | 8c | **Skills** and the form push, with a visible diff | replaces the most tedious CLI sequence |
-| 8d | **Print job**, including the variant dropdowns | the first view that needs the bank, not just the course |
+| 8d | **Assessment**: choices with overrides, defaults, variants, then build | the first view that needs the bank, not just the course |
 | 8e | **Record** and **Responses**, both read-mostly | cheap once the shell exists |
 | 8f | **Seating**, drag and drop, plus randomise and swap | genuinely new code; the interaction needs prototyping rather than specifying |
 | 8g | **Cold call** | new, and the smallest |
