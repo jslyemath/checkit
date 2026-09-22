@@ -916,7 +916,7 @@ unchanged. That last step is the test that matters.
 | 6b availability | **done** | a list the form push and the print job both read |
 | 6c print record | **done** | SQLite written from the manifest; queries read-only |
 | 7a form write | **done, verified** | create-or-attach, then push the derived slots |
-| 7b form read | **next** | responses pulled to the day's skills; CSV kept |
+| 7b form read | **built, one thing unverified** | responses pulled to the day's skills; CSV kept |
 | 8 GUI | | seating drag-and-drop writing the file the CLI reads |
 | 9 gradebook | | pass / no pass / absent, and the table editor for it |
 
@@ -955,7 +955,16 @@ the script** before any call succeeds -- the manual path gets this free from
 the editor's deploy flow, and the clasp path does not. `form create` should
 print the URL and wait.
 
-### What 7b needs
+### 7b is built; one thing is unverified
+
+`form pull` works and `responses.py` is mutation-tested through fifteen
+mutations. **No real response has been read.** The scratch form holds none, so
+the op has only returned an empty list. Unknown: the shape Google gives a
+checkbox answer (an array is assumed, a bare string tolerated by `_as_list`)
+and whether `getRespondentEmail()` is populated on this domain. One
+submission to the scratch form settles both.
+
+### What 7b needed
 
 Responses are scoped to an assessment **by the date the student confirms**,
 not by a timestamp window -- see 12.10. The confirmation checkbox exists for

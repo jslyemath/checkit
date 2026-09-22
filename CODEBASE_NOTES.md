@@ -6038,3 +6038,83 @@ The four real findings were all documentation or plumbing, not the print
 path. That is the reassuring part: the thing that produces papers for
 forty-eight students was unaffected, and was verified against its own output
 rather than assumed.
+
+## Stage 7b: reading the responses (2026-09-21)
+
+`form pull` reads an assessment's responses into the course roster. The Google
+half is deliberately thin: a `responses` op that returns timestamp, respondent
+email and answers keyed by **item id**, and decides nothing. Every rule lives
+in `responses.py`, where it can be tested without a network -- the half that
+cannot be tested from here is the half with no rules in it.
+
+### Scoping, and why the checkbox exists
+
+A form accumulates responses all term, so the first question is always which
+of them belong to today. The retired Control Center answered it with
+`filterArrayBySingleDateCriterion(responses, 0, 2, GetDate)`: match the
+response's date against the assessment's. **That is what the "Confirm Skill
+Checkpoint Date" checkbox is for** -- it is the scoping key, not a nudge, and
+it survives a late submission that a timestamp window would drop.
+
+Two things changed in carrying it over.
+
+The old script read **column 2 of a sheet**. That is exactly the positional
+fragility this design rejects everywhere else, and the same mistake as
+`getItems(CHECKBOX)[1]`, where inserting one header silently retargeted every
+write. The confirmation is now found by its recorded item id.
+
+And the date is read out of **the student's own answer** rather than a
+separate column, because the answer is the thing that says which assessment
+they were answering for. printit generates that sentence -- "I understand that
+I am selecting skills for Friday, 9/25." -- so a response submitted against an
+earlier push carries the earlier date and scopes itself out, with no
+bookkeeping.
+
+Month and day only, no year: that is what the old script compared, and a form
+does not span a year within a term. Narrowing it silently would have been the
+worse choice, so there is a test naming the behaviour.
+
+### What it refuses to do quietly
+
+Every one of these is a way a student answers and does not get their paper,
+which nobody notices until the room:
+
+- an address nobody on the roster has -- listed, with what to do about it;
+- an option naming a skill the bank does not have, from a list pushed before
+  the instructor changed it -- listed rather than dropped;
+- a response that ticked no date, so it belongs to no assessment;
+- responses for another day, and responses superseded by a later one.
+
+`form pull` **refuses to write the roster** when an address or an option could
+not be placed, unless given `--force`. Writing a smaller class set without
+comment is the failure mode worth designing against.
+
+Matching is by address, through `Student.all_emails()`, never by name: one
+real student appears under two addresses in two same-day exports and the form
+only ever sees one of them. Latest response per student wins, which is what
+the 2026-09-18 run did by hand.
+
+### The tests passed first time, which is the warning
+
+Twenty-six of them, green on the first run -- written alongside the code,
+thinking about how it works rather than how it could be wrong. Fifteen
+mutations were applied one at a time: keep every response regardless of date,
+compare the year too, drop unconfirmed responses silently, first-wins instead
+of latest, case-sensitive addresses, never count superseded, treat an
+unreadable timestamp as now, split the slug on the last dash instead of the
+first, let unknown slugs through, ignore secondary addresses, drop unknown
+emails, keep duplicate picks, count dropped students as silent, and turn each
+of the two hard errors into a quiet empty result.
+
+All fifteen were caught. That is the first time in this project a set of tests
+has survived mutation testing without a single vacuous one being found, and it
+is worth recording why: they were written from the *failure* list above rather
+than from the code, so each one already had a specific wrong behaviour in mind.
+
+### Still not verified
+
+No real response has been read yet. The scratch form holds none, so the op has
+only been exercised returning an empty list. What remains unknown is the exact
+shape Google gives a checkbox answer -- an array is assumed, and
+`_as_list` tolerates a bare string -- and whether `getRespondentEmail()` is
+populated on this domain. One test submission settles both.
