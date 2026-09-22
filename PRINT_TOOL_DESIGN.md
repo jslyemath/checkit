@@ -911,6 +911,8 @@ Replacing it with a CLI plus one drag-and-drop page replaces the seating menu
 and nothing else. Every other thing that used to be two clicks is now a
 command line with a `-c` flag.
 
+<!-- audit-ignore -->
+
 **Load-bearing rule: the GUI calls the same functions the CLI calls.** No
 second implementation of anything -- not the roster join, not the selection
 modes, not the push payload. On 2026-09-21 the same fix had to be applied
@@ -1000,8 +1002,8 @@ on its own:
 
 | | slice | why here |
 |---|---|---|
-| 8a | the shell: serve a course, switch views, read-only everywhere | proves the backend reads what the CLI reads |
-| 8b | **Roster** table, editable, with drop and restore | the most-wanted, and write-round-trip is the thing to get right early |
+| 8a | **done** -- the shell: serve a course, switch views, read-only everywhere | proves the backend reads what the CLI reads |
+| 8b | **done** -- **Roster** table, editable, with drop and restore | the most-wanted, and write-round-trip is the thing to get right early |
 | 8c | **Skills** and the form push, with a visible diff | replaces the most tedious CLI sequence |
 | 8d | **Print job**, including the variant dropdowns | the first view that needs the bank, not just the course |
 | 8e | **Record** and **Responses**, both read-mostly | cheap once the shell exists |
