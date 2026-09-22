@@ -898,15 +898,136 @@ today.
 
 ### 12.6 The GUI
 
-Unchanged from "Where we paused (2026-09-02)" in `CODEBASE_NOTES.md`: a local
-web app with a Python backend, bound to `127.0.0.1` and never `0.0.0.0`,
-editing the same TOML files the CLI reads. One correction to that note --
-it says "everything stays in git", which is wrong. These files carry names,
-SIDs and emails and live outside every repository.
+**Written 2026-09-02 as "the seating chart", and not revisited while the CLI
+grew to 22 commands.** The instructor's question on 2026-09-21 -- why is none
+of this recorded -- was fair. What follows is derived from two sources rather
+than from imagination: the CLI as it now stands, and the menu the retired
+Control Center actually offered.
 
-First slice, in order: serve `seating.toml` as read-only desks; then
-drag-to-swap writes the file back; then confirm `build --preview` reads it
-unchanged. That last step is the test that matters.
+#### It is the front end for the whole tool, not a seating widget
+
+The Control Center was a Google Sheet an instructor sat in front of all term.
+Replacing it with a CLI plus one drag-and-drop page replaces the seating menu
+and nothing else. Every other thing that used to be two clicks is now a
+command line with a `-c` flag.
+
+**Load-bearing rule: the GUI calls the same functions the CLI calls.** No
+second implementation of anything -- not the roster join, not the selection
+modes, not the push payload. On 2026-09-21 the same fix had to be applied
+three times in one day because three code paths did the same job (`"-w"` in
+option definitions vs ` -w ` in messages vs `` `-w` `` in a table;
+`_deploy_and_record` vs `form attach`'s own copy; `form connect` missing both).
+A GUI that reimplements any rule doubles that problem permanently. The CLI
+command bodies should be thin wrappers over functions the web handlers also
+call, and anything currently living inside a `@click.command` body that the
+GUI will need has to move out first.
+
+#### The views
+
+Derived from the CLI surface and the Control Center's menu. "CLI" names the
+command that already does the work.
+
+| view | what the instructor does | CLI |
+|---|---|---|
+| **Roster** | an editable table: preferred name / nickname, section, email, ids; mark dropped and undo it; import a class list and see the merge before it lands | `roster import`, `roster drop`, `roster restore` |
+| **Skills** | toggle which skills are open for retake; set the assessment's name, date, due time, and the choose/limit rule; see the exact wording the form will show; push it | `skills open`, `skills set`, `skills preview`, `form push` |
+| **Responses** | who has answered, who has not, what they chose; the addresses that matched nobody; pull into the roster | `form pull` |
+| **Seating** | drag students between seats; randomise; swap two; see version letters and empty seats | *(none -- see below)* |
+| **Print job** | choose skills and per-skill variant, extras, keys, names; preview the draw; build; open the PDF | `build`, `build --preview` |
+| **Record** | what has been printed, to whom, when, at which seed; per-student and per-skill views | `record runs`, `record student`, `record skills` |
+| **Cold call** | pick a random student, pick several, refresh the call list with its skip flags | *(none)* |
+| **Setup** | create or attach the form, map items, course settings, bank path | `course init`, `form create`, `form attach`, `form map`, `form add-items`, `form connect` |
+
+The last column is the useful part of this table: most of the GUI is a face on
+code that exists and is tested. The two rows with no CLI are the genuinely new
+work, and **seating is one of them** -- `randomizeSeating` and
+`shuffleSelectedStudents` were Control Center features that have no printit
+equivalent at all. That is worth knowing before estimating.
+
+#### What the GUI needs that the CLI does not
+
+1. **Variants, per skill, in the print job view.** Eight of mat-106's
+   twenty-nine outcomes declare variants, and the labels are not guessable:
+
+   | skill | variants |
+   |---|---|
+   | `R2` | `beginning`, `add_sub_frac`, `mult_div_whole`, `int_pemdas` |
+   | `W4`, `W4-E`, `W5` | `multiplication`, `no_multiplication` |
+   | `W7` | `terminating`, `no_terminating` |
+   | `N3`, `N4` | `any_method`, `listing_only` |
+   | `D2` | `repeating`, `no_repeating` |
+
+   On the command line this is `[variants] D2 = "no_repeating"` in
+   `publication.toml`, typed from memory. In a GUI it is a dropdown that has
+   to be **populated from the bank**, which means enumerating
+   `Bank.variant(slug, seed)` across the print tier and caching it -- there is
+   no declaration to read, the label is written into each version's data by
+   the generator wrapper. `Bank.seeds_with_variant` already refuses a variant
+   with no printable version; the GUI should never offer one.
+
+2. **A job is currently a folder.** `build` reads `publication.toml` from a
+   directory. A GUI has no directory -- the instructor sets options in a form
+   and presses Build. Either the GUI writes a job folder and calls `build`
+   on it (keeping one code path and leaving a folder to inspect, which is
+   also what `--replay` needs), or `build` grows a non-folder entry point.
+   **The first.** The folder is the artifact that makes a run reproducible,
+   and inventing a second way in is exactly the duplication the rule above
+   forbids.
+
+3. **Long operations.** `build` compiles LaTeX and `form pull` crosses the
+   network. Both need progress and a readable failure, not a spinner that
+   ends in "something went wrong". The CLI's own messages are already written
+   for a human; they should be streamed rather than rewritten.
+
+4. **Confirmation before anything outward-facing.** `form push` rewrites what
+   students see. The CLI has `--dry-run`; the GUI needs the equivalent as a
+   visible diff, not a checkbox.
+
+#### Architecture, unchanged
+
+A local web app with a Python backend, bound to `127.0.0.1` and never
+`0.0.0.0`, editing the same TOML files the CLI reads. It carries names, SIDs
+and email addresses, so it lives outside every repository along with
+everything else in `~/CheckItPrintIt/`.
+
+Correcting the 2026-09-02 note again: it said "everything stays in git", which
+is wrong for exactly that reason.
+
+#### Staging within 8
+
+Ordered so that the riskiest unknown is not last, and so each slice is usable
+on its own:
+
+| | slice | why here |
+|---|---|---|
+| 8a | the shell: serve a course, switch views, read-only everywhere | proves the backend reads what the CLI reads |
+| 8b | **Roster** table, editable, with drop and restore | the most-wanted, and write-round-trip is the thing to get right early |
+| 8c | **Skills** and the form push, with a visible diff | replaces the most tedious CLI sequence |
+| 8d | **Print job**, including the variant dropdowns | the first view that needs the bank, not just the course |
+| 8e | **Record** and **Responses**, both read-mostly | cheap once the shell exists |
+| 8f | **Seating**, drag and drop, plus randomise and swap | genuinely new code; the interaction needs prototyping rather than specifying |
+| 8g | **Cold call** | new, and the smallest |
+
+Seating is deliberately not first. It was the whole of this section for three
+weeks, it is the only view whose *feel* cannot be settled in writing, and it
+is the one an instructor can most easily do by hand in the meantime.
+
+#### Open
+
+1. **Does the roster table edit in place, or stage a diff?** Editing in place
+   is nicer; `roster import` already shows a merge before it lands, and a
+   table that silently rewrites `roster.toml` on every keystroke removes the
+   one moment where a bad import is catchable.
+2. **How is a print job's history surfaced?** `record.db` knows every run, and
+   the job folders are on disk. The GUI could list past runs and offer
+   `--replay` on any of them, which would make reproducibility a button
+   rather than a documented procedure.
+3. **Multiple courses at once**, or one at a time with a switcher. An
+   instructor running 820 and 830 as separate courses will want to see both.
+4. **Email missing students** was a Control Center feature with a templated
+   body and `$FIRSTNAME`-style substitutions. Deferred, but it is the obvious
+   home for it once Responses exists, and the variable set is recorded in
+   12.10.
 
 ### 12.7 Staging
 
@@ -917,7 +1038,7 @@ unchanged. That last step is the test that matters.
 | 6c print record | **done** | SQLite written from the manifest; queries read-only |
 | 7a form write | **done, verified** | create-or-attach, then push the derived slots |
 | 7b form read | **done, verified** | responses pulled to the day's skills; CSV kept |
-| 8 GUI | | seating drag-and-drop writing the file the CLI reads |
+| 8 GUI | | a front end for the whole tool: roster, skills, responses, print job, record, seating, cold call. See 12.6 |
 | 9 gradebook | | pass / no pass / absent, and the table editor for it |
 
 ### 7a ran against a real account on 2026-09-21

@@ -6185,3 +6185,86 @@ with no warning.
 rewrite the whole file. Noticed only because the header was sitting directly
 above the `skills = ["W1", "W3"]` line being checked -- reading the artifact,
 not the code.
+
+## The GUI section was about seating, and the GUI is not (2026-09-21)
+
+Asked how to plan stage 8, the instructor redirected: start with the other
+views -- an editable roster with nicknames and a dropped flag, toggling skills
+and pushing to the form, running a print job with its variant choices -- and
+added, reasonably, that they were surprised none of this was written down.
+
+It was not. `12.6 The GUI` was twelve lines, written 2026-09-02, and described
+a seating chart: serve the desks read-only, then drag-to-swap, then check
+`build --preview` still reads the file. At the time that was the whole idea.
+Then the CLI grew to twenty-two commands across five groups and the section
+was never revisited, so the plan still described replacing one menu out of the
+Control Center's four.
+
+**The general shape: a section written when a feature was small keeps
+describing the small version, and nothing prompts a reread.** The staging
+table said "8 GUI -- seating drag-and-drop", which looked complete next to the
+other rows and hid that it was a fraction of the work.
+
+### What the rewrite is derived from
+
+Not from imagination. Two sources, both checked:
+
+- **The CLI as it stands**, enumerated by running `--help` on every group:
+  `build`, `import`, `init`, `install`, plus `course`, `roster`, `skills`,
+  `record` and `form`.
+- **The Control Center's own menu**, from `reference/control_center.gs`: the
+  cold-call trio, randomise seating, shuffle selected, populate print preview,
+  get print job TeX, log and reset, update the form, email missing students.
+
+Mapping those against each other produced the useful fact: **most of the GUI
+is a face on code that already exists and is tested**, and only two views are
+new work. Seating is one of them -- `randomizeSeating` and
+`shuffleSelectedStudents` have no printit equivalent at all, which was not
+obvious while seating was assumed to be the easy part.
+
+### Variants, which nothing had recorded
+
+The print-job view needs a per-skill variant chooser, and the labels are not
+guessable. Enumerated from the bank rather than assumed:
+
+    R2     beginning, add_sub_frac, mult_div_whole, int_pemdas
+    W4     multiplication, no_multiplication
+    W4-E   multiplication, no_multiplication
+    W5     multiplication, no_multiplication
+    W7     terminating, no_terminating
+    N3     any_method, listing_only
+    N4     any_method, listing_only
+    D2     repeating, no_repeating
+
+Eight of twenty-nine outcomes. There is no declaration to read: the label is
+written into each version's data by the generator wrapper as `__variant__`, so
+populating a dropdown means walking `Bank.variant(slug, seed)` across the
+print tier. On the command line this is `[variants] D2 = "no_repeating"` typed
+from memory, which is exactly the kind of thing a GUI should stop being.
+
+### The rule the rewrite is built around
+
+**The GUI calls the same functions the CLI calls.** No second implementation
+of the roster join, the selection modes, or the push payload.
+
+This is not a general principle, it is today's lesson. The same fix had to be
+applied three times in one day because three paths did the same job: the
+rename caught `"-w"` in option definitions but not ` -w ` in messages nor
+`` `-w` `` in a table; `form attach` carried its own copy of deploy/ping/echo
+so a fix to the shared helper left it unchanged; and `form connect` missed
+every improvement the clasp path got. A GUI that reimplements any rule makes
+that permanent instead of occasional.
+
+The practical consequence, written into 12.6: anything currently inside a
+`@click.command` body that the GUI will need has to move out into a function
+first. And a GUI print job should **write a job folder and call `build` on
+it** rather than gaining its own entry point -- the folder is what makes a run
+reproducible and what `--replay` reads.
+
+### Ordering
+
+Seating is scheduled sixth of seven, not first. It was the whole of the
+section for three weeks; it is the only view whose *feel* cannot be settled in
+writing; and it is the one an instructor can most easily keep doing by hand
+meanwhile. The roster table goes second, right after the shell, because the
+write round-trip is the thing most worth getting wrong early.
