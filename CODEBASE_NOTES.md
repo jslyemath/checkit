@@ -6118,3 +6118,70 @@ only been exercised returning an empty list. What remains unknown is the exact
 shape Google gives a checkbox answer -- an array is assumed, and
 `_as_list` tolerates a bare string -- and whether `getRespondentEmail()` is
 populated on this domain. One test submission settles both.
+
+## 7b against a real response (2026-09-21)
+
+One test submission to the scratch form. Every assumption held, and the
+timestamp made the design's own argument better than the design did.
+
+### What Google actually returns
+
+    {
+      "timestamp": "2026-09-22T02:59:16.812Z",
+      "email": "<the respondent>",
+      "answers": {
+        "1057415225": ["I understand that I am selecting skills for Friday, 9/25."],
+        "2133307229": ["W1 - I can convert the ancient Roman/Babylonian/...",
+                       "W3 - I can compute subtraction of multi-digit ..."]
+      }
+    }
+
+A checkbox answers with an **array**, as assumed. `getRespondentEmail()` **is**
+populated on this domain, which was the other unknown. The option text round
+trips as `SLUG - description`, so `slug_of` recovers the slug from the
+student's answer. The timestamp carries milliseconds and a `Z`, which
+`_timestamp` normalises.
+
+### Three dates in one response
+
+The submission was made at about 23:00 Eastern on **9/21**. Google recorded it
+as **9/22**, in UTC. It is for the assessment on **9/25**.
+
+This is the argument for confirmation-based scoping, made by accident and
+better than the design made it. A timestamp window would have to decide which
+of the first two dates it meant, in whose timezone, and would still be
+answering the wrong question -- neither of them is the assessment. The
+student's own confirmation says 9/25, and that is the only date in the
+response that identifies the paper they want.
+
+Recorded because the next person to look at this will wonder why the timestamp
+is right there, unused.
+
+### Verified against the live response, not just fixtures
+
+- **Matched** by address, both slugs recovered, the roster written with
+  `skills = ["W1", "W3"]`, and the student who did not answer reported.
+- **Scoped out**: moving the assessment to 10/2 and pulling again reported
+  "1 response(s) are for another day" and matched nobody. Moving it back
+  matched again. The response never changed.
+- **Refused**: with the address edited so nobody on the roster had it, the
+  pull named the address, said what to do about it, exited non-zero, and
+  **left the roster untouched**. That is the case worth having: a student who
+  answered and would otherwise have quietly not got a paper.
+
+### One lie found while looking at the output
+
+The roster file's header read:
+
+    # Written by `checkit-printit import`. Edit freely -- this is the
+    # tool's own format, and nothing regenerates it.
+
+`form pull` had just written it, not `import`. And "nothing regenerates it"
+was false for `roster drop` and `roster restore` before today. An instructor
+who believed that sentence and added a comment would lose it at the next pull,
+with no warning.
+
+`to_toml` now takes the command to blame and says plainly that four commands
+rewrite the whole file. Noticed only because the header was sitting directly
+above the `skills = ["W1", "W3"]` line being checked -- reading the artifact,
+not the code.

@@ -916,7 +916,7 @@ unchanged. That last step is the test that matters.
 | 6b availability | **done** | a list the form push and the print job both read |
 | 6c print record | **done** | SQLite written from the manifest; queries read-only |
 | 7a form write | **done, verified** | create-or-attach, then push the derived slots |
-| 7b form read | **built, one thing unverified** | responses pulled to the day's skills; CSV kept |
+| 7b form read | **done, verified** | responses pulled to the day's skills; CSV kept |
 | 8 GUI | | seating drag-and-drop writing the file the CLI reads |
 | 9 gradebook | | pass / no pass / absent, and the table editor for it |
 
@@ -955,14 +955,15 @@ the script** before any call succeeds -- the manual path gets this free from
 the editor's deploy flow, and the clasp path does not. `form create` should
 print the URL and wait.
 
-### 7b is built; one thing is unverified
+### 7b read a real response on 2026-09-21
 
-`form pull` works and `responses.py` is mutation-tested through fifteen
-mutations. **No real response has been read.** The scratch form holds none, so
-the op has only returned an empty list. Unknown: the shape Google gives a
-checkbox answer (an array is assumed, a bare string tolerated by `_as_list`)
-and whether `getRespondentEmail()` is populated on this domain. One
-submission to the scratch form settles both.
+Checkbox answers are arrays, `getRespondentEmail()` is populated, and the
+option text round trips as `SLUG - description`. Matching, date scoping and
+the refusal-to-write were all exercised against that one live response, not
+only against fixtures. See "7b against a real response" in the notes --
+including the submission whose three dates (submitted 9/21 Eastern, recorded
+9/22 UTC, for the assessment on 9/25) make the case for confirmation-based
+scoping better than this document did.
 
 ### What 7b needed
 
