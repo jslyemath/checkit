@@ -6268,3 +6268,101 @@ section for three weeks; it is the only view whose *feel* cannot be settled in
 writing; and it is the one an instructor can most easily keep doing by hand
 meanwhile. The roster table goes second, right after the shell, because the
 write round-trip is the thing most worth getting wrong early.
+
+## The GUI: the shell and the roster table (2026-09-21)
+
+Stages 8a and 8b. `checkit-printit gui -c COURSE` serves one course at
+`127.0.0.1:8765`: an overview, an editable roster table, and the other six
+views present in the nav saying what they will do and which CLI command does
+it today.
+
+No new dependency. `http.server` from the standard library is enough for a
+single-user local app, and the alternative was adding Flask to a project that
+has deliberated over every dependency it has.
+
+### Loopback is not the same as safe
+
+Binding to `127.0.0.1` stops another *machine*. It does not stop another
+*page*: any website open in the same browser can issue a background POST to
+`http://127.0.0.1:8765` and this app would have obeyed it. The data in
+question is names, student ids and email addresses.
+
+So each run mints a token, injects it into the page as it is served, and
+requires it on every API call as a header. A cross-origin form cannot set a
+custom header without a preflight, which this server does not answer. Verified
+by hand in the browser and then as tests: no token, wrong token, and an
+unauthenticated write all answer 403.
+
+### The rule that shaped the code
+
+**Every handler calls the function the CLI calls.** Dropping a student goes
+through `roster.set_dropped`, exactly as `checkit-printit roster drop` does.
+
+That required moving the rule out of the Click command body first: it was
+`_set_dropped`, which interleaved the logic with `click.echo` and
+`click.ClickException`, so a web handler could not have used it without either
+importing click or writing the rule again. `set_dropped` now returns a
+`DropResult` and the CLI renders it.
+
+The proof it is one implementation and not two is pleasing: the roster file
+the *GUI* writes is headed "Written by checkit-printit roster drop", because
+the GUI never had its own writer to name.
+
+This is not a general principle borrowed from elsewhere. It is 2026-09-21's
+lesson: one fix had to be applied three separate times that day because three
+paths did the same job.
+
+### Explicit save, not live editing
+
+The table holds edits until Save, with a count of unsaved changes and a marked
+border on each changed cell. Live editing is nicer to use, and it would remove
+the one moment at which a bad edit is catchable -- the same reasoning that
+makes `roster import` show a merge before it lands. Dropping a student while
+edits are pending is refused rather than silently discarding them.
+
+Only `name`, `preferred`, `section` and `email` are editable. Ids, the dropped
+flag and the accumulated address list are each set by an import, a drop or a
+pull, which have rules a text box would bypass; the server refuses any other
+field by name and says why.
+
+### Three things the testing caught
+
+**A screenshot is not the state.** Twice, a screenshot taken in the same batch
+as a click showed the page before the click's `fetch` resolved, and both times
+it looked like a bug. `read_page` also reports the text of *hidden* elements,
+so an empty-state message that was correctly hidden read as though it were on
+screen. Both were diagnosed by querying the live DOM instead. For anything
+asynchronous, ask the page what it thinks rather than looking at a picture of
+it.
+
+**A security test that could not fail.** The path-traversal test passed with
+the guard deleted, for two independent reasons: `urllib` normalises `../` out
+of a URL before sending, so no traversal was ever attempted; and it aimed at a
+file that does not exist, so `os.path.isfile` would have refused it anyway.
+Both had to be fixed -- a raw socket, and a target that really exists outside
+the static directory, for which the package's own source serves. Only then did
+removing the guard fail it.
+
+That is the second time a test about a *refusal* has been vacuous, and the
+shape is the same both times: the test never reached the code it was about.
+
+**An equivalent mutant, left alone and labelled.** `api_roster_save` validates
+every edit before applying any, and a mutation that applies them as they are
+validated is not caught. It is not a gap in the tests: nothing is written
+until validation finishes, so both orders are equally safe and no observable
+behaviour differs. The two-phase loop stays because it makes the guarantee
+legible, with a comment saying the mutation is undetectable on purpose. Better
+than either deleting a useful shape or inventing a test that asserts an
+implementation detail.
+
+### The audit needed an opt-out
+
+12.6 quotes `-w` while explaining the rename that missed it, and the audit
+duly flagged the explanation as a stale flag. Adding another heading keyword
+would have rotted; instead the audit honours `<!-- audit-ignore -->`, which is
+invisible in rendered markdown and applies to the rest of the section.
+
+Third instance of a document being parsed as the thing it documents -- the
+Mustache and Jinja templates both broke this way, and it is already in
+CLAUDE.md as "a template that documents its own syntax will have that
+documentation parsed as syntax".
