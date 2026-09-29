@@ -6436,3 +6436,47 @@ size without a real student in a test fixture. With it, nothing clips.
 
 The general shape: **a fixture small enough to be convenient is small enough
 to hide the thing you are measuring.**
+
+## Sorting that stacks, the way a spreadsheet's does (2026-09-29)
+
+The first sort replaced the previous one. In a spreadsheet it does not: sort
+by surname, then by section, and you get 820 A-Z followed by 830 A-Z, because
+**the most recent sort is the primary key and the earlier ones survive as
+tiebreakers.**
+
+Now a stack, index 0 primary. Clicking a heading that is already primary steps
+its own cycle -- ascending, descending, and for Name on to given-name order.
+Clicking any other heading makes it primary and pushes the rest down one.
+
+Three things that needed deciding rather than guessing:
+
+**One entry per key.** Re-sorting by a column already further down the stack
+has to move it, not add a second copy: a stale entry would sit there doing
+nothing but occupying a slot.
+
+**A depth of four.** Unbounded, the stack quietly keeps a key set minutes ago
+and forgotten, and the order stops being predictable from what is on screen.
+Four is more than anyone will use deliberately.
+
+**The order is written out in words.** "sorted by section, then name (last)"
+sits above the table, because four small arrows and rank numbers are a
+puzzle, not an answer. The ranks appear on the headings only when more than
+one key is active -- a lone "1" is noise.
+
+### The default
+
+The table opens **grouped by section, alphabetical by surname within each**,
+which is the order a roster gets read in. In stack terms that is
+`[section, sort_last]` -- section primary -- which is what you land on by
+sorting surname first and section second, exactly as described.
+
+A `reset order` link appears as soon as the order differs from that default,
+and hides itself again when it matches.
+
+### A dead function, caught by the same habit as the audit
+
+`clearSort` was written and wired to nothing -- the same shape as the
+`retries=` parameter that was declared and unimplemented earlier this month,
+and the reason `tools/audit.py` checks for unused parameters. Found by
+grepping for its own name before committing. It is now the `reset order`
+button, which the four-deep stack genuinely needs.
