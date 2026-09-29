@@ -6653,3 +6653,66 @@ worked, which ruled out the obvious suspect and pointed at the ordering.
 index cannot.** It is the same rule already in CLAUDE.md about patch scripts,
 applied to a case it does not mention: not a mangled pattern, but a correct
 pattern over a range containing something else.
+
+## The form's fixed wording gets an owner (2026-09-29)
+
+The preview showed only the four things a push writes, so it looked nothing
+like the form. Missing: the form's own title and description, the heading
+above each item, and a "How do I decide what to choose?" section that exists
+on the live form and printit had never heard of.
+
+Fixing that forced a question the design had dodged -- **who owns the wording
+that does not change?** printit creates the form, so the alternative is that
+the authority is whatever an instructor last typed into Google, and a rebuilt
+form silently loses it. So: printit, in `boilerplate.py`.
+
+Two items are required, and the reason is mechanical rather than editorial.
+`confirm_date` is the scoping key -- `form pull` decides which assessment a
+response belongs to by reading the date confirmed there, so a form without it
+cannot be read back at all. `choose_skills` is the question. Their wording is
+editable; their presence is not. Everything else is optional.
+
+### It removed a duplicate rather than adding one
+
+The item titles were already written in `appsscript/Code.gs`, where
+`addItems_` created them. Putting them in `boilerplate.py` as well would have
+been a second copy of exactly the kind this codebase keeps getting caught by,
+so `addItems` now takes them from the payload and the literals in the script
+are a fallback for an older printit, not an authority.
+
+### A section with no text says so
+
+"How do I decide what to choose?" is on the live form and its text has never
+been supplied. The preview draws it with a dashed border and a note, rather
+than rendering it empty -- an empty card reads as "this section is blank on
+the form", which is a different and wrong claim.
+
+### `display: flex` beats `[hidden]`
+
+Choosing "any number" hid the count input and left its "Skills" label sitting
+there. `.fields label { display: flex }` overrides the browser's own
+`[hidden] { display: none }`, because a class selector is more specific than
+the user-agent rule. One line fixes it for the whole app:
+
+    [hidden] { display: none !important; }
+
+Worth knowing generally: setting `display` on anything that might also be
+hidden by attribute breaks the attribute, silently, and only for that
+element.
+
+### Where a twice-a-year control goes
+
+Recorded in 12.6 rather than here, but the reasoning is the useful part.
+A boilerplate editor is touched at the start of a semester or in an
+emergency, so a tab of its own overstates it and a sub-tab inside a weekly
+view buries it.
+
+It goes in **Setup**, with the other once-per-course work -- grouping by how
+often a thing is touched is what keeps the weekly views uncluttered -- and
+the Form preview panel carries a door to it, because an instructor notices
+bad wording while looking at the preview, not while thinking about Setup.
+
+The rejected alternative is worth recording: making the preview itself
+editable. It reads as obvious and it erases the distinction the whole design
+rests on -- some of that text is rewritten by every push and some of it is
+never touched -- by making all of it look equally editable.

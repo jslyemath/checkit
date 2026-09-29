@@ -1003,6 +1003,78 @@ which is what `importStudentChoices` did in the Control Center.
    students see. The CLI has `--dry-run`; the GUI needs the equivalent as a
    visible diff, not a checkbox.
 
+#### The form's fixed wording, and who owns it
+
+Decided 2026-09-29. printit creates the form, so **printit is the source of
+truth for every word on it** -- not whatever an instructor last typed into
+Google. The alternative loses the wording the first time a form is rebuilt,
+silently.
+
+`src/checkit_printit/boilerplate.py` holds it: the form's title and
+description, the heading above each item, and any section that stays the same
+all term. The wording that changes weekly -- which assessment, which date,
+which skills -- is still derived in `form.payload_for` and rewritten on every
+push.
+
+**Two items are required and appear on every instructor's form:**
+
+| | why it cannot be left out |
+|---|---|
+| `confirm_date` | the scoping key. `form pull` decides which assessment a response belongs to by reading the date a student confirmed. A form without it cannot be read back at all |
+| `choose_skills` | the question itself |
+
+Their *wording* is editable; their *presence* is not. Everything else -- the
+form description, "What am I selecting skills for?", "When is this form
+due?", "How do I decide what to choose?" -- is optional, and an instructor
+may reword it or leave it out.
+
+The item titles used to live in `appsscript/Code.gs`, where `addItems_`
+created them. They are in `boilerplate.py` now and passed across in the
+payload, because a title in two places is a title that will disagree with
+itself.
+
+**Not yet supplied:** the text of "How do I decide what to choose?". It is on
+the live MAT 106 form, added by hand, and printit has never had it. The
+preview shows the section with a dashed border saying so, rather than
+rendering it empty, which would read as "this section is blank on the form".
+
+#### Still to build, in this area
+
+**A boilerplate editor.** Change the fixed wording, and choose which optional
+sections to include. Touched at the start of a semester or in an emergency,
+which is the whole problem with placing it -- see below.
+
+**Creating a form from the app.** `form create` exists on the command line
+and does the whole job: form, bound script, deploy, items, recorded ids. The
+GUI should offer it rather than sending an instructor to a terminal, with
+somewhere to say which Drive folder it goes in.
+
+#### Where the boilerplate editor goes
+
+The question is real: it is edited perhaps twice a year, so a tab of its own
+overstates it, and a sub-tab inside Update form buries a rare thing inside a
+weekly one.
+
+**Recommendation: it lives in Setup, with a door from the preview.**
+
+Setup already exists on this roadmap for the things done once -- `course
+init`, `form create`, `form attach`, `form map`, the bank path. The
+boilerplate has exactly that cadence, and grouping by *how often you touch
+it* is what keeps the weekly views uncluttered.
+
+The second half matters as much. An instructor notices the wording is wrong
+**while looking at the preview**, not while thinking "I should visit Setup",
+so the Form preview panel carries an `edit wording` link that opens it. Put
+it where the cadence says; provide a door where the need arises.
+
+The tempting alternative -- make the preview itself editable, click a
+sentence and change it -- is worth naming and rejecting. The preview is
+consulted every week before a push, and making it editable invites an
+accidental edit to something meant to be stable. Worse, it erases the
+distinction the design is built on: some of that text is rewritten by every
+push and some is not, and a preview where everything looks equally editable
+teaches the opposite.
+
 #### Architecture, unchanged
 
 A local web app with a Python backend, bound to `127.0.0.1` and never
@@ -1027,6 +1099,7 @@ on its own:
 | 8e | **Record** and **Responses**, both read-mostly | cheap once the shell exists |
 | 8f | **Seating**, drag and drop, plus randomise and swap | genuinely new code; the interaction needs prototyping rather than specifying |
 | 8g | **Cold call** | new, and the smallest |
+| 8h | **Setup**: create or attach a form from the app, and the boilerplate editor | both are start-of-semester work, and the editor needs somewhere the weekly views do not |
 
 Seating is deliberately not first. It was the whole of this section for three
 weeks, it is the only view whose *feel* cannot be settled in writing, and it
