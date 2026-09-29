@@ -6366,3 +6366,73 @@ Third instance of a document being parsed as the thing it documents -- the
 Mustache and Jinja templates both broke this way, and it is already in
 CLAUDE.md as "a template that documents its own syntax will have that
 documentation parsed as syntax".
+
+## Sorting a roster that has only one name field (2026-09-29)
+
+Asked for Last and First columns in the roster table, so the list could be
+sorted either way, with "unless you have a better idea".
+
+**`last` and `first` are empty on every real roster here.** Checked before
+answering: all 48 students in the 09-21 job and all 23 in the 09-25 redo have
+`name` and nothing else, because those rosters came from the Control Center
+export, which carries a single "Full Name" column. Splitting the column would
+have produced two blank columns and a sort that did nothing.
+
+They could be filled by splitting, but `classlist.split_full_name` says in its
+own docstring that only the `Last, First` comma form gets multi-word surnames
+right. From `First Last` it guesses, and **the MAT 106 roster contains a case
+it gets wrong**: a compound Spanish surname comes back as its last word alone,
+with the first word landing in `middle`.
+
+That decided it. `name` is load-bearing -- it prints on the paper and the
+seating chart matches on it -- so a guessed surname stored beside it is a
+second field that can disagree with the first, silently, forever.
+
+### What was built instead
+
+One Name column, whose heading cycles through surname and given name, each
+way, and says which it is on: `Name · last ↑`. The keys are **derived on the
+way out and stored nowhere**, so a wrong guess puts one row in an odd position
+in a sort -- which is visible and harmless -- instead of writing a wrong
+surname into `roster.toml`, which is neither.
+
+Where a real class-list import *has* filled `last` and `first`, those are used
+verbatim; the guess is only ever the fallback. `_sort_names` does this by
+calling `classlist.split_full_name`, so the rule has one implementation and
+the browser has none of it. Four mutations, all caught.
+
+### Two stale-code mistakes in one sitting
+
+Both cost a false diagnosis, and both have the same shape: **code changed on
+disk, but something was still running the old copy.**
+
+The browser had cached `app.js`, so a fixed page kept behaving as though
+unfixed. Already handled -- the server now sends `Cache-Control: no-store`.
+
+Then the *server* did it. `gui/__init__.py` gained the derived sort keys, and
+sorting by surname went on producing given-name order, which read as a bug in
+the sort. Python does not reload a module in a live process: the running
+`checkit-printit gui` had loaded the version from before the edit, so
+`sort_last` was never in the JSON and the front end silently fell back to the
+full name.
+
+Worth naming as a rule: **after editing anything under `gui/`, restart the
+server before believing what the page does.** The front end fails soft here by
+design -- an absent key falls back rather than erroring -- which is right for
+robustness and exactly what makes a stale server hard to spot.
+
+### And a measurement taken on the wrong sample
+
+The column widths were also wrong -- Name and Email clipped most of their
+content -- because the minimums were tuned against the two-row scratch course,
+whose longest name is "Test Student". Measured against the real roster
+instead: longest name 22 characters, about 167px, median 14; longest address
+19.
+
+There is now a synthetic 48-student course, `Scratch 48`, shaped like the real
+one -- same section split, same name-length distribution, same chart including
+the three-seat table and the lone seat -- so the table can be checked at full
+size without a real student in a test fixture. With it, nothing clips.
+
+The general shape: **a fixture small enough to be convenient is small enough
+to hide the thing you are measuring.**
