@@ -6579,3 +6579,77 @@ back "2026-10-01T23:59"; compared raw they never match. A control that is
 always lit stops meaning anything, which is worse than one that never lights.
 
 Ten mutations across the four files, all caught. 326 tests.
+
+## Reworking the form tab (2026-09-29)
+
+Six pieces of feedback on 8c, and one bug I made while acting on them.
+
+### The app now notices an expired Google session
+
+It already knew how -- `clasp.logged_in()` -- and simply never asked, so the
+first sign of an expired session was a push failing with Google's reauth
+blob. A banner across the top of the tab now says so and offers a **Sign in**
+button, which spawns clasp in a thread: clasp opens the browser itself, and
+waiting for it in the request would hold the page for as long as someone
+takes to find a password.
+
+The answer is cached for 45 seconds, because asking costs an npx invocation
+and several seconds. And "could not tell" is kept distinct from "signed out":
+offering a sign-in button for an unrelated failure sends the instructor round
+a loop that cannot fix it.
+
+### "Skills" is now "Update form"
+
+Freed up for a future tab that edits the bank visually. The instructor chose
+`Update form` over `Next assessment`, `Retakes` and `Availability`.
+
+### The zero is gone
+
+`choose = 0` meaning "any number" was a quirk of the prototype sheet. The
+dropdown now offers **at most / at least / exactly / any number**, and
+picking the last hides the count entirely. The file still stores zero -- that
+is the format, and the retired script's convention -- but nobody has to know
+that to use the form.
+
+### The preview looks like a form
+
+Four rounded cards, one per item, as a Google Form stacks them, with
+checkboxes that are styled spans rather than inputs: they have to look like
+the form without inviting a click that does nothing. The explanatory subtitle
+is gone -- it sat immediately above the preview text and read as part of it.
+
+### The diff is gone, and so is its endpoint
+
+`form push` had a two-step "show what would change" before it. The
+instructor's objection: the preview is directly above, and a push replaces
+the four slots wholesale, so a diff of a wholesale replacement is a second
+way of reading the same thing.
+
+That overrides 12.6, which called for a visible diff rather than a
+confirmation. The reasoning there was that a push rewrites what students see
+-- but a preview showing exactly what they will see satisfies that better
+than a diff does, because it is what you were already looking at.
+
+One capability went with it: the diff read the form's *current* state, so it
+would have shown a form edited by hand since the last push. Nothing surfaces
+that now. Recorded here rather than kept as an unused endpoint -- `git log`
+has `api_form_diff` if drift detection is wanted later. What replaced it is
+smaller and in the right place: the push reports which slots actually
+changed, so a push that changed nothing no longer looks like one that
+rewrote everything.
+
+### Index-based surgery deleted a neighbour
+
+Reworking `app.js` replaced a slice between two functions found with
+`str.index`. `sameMinute` had been added between them an hour earlier, so the
+slice removed it, and the tab loaded with an empty preview.
+
+It presented as `renderWording` failing, which it was not -- `renderSkills`
+threw at its last line, *after* building all 29 rows, so the rows were on
+screen and the two calls after it never ran. Calling `renderWording` by hand
+worked, which ruled out the obvious suspect and pointed at the ordering.
+
+**Anchored replacement with an assert would have caught this; slicing by
+index cannot.** It is the same rule already in CLAUDE.md about patch scripts,
+applied to a case it does not mention: not a mangled pattern, but a correct
+pattern over a range containing something else.
