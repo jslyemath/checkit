@@ -1022,7 +1022,7 @@ on its own:
 |---|---|---|
 | 8a | **done** -- the shell: serve a course, switch views, read-only everywhere | proves the backend reads what the CLI reads |
 | 8b | **done** -- **Roster** table, editable, with drop and restore | the most-wanted, and write-round-trip is the thing to get right early |
-| 8c | **Skills** and the form push, with a visible diff | replaces the most tedious CLI sequence |
+| 8c | **done** -- **Skills** and the form push, with a visible diff | replaces the most tedious CLI sequence |
 | 8d | **Assessment**: choices with overrides, defaults, variants, then build | the first view that needs the bank, not just the course |
 | 8e | **Record** and **Responses**, both read-mostly | cheap once the shell exists |
 | 8f | **Seating**, drag and drop, plus randomise and swap | genuinely new code; the interaction needs prototyping rather than specifying |

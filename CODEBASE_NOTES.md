@@ -6507,3 +6507,75 @@ The check afterwards was for dead code, because `clearSort` had been written
 and wired to nothing the day before: every function in `app.js` is reachable,
 and every element id it looks up either exists in the markup or is created in
 script.
+
+## Stage 8c: the Skills view (2026-09-29)
+
+Turn skills on and off, set the assessment, see exactly what the form will
+say, and push it -- replacing the sequence `skills open`, `skills set`,
+`skills preview`, `form push`.
+
+Both rules were lifted out of their Click bodies first, as the roster's drop
+was: `availability.set_open` and `availability.set_assessment`. The CLI is
+now a renderer over them, so the web app calls one implementation rather than
+a copy. `set_assessment` leaves any argument that is None alone, which is
+what a form with five inputs and one changed box needs.
+
+### The preview is not an approximation
+
+It calls `form.payload_for` -- what `form push` actually sends -- against an
+Availability built in memory from the unsaved values. So "Choose At Most TWO
+Skills" appears as you type, nothing is written, and there is still exactly
+one implementation of the wording. A second one would differ precisely where
+it mattered: on a form students are already reading.
+
+### A wording divergence from the specification
+
+Writing that preview surfaced one. The retired script's help text names the
+limiter for two of its three modes and not the third --
+`control_center.gs` 595 and 601 read "Please choose at most/at least N
+skill(s)", but 607 reads "Please choose N skill(s)" with no limiter. printit
+said "Please choose exactly N skill(s)" for that case.
+
+Corrected to match. The reference is the specification for anything a student
+reads, and the difference only became visible because the preview puts the
+sentence on screen. `Choose Exactly ONE Skills` remains ungrammatical, which
+was checked and *is* the retired script's own wording, so it stays.
+
+### The diff compared two different fields
+
+A push touches a different field per slot: the help text of a section header,
+the single option of the confirmation checkbox, the title of the skill
+question. The first diff held the confirmation item's **title** against the
+**option** that would replace it -- so that row showed a change every time and
+never showed the real one.
+
+`describe` now returns a checkbox's choices, each row names the field it is
+comparing, and the option list is compared as a list. Rows for items not yet
+on the form say so rather than reading as a change.
+
+### clasp sessions expire
+
+Eight days after a successful login, `form attach` failed with
+
+    could not tell whether clasp is logged in:
+    {"error":"invalid_grant","error_description":"reauth related error
+     (invalid_rapt)", ...}
+
+Google's reauth policy expires a session holding sensitive scopes. The answer
+was simply "sign in again", but `logged_in` looked for three words --
+"login", "credential", "unauthor" -- none of which appear in that blob, so it
+raised "could not tell" and printed JSON.
+
+Writing the phrases out as test cases then found a second gap that had been
+there from the start: **"login" does not match "You are not logged in."**
+The original list could not recognise the most ordinary way of saying it.
+`NEEDS_LOGIN` now holds both spellings along with the reauth family.
+
+### One front-end bug worth the note
+
+The Skills form was dirty the instant it loaded, so Save was always lit. The
+file stores `due` as "2026-10-01 23:59:00" and a `datetime-local` input reads
+back "2026-10-01T23:59"; compared raw they never match. A control that is
+always lit stops meaning anything, which is worse than one that never lights.
+
+Ten mutations across the four files, all caught. 326 tests.
