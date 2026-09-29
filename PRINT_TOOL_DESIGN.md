@@ -935,7 +935,7 @@ command that already does the work.
 | **Skills** | toggle which skills are open for retake; set the assessment's name, date, due time, and the choose/limit rule; see the exact wording the form will show; push it | `skills open`, `skills set`, `skills preview`, `form push` |
 | **Responses** | who has answered, who has not, what they chose; the addresses that matched nobody; pull into the roster | `form pull` |
 | **Seating** | drag students between seats; randomise; swap two; see version letters and empty seats | *(none -- see below)* |
-| **Assessment** | the staging area for one sitting: each student's choices with a manual override, skills appended for everyone, defaults for non-responders, per-skill variant, title and date, extras, keys, names; preview the draw; build; open the PDF | `build`, `build --preview` |
+| **Print job** | the staging area for one sitting: each student's choices with a manual override, skills appended for everyone, defaults for non-responders, per-skill variant, title and date, extras, keys, names; preview the draw; build; open the PDF | `build`, `build --preview` |
 | **Record** | what has been printed, to whom, when, at which seed; per-student and per-skill views | `record runs`, `record student`, `record skills` |
 | **Cold call** | pick a random student, pick several, refresh the call list with its skip flags | *(none)* |
 | **Setup** | create or attach the form, map items, course settings, bank path | `course init`, `form create`, `form attach`, `form map`, `form add-items`, `form connect` |
@@ -945,6 +945,21 @@ code that exists and is tested. The two rows with no CLI are the genuinely new
 work, and **seating is one of them** -- `randomizeSeating` and
 `shuffleSelectedStudents` were Control Center features that have no printit
 equivalent at all. That is worth knowing before estimating.
+
+#### One name per view
+
+Kept in one place because it has already drifted twice. The staging table
+said **Skills** after the tab became **Update form**, and **Assessment**
+after the app had settled on **Print job** -- both because a view was renamed
+in the plan and not in the nav, or the reverse.
+
+`Print job` beats `Assessment` for 8d on a collision: Update form already has
+a panel headed "The next assessment", and `availability.toml` an
+`[assessment]` table, and those are a different thing. "Print job" names what
+comes out of it.
+
+**The nav is the authority. When a view is renamed, this table is renamed in
+the same commit.**
 
 #### The roster is the course; choices belong to one sitting
 
@@ -957,7 +972,7 @@ table that holds who is enrolled.
 So the **Roster** view is the course overall -- who exists, what they are
 called, which section, who has left -- and never mentions an assessment.
 
-Choices live in the **Assessment** view instead, which is a staging area for
+Choices live in the **Print job** view instead, which is a staging area for
 one sitting rather than a form with a Build button on it: each student's
 choices shown with a manual override, skills appended for everyone, defaults
 for whoever did not respond, the per-skill variant, the title and date, the
@@ -1094,8 +1109,8 @@ on its own:
 |---|---|---|
 | 8a | **done** -- the shell: serve a course, switch views, read-only everywhere | proves the backend reads what the CLI reads |
 | 8b | **done** -- **Roster** table, editable, with drop and restore | the most-wanted, and write-round-trip is the thing to get right early |
-| 8c | **done** -- **Skills** and the form push, with a visible diff | replaces the most tedious CLI sequence |
-| 8d | **Assessment**: choices with overrides, defaults, variants, then build | the first view that needs the bank, not just the course |
+| 8c | **done** -- **Update form**: the open skills, the assessment, the wording preview, the push | replaces the most tedious CLI sequence |
+| 8d | **Print job**: choices with overrides, defaults, variants, then build | the first view that needs the bank, not just the course |
 | 8e | **Record** and **Responses**, both read-mostly | cheap once the shell exists |
 | 8f | **Seating**, drag and drop, plus randomise and swap | genuinely new code; the interaction needs prototyping rather than specifying |
 | 8g | **Cold call** | new, and the smallest |
