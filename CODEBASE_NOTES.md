@@ -6480,3 +6480,30 @@ and hides itself again when it matches.
 and the reason `tools/audit.py` checks for unused parameters. Found by
 grepping for its own name before committing. It is now the `reset order`
 button, which the four-deep stack genuinely needs.
+
+## Two UI notes on the roster headings (2026-09-29)
+
+**The tooltip was one string for every state.** Every heading, the primary
+included, said "Sorting by another column keeps this one as a tiebreaker" --
+so the column doing the actual sorting described itself as a tiebreaker. Now
+per state and much shorter: "Primary sort column.", "Tier 2 tiebreaker.",
+"Sort by this column.", with the Name column adding a clause about its cycle.
+
+Small, but the shape is familiar: a string written once and applied to cases
+that had not been separated yet.
+
+**The prose description is gone.** A line reading "sorted by section, then
+name (last)" sat above the table. The instructor's objection was the right
+one: *if the column headers need a sentence to explain them, that is a
+UI failure, not a caption.* The headings already carry the key, the
+direction and the rank, and if that is not enough the fix is the headings.
+
+`reset` moved from the toolbar -- where it sat beside a checkbox and two
+buttons it has nothing to do with -- into the one empty heading, above the
+drop column, right-aligned so it does not read as a label for the links
+beneath it. It appears only when the order differs from the default.
+
+The check afterwards was for dead code, because `clearSort` had been written
+and wired to nothing the day before: every function in `app.js` is reachable,
+and every element id it looks up either exists in the markup or is created in
+script.
