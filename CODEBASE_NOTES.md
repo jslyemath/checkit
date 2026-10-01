@@ -6799,3 +6799,38 @@ caught.
 Worth the care: "equivalent mutant" is the right answer often enough to be a
 comfortable one, and it is indistinguishable at a glance from "the test I
 have not written yet".
+
+## Two bugs that only a narrow window showed (2026-09-30)
+
+Asked to see the UI rather than read about it. Screenshotting it at the
+pane's own width -- about 530px, half what every earlier check had used --
+found two things immediately.
+
+### Column widths were proportions, not widths
+
+The roster table measured its columns to fit the content, summed to 814px,
+and rendered at **482**. Every name and address was clipped, and the
+horizontal scrollbar never appeared.
+
+A `table-layout: fixed` table cannot be wider than its container. Given
+column widths that do not fit, the browser treats them as *proportions* and
+squashes all of them -- it does not overflow, so the scroller has nothing to
+scroll. The old hard-coded `min-width: 720px` had been doing that job, and
+removing it when the widths became content-driven removed the floor with it.
+`sizeColumns` now sets the sum as the table's `min-width`, which is what
+makes it overflow and therefore what makes the scrollbar exist.
+
+Worth stating plainly: **every check of this had been run at 1053px, where
+everything fits.** The widths were measured correctly and the bug was in
+what the browser does when they do not fit -- a case the wide window could
+not reach.
+
+### Back and forward did nothing
+
+`show()` wrote `location.hash` but nothing listened for it, so the browser's
+Back button moved the URL and left the page where it was. Noticed while
+navigating by hash during the screenshots and finding the view had not
+changed -- which read, for a moment, as the app being broken.
+
+Three lines. The general shape is that writing to `location.hash` looks like
+routing and is only half of it.
