@@ -7341,3 +7341,33 @@ that built anything left `TestThemeInstall` asserting against a bank that
 already had a theme. Every one of those tests passes alone. A suite that is
 green in isolation and red together is the hardest kind to read, and the
 only signal was the exit code that had been thrown away.
+
+## One command, one exit code (2026-10-01)
+
+`tools/check.py` runs printit's tests, the audit and the platform's tests,
+and exits non-zero if any of them is unhappy. It exists because
+`pytest -q | tail && git commit` committed and pushed a suite with six
+failures in it: a pipeline reports its last command's exit code, so the
+`&&` saw `tail` succeed.
+
+Two things in it are deliberate and worth not undoing.
+
+**The output is three lines.** That is the actual guard. The footgun was
+already written down and had been read that morning; what made the pipe
+attractive was a page of dots and a summary at the bottom. A command whose
+whole answer is three lines and an exit code gives nobody a reason to pipe
+it anywhere. Detail is printed only for what failed, and for a test run it
+is the **names of the failing tests** rather than the first assertion --
+taking lines in document order filled the budget with `E` lines from one
+failure and never reached the summary.
+
+**A run that examined nothing fails.** Same rule as `verify_run.py`. pytest
+exits 5 on an empty collection, but a mistyped path, a conftest that skips
+everything, or `--co` all come back 0 with nothing run, and "0 tests, no
+failures" must not read as clean. The venv is located explicitly for the
+same reason: falling back to `sys.executable`, which has neither package
+installed, would collect nothing and look fine.
+
+Watched failing before being believed, which for this file is the whole
+point: a failing test, an audit problem, a run that collected nothing, and
+a clean tree still passing.
