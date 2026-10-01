@@ -1025,6 +1025,41 @@ forgotten.
 These two touch the same layout, so they are cheaper done together than
 apart.
 
+#### What the Print job table has to say for itself
+
+Settled 2026-10-01, from six reports against the first build of the view.
+Each is a case of the screen having to state a rule rather than the
+instructor having to hold it.
+
+**A default is shown by being selected, not by being listed twice.** The
+version dropdown had a nameless first option carrying the seat's letter and
+then the letters themselves, so a student at A saw "A" twice. The outline
+already says when a row is off its default. A `↺` beside the control --
+`U+21BA`, the glyph in common use -- appears only when it is, with one of
+the same at the head of the column. Choosing the seat's own letter clears
+the pin rather than recording one that changes nothing, so "off default"
+and "has a pin" cannot drift apart.
+
+**A new version is added where versions are chosen.** Each dropdown offers
+the letter after the highest in play: `+ E`, and once E is taken, `+ F`.
+Next-after-highest rather than first-unused, because a chart of A, B, D
+would otherwise offer C, which reads as a mistake rather than as a new
+version. Both ends had to agree -- the save stopped requiring a letter the
+chart already had, and `assemble.versions_for` draws seeds for whatever the
+pins name.
+
+**Reset is an edit, not a command.** "Reset this print job" fills the draft
+with the server's defaults and leaves saving to Save, so Discard puts the
+old job back. A button that wrote the file directly would be a way to lose
+a job in one click.
+
+**A view that caches has to say when it has stopped.** Print job loaded
+once per page load, so a name saved in Roster never reached it. It reloads
+on every visit now, keeps any unsaved draft, and names what changed. The
+original request was for a note saying the changes would merge at the next
+Save; there was never a merge to wait for -- saving was simply the only
+code path that re-fetched.
+
 #### The roster is the course; choices belong to one sitting
 
 Decided 2026-09-22, on seeing the first roster table. It had a "Chose" column

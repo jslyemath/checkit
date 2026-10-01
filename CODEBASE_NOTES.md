@@ -7056,3 +7056,139 @@ Round three: seventeen of seventeen caught.
   exists to catch, occurring inside `verify_run`.
 - The browser was checked at 530px as well as wide, and the server restarted
   first. Both are in `checkit-printit/CLAUDE.md` because both have cost time.
+
+## Six reports against the Print job view (2026-10-01)
+
+Four were about what the screen says; two were bugs, and one of those was
+mine from earlier the same day.
+
+### "Open the folder" answered with nothing
+
+`gui/__init__.py` never imported `sys`, and `api_print_reveal` asks
+`sys.platform`. So the handler raised `NameError`, died before writing a
+response, and the browser reported "failed to fetch" -- which is all a
+browser can say when a connection closes mid-request. The network log from
+the instructor's own session has it: `POST /api/print/reveal` →
+`net::ERR_EMPTY_RESPONSE`.
+
+The missing import is the fault. **The reason it was invisible is the
+second fault**, and the more important one: `_api` caught `GuiError`,
+`RosterError` and `OSError`, and anything else escaped into
+`BaseHTTPRequestHandler`, which closes the connection. A bug has to still
+answer. It now catches everything, prints the traceback to the terminal
+where it is useful, and returns a 500 naming the exception type.
+
+This is worth generalising: **an error path that produces no output is
+worse than one that produces a wrong message.** A wrong message is a lead.
+"Failed to fetch" is indistinguishable from the server being down, the
+token being wrong, and a typo in a URL, so the first hour goes on the three
+things that were never broken.
+
+### The version selector said the same thing twice
+
+Each dropdown had a nameless first option showing the seat's letter, then
+the letters A..D below it -- so a student seated at A saw "A" twice, one of
+which was "as seated" and one of which was "A". The outline on the control
+already says when a row is off its default, so the duplicate carried no
+information and two of the five options meant the same thing.
+
+Now the dropdown is just the letters, with the seat's one selected, and a
+`↺` appears beside it only when the row is off its default. Same for
+Override, and one of each at the head of its column.
+
+Three small decisions inside that:
+
+- **`↺` (U+21BA), not `⟲` (U+27F2) or `⭯`.** The instructor asked which is
+  more common. U+21BA is: U+27F2 renders as an emoji on some systems and
+  U+2B6F is missing from most fonts.
+- **Beside the box, not inside it.** An overlay would sit on top of the
+  text it exists to clear, and putting both columns' resets in the same
+  place makes them read as one idea.
+- **Hidden, not absent.** `visibility: hidden`, so a column does not
+  resize under the pointer as rows move on and off their default.
+
+Choosing the seat's own letter now *clears* the pin rather than recording
+one that changes nothing, so "off default" and "has a pin" cannot drift
+apart.
+
+### A version can be added from the table
+
+The next letter after the highest in play is offered as `+ E`. Choose it
+and every other dropdown then offers `E` and `+ F`.
+
+Next-after-highest rather than first-unused: a chart of A, B, D would
+otherwise offer C, which reads as a mistake rather than as a new version.
+
+This needed the back end to agree in two places. `api_print_save` refused
+any letter the chart did not have, and now asks only that it is a single
+capital -- the value reaches a filename and a printed paper. And `assemble`
+drew seeds for `chart.versions` alone, so a pin naming a new letter reached
+`build_handouts`, found no seed, and was reported as
+
+    Ada Lovelace asked for 'AD', which is not in the bank.
+
+which sends you to the bank to look for a skill that is in it. The rule is
+now `versions_for(chart, publication)`, and the missing-seed message
+distinguishes the two faults.
+
+### A crash I left behind this morning
+
+`printed_collisions` started returning `(seat, seat, version)` triples when
+it learned to read the paper rather than the chart. `__main__.py` was
+updated. `gui/__init__.py` was not, and still unpacked pairs -- so any GUI
+build *with a collision* raised `ValueError`, reachable only in the rare
+case the warning exists for.
+
+Nothing caught it: 401 tests passed, the audit passed, and the live app was
+exercised without a collision in the draft. It is the same "is there a
+second copy" miss already listed twice in `checkit-printit/CLAUDE.md`, and
+the thing that found it was reading the file for an unrelated reason.
+
+### The other three
+
+**Keys and Names.** Their headings had been moved inline to get the ticks
+aligned with the inputs beside them. That fixed the alignment and made the
+two read as a different kind of control from every other field. The heading
+goes back above the box, and the tick sits in a wrapper the same height as
+a text input -- 18px line box, 5px padding, 1px border, 30px under the
+global `border-box`. Measured against `#p-title`, because the first attempt
+at 18px produced 27 and left the ticks three pixels high.
+
+**Resetting the whole job.** "Reset this print job" fills the local draft
+from the server's `DEFAULTS`, which `api_print` now sends. Deliberately an
+ordinary edit rather than a second endpoint: it marks the view dirty, Save
+keeps it, and **Discard puts the old job back**. An endpoint that wrote the
+file directly would have been a way to lose a job with one click.
+
+**The roster and the print job disagreeing.** `show()` loaded the Print job
+view only when `printState === null` -- once per page load. So a name
+edited and saved in Roster never reached this table until the print job
+itself was saved, which is what made it look stale.
+
+It now reloads on every visit, keeping any unsaved draft (`printDirty`
+compares the local draft with the saved file, so replacing the file's copy
+and keeping the local one leaves that comparison correct), and says what
+changed: *"From Roster since this tab last opened: 1 name, 1 section.
+Already shown below."*
+
+The request was for a note saying the changes would merge at the next Save.
+Built the other way round -- shown immediately, with the note explaining
+why a row looks different -- because there was never a merge to wait for.
+The only reason saving appeared to "merge" is that saving was the one code
+path that re-fetched.
+
+### What was verified, and what was not
+
+Verified live, in the browser, on the 48-student course: the dropdown
+offering `+ E` then `+ F` after E is taken; the row and column resets
+appearing and clearing; Reset-then-Discard restoring the saved job exactly;
+a name and a section edited in Roster appearing in Print job with the note;
+the tick wrapper measuring 30px against the inputs' 30px; no horizontal
+overflow at 530px; and `POST /api/print/reveal` returning 200 and opening a
+real folder.
+
+Nine mutations on the back-end half, 0 survivors.
+
+**The front end has no automated tests at all.** Every claim above about
+the dropdown, the resets and the note rests on driving the live page, which
+is a real gap and not one this change closes.
