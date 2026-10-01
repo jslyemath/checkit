@@ -931,7 +931,7 @@ command that already does the work.
 
 | view | what the instructor does | CLI |
 |---|---|---|
-| **Roster** | an editable table: preferred name / nickname, section, email, ids; mark dropped and undo it; import a class list and see the merge before it lands | `roster import`, `roster drop`, `roster restore` |
+| **Roster** | an editable table: the name, what it prints as, section, email, ids; mark dropped and undo it; import a class list and see the merge before it lands | `roster import`, `roster drop`, `roster restore` |
 | **Skills** | toggle which skills are open for retake; set the assessment's name, date, due time, and the choose/limit rule; see the exact wording the form will show; push it | `skills open`, `skills set`, `skills preview`, `form push` |
 | **Responses** | who has answered, who has not, what they chose; the addresses that matched nobody; pull into the roster | `form pull` |
 | **Seating** | drag students between seats; randomise; swap two; see version letters and empty seats | *(none -- see below)* |
@@ -963,24 +963,29 @@ the same commit.**
 
 #### Open, and blocking the next slice
 
-Three decisions belong to the instructor. Nothing should be built on top of
+Two decisions belong to the instructor. Nothing should be built on top of
 them until they are settled, because each one changes a layout that other
 work would have to be redone against.
 
-**1. Does the nickname print?**
+**Settled 2026-10-01 -- the preferred name prints, everywhere.**
 
-`Student.preferred` is read by nothing in the print path. The paper prints
-`name`; the seating chart matches on `name`. The app displays the nickname
-now, and that is all it does.
+As in the Sheets prototype: a preferred name put into the roster appears on
+the paper, on the seating chart and in every list in the app. `preferred` no
+longer means a first name -- it is the whole name to print, the column is
+labelled **Prints as**, and an empty box shows the roster name as a
+placeholder.
 
-*Recommendation: print `preferred` where it is set, keep matching on `name`.*
-The chart is matched in code and the paper is read by a person, and those
-want different things. The risk is that the two drift far enough apart that
-a human comparing a paper to the chart cannot -- which argues for showing
-both in the seating GUI when it exists, not for keeping the nickname off the
-paper.
+Matching is unchanged and stays on sid, alt id, email and name, with one
+exception that had to be faced rather than assumed: `seating.toml` holds no
+id, so the chart is the single join made on a name. It now accepts either
+spelling, and refuses a seat that matches two students or a student that
+holds two seats. Working this out turned up a separate and worse bug -- the
+build's collision warning was reading the chart rather than the paper, so a
+per-run `[versions]` pin could seat two neighbours on one version with the
+build reporting none. Both are in the notes under "The preferred name, and a
+collision check that was looking elsewhere".
 
-**2. Does Responses stay a tab?**
+**1. Does Responses stay a tab?**
 
 The roadmap has both a Responses tab (8e) and each student's choices inside
 Print job (8d). That is two views of one set of facts.
@@ -996,7 +1001,7 @@ another day) and they need room; and "who has not answered" is useful
 outside a print job. Both are real, and both are better served by the card
 reporting them in place than by a second tab.
 
-**3. Is "simply print" a mode rather than a card?**
+**2. Is "simply print" a mode rather than a card?**
 
 Setting `simply_print` silently cancels the other two selection modes *and*
 every per-student override. The current layout shows three equal cards, one
@@ -1017,8 +1022,8 @@ cannot set simply-print and then wonder why an override did nothing, because
 the override box is not on screen. A rule enforced by layout cannot be
 forgotten.
 
-Decisions 2 and 3 touch the same layout, so they are cheaper done together
-than apart.
+These two touch the same layout, so they are cheaper done together than
+apart.
 
 #### The roster is the course; choices belong to one sitting
 
