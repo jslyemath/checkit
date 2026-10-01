@@ -7371,3 +7371,85 @@ installed, would collect nothing and look fine.
 Watched failing before being believed, which for this file is the whole
 point: a failing test, an audit problem, a run that collected nothing, and
 a clean tree still passing.
+
+## The response pull moves into Print job (2026-10-01)
+
+The last of the three decisions, built. Responses is gone from the nav and
+the pull is Print job's first card, so a week reads top to bottom on one
+page: pull, see the choices, override, build.
+
+### Four copies, found by trying to add a fifth
+
+Folding the pull in meant a second caller for things that already had more
+than one implementation, so those came first:
+
+- **which id identifies a student** -- three copies of
+  `sid or alt_id or email or name`, in `collect`, in `form pull`'s body and
+  in the Print job view. Now `roster.key_of`, next to `roster.keys_of`,
+  which is the list a *lookup* tries. A write has to pick one, and the two
+  have to agree or a student's pulled choices and their override land under
+  different keys.
+- **which bank a course prints from** -- two, the CLI's `_bank_for` and the
+  web app's `Course.bank`. Now `course.bank_for`.
+
+None of these were broken. They were four chances to fix something once and
+have it stay broken somewhere else, which is the failure already listed
+three times in `checkit-printit/CLAUDE.md`.
+
+### What was in the click body
+
+`form pull` was 103 lines and most of it was rules rather than reporting:
+which skills count as known (the bank's, or the open list when there is no
+bank), what counts as trouble, the refusal to write a roster when some
+responses could not be placed, and the write itself.
+
+`responses.pull_for_course(space, write=, force=)` now holds all of it and
+returns a `PullOutcome`; the command is 62 lines of `click.echo`. The web
+app calls the same function. That is the rule the app is built on, and the
+reason to care is that **`--force` and "write the rest anyway" are now the
+same code path**, not two readings of one sentence.
+
+Two shapes in it are deliberate:
+
+**Trouble is returned, not raised.** The first draft raised
+`ResponseError`, which would have meant the caller -- holding the list of
+which address matched nobody and which answer named no real skill -- could
+report none of it. `written` carries the decision and `trouble` explains
+it, so both front ends show the detail and then the refusal.
+
+**`trouble` is a property, not a flag.** Set once at the end, a new kind of
+trouble added to `Pull` could be forgotten there and quietly write a
+roster.
+
+### The card shows what the table does not
+
+The card reports counts and every reason a student might not get the paper
+they asked for -- an address nobody has, an answer naming no real skill,
+responses that confirmed no date, responses for another day, responses
+superseded by a later one. It deliberately does **not** list who chose
+what: the table two cards down is the view of that, and two views of one
+set of facts is the reason Responses is not a tab.
+
+The payload was trimmed to match. The first version sent the per-student
+list and the card never drew it, which is the same dead-field shape as the
+nickname and the override, caught this time by reading it back rather than
+by somebody noticing it did nothing.
+
+It is hidden on a course with no form, and in the "everyone sits the same
+thing" mode, where what students chose does not apply.
+
+### Verified against the real form
+
+The scratch course's own Google Form, through the page:
+
+- a dry run: 1 response on the form, 0 for this assessment, 1 for another
+  day, nothing written -- the date scoping working on a response that was
+  confirmed for 9/25 against an assessment set to 10/9
+- then the assessment moved to 9/25 and the roster's chosen skills cleared
+  by hand, so the write had something to change. Before the pull the table
+  read "—"; after it, "W1, W3", with no reload. The first attempt proved
+  nothing, because the roster already held the values the pull would write.
+- the CLI's own `form pull --dry-run` still works after its body was
+  replaced
+
+Eleven mutations, 0 survivors.
