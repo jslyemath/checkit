@@ -6834,3 +6834,78 @@ changed -- which read, for a moment, as the app being broken.
 
 Three lines. The general shape is that writing to `location.hash` looks like
 routing and is only half of it.
+
+## Seven notes on the Print job view (2026-10-01)
+
+Four implemented, three left open because they are the instructor's to
+decide. The open three are in `PRINT_TOOL_DESIGN.md` 12.6 under "Open, and
+blocking"; this is what was found.
+
+### A multi-select was the wrong control twice over
+
+The three selection modes used `<select multiple>`. The note justifying it
+said a wall of checkboxes would bury the common case. That was wrong on two
+counts: picking a second item needs ctrl-click, which nobody discovers, and
+it made the same kind of choice look like a different control from the
+checkbox list two tabs away on Update form. Now the same component as that
+list.
+
+Worth naming the pattern: **a control chosen for how a list usually looks is
+a worse bet than a control chosen to match the one next to it.**
+
+### The nickname was a field nothing read
+
+Reported as "I changed a nickname and the Print job table did not show it".
+Not a caching bug: `Student.preferred` is used **nowhere in the print path**.
+The paper prints `student.name` and the seating chart matches on
+`student.name`. The roster table writes the nickname and reads it back, and
+that is the entire life of the field.
+
+The app now displays it, with the full name on hover. **Whether it should
+print is open** -- see 12.6. The recommendation there is to print `preferred`
+and keep matching on `name`, because the chart is matched in code and the
+paper is read by a person.
+
+### The override box took anything
+
+Typing `W9` into a student's override reached the build as "X asked for
+'W9', which is not in the bank" -- after the job folder had been written. The
+box now marks it while you type and the save refuses it, along with the three
+modes, the extras, and a version letter the seating chart does not have.
+
+The general shape: **a validation that fires after a side effect is not a
+validation, it is an autopsy.**
+
+### A version can be changed for one run
+
+The letter comes from a seat's position, which is right almost always. The
+exception is the run where it is not -- someone sitting elsewhere that day,
+two who ended up adjacent after a drop. That needed the seating chart edited
+and put back.
+
+Each row now carries the seat's letter and can be moved, recorded as
+`[versions]` in the job's `publication.toml`, keyed by student id. **The chart
+is untouched**, so next week is unaffected and nothing has to be restored.
+`build_handouts` consults it after `chart.order()`; the collision check still
+runs afterwards, so moving someone onto their neighbour's version is reported
+rather than silently printed.
+
+Verified on a real build: a student whose seat says A was moved to D, and
+their papers in the compiled PDF carry version D's seeds.
+
+### The mutation run earned its keep, again
+
+Four of five mutations survived the first pass: `assemble` ignoring the pin
+entirely, and both new validations. The tests checked that an override
+reaches `publication.toml` and stopped -- **the plumbing, not the
+behaviour.** "It is written to the file" and "it changes the paper" are
+different claims, and only the first had a test.
+
+This is the sharpest instance so far of the rule already in CLAUDE.md. The
+tests were not weak-looking; they asserted real things about real files. They
+simply stopped one step short of the thing that matters, and nothing but
+breaking the code on purpose would have said so.
+
+Two of the five also exposed, for the second time this month, how easily
+"equivalent mutant" is reached for. Both earlier candidates turned out to
+have a testable difference after a second look.

@@ -45,9 +45,10 @@ mat-106's venv has checkit installed **editable**, pointing at `Projects/checkit
 - `--remote URL` — required when the bank has images
 - `--thaw SLUG` — regenerate an outcome marked `<frozen/>`
 
-`checkit-printit` has grown a lot: `build`, `init`, `install`, plus
-`course`, `roster`, `skills`, `record` and `form` groups. Its own
-`CLAUDE.md` lists them all — read that before touching it.
+`checkit-printit` has grown a lot: `build`, `init`, `install`, `gui`, plus
+`course`, `roster`, `skills`, `record` and `form` groups. It also has a local
+web app (`gui -c <course>`), four views in. Its own `CLAUDE.md` lists
+everything and says what is open — read that before touching it.
 
 ## Seed tiers
 

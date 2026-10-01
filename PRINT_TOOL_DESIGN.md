@@ -961,6 +961,65 @@ comes out of it.
 **The nav is the authority. When a view is renamed, this table is renamed in
 the same commit.**
 
+#### Open, and blocking the next slice
+
+Three decisions belong to the instructor. Nothing should be built on top of
+them until they are settled, because each one changes a layout that other
+work would have to be redone against.
+
+**1. Does the nickname print?**
+
+`Student.preferred` is read by nothing in the print path. The paper prints
+`name`; the seating chart matches on `name`. The app displays the nickname
+now, and that is all it does.
+
+*Recommendation: print `preferred` where it is set, keep matching on `name`.*
+The chart is matched in code and the paper is read by a person, and those
+want different things. The risk is that the two drift far enough apart that
+a human comparing a paper to the chart cannot -- which argues for showing
+both in the seating GUI when it exists, not for keeping the nickname off the
+paper.
+
+**2. Does Responses stay a tab?**
+
+The roadmap has both a Responses tab (8e) and each student's choices inside
+Print job (8d). That is two views of one set of facts.
+
+*Recommendation: fold the pull into Print job as its first card, and drop
+the separate tab* until "email missing students" exists -- which is the one
+part of responses that is genuinely not about assembling a print job.
+
+The weekly flow then reads top to bottom on one page: pull, see the choices,
+override, build. Against it: the pull has failure modes of its own (an
+address matching nobody, a skill no longer in the bank, a response for
+another day) and they need room; and "who has not answered" is useful
+outside a print job. Both are real, and both are better served by the card
+reporting them in place than by a second tab.
+
+**3. Is "simply print" a mode rather than a card?**
+
+Setting `simply_print` silently cancels the other two selection modes *and*
+every per-student override. The current layout shows three equal cards, one
+of which quietly disables the others -- which is a rule you have to hold in
+your head rather than something the screen tells you.
+
+*Recommendation: a mode switch at the top of the tab.*
+
+> ( ) **Everyone sits the same thing** -- pick the skills; that is the page
+> ( ) **Students chose** -- pull, defaults, append-for-everyone, overrides
+
+The first *hides* the response machinery rather than disabling it, because
+none of it applies. "Who gets what" and Build stay in both, because they are
+the same job either way.
+
+The point is not tidiness. It makes the exclusivity **structural**: you
+cannot set simply-print and then wonder why an override did nothing, because
+the override box is not on screen. A rule enforced by layout cannot be
+forgotten.
+
+Decisions 2 and 3 touch the same layout, so they are cheaper done together
+than apart.
+
 #### The roster is the course; choices belong to one sitting
 
 Decided 2026-09-22, on seeing the first roster table. It had a "Chose" column
@@ -1111,7 +1170,7 @@ on its own:
 | 8b | **done** -- **Roster** table, editable, with drop and restore | the most-wanted, and write-round-trip is the thing to get right early |
 | 8c | **done** -- **Update form**: the open skills, the assessment, the wording preview, the push | replaces the most tedious CLI sequence |
 | 8d | **done** -- **Print job**: choices with overrides, defaults, variants, then build | the first view that needs the bank, not just the course |
-| 8e | **Record** and **Responses**, both read-mostly | cheap once the shell exists |
+| 8e | **Record**, and the response pull -- see "Open, and blocking" for whether Responses stays a tab | cheap once the shell exists |
 | 8f | **Seating**, drag and drop, plus randomise and swap | genuinely new code; the interaction needs prototyping rather than specifying |
 | 8g | **Cold call** | new, and the smallest |
 | 8h | **Setup**: create or attach a form from the app, and the boilerplate editor | both are start-of-semester work, and the editor needs somewhere the weekly views do not |
