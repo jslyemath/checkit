@@ -6886,6 +6886,11 @@ and put back.
 Each row now carries the seat's letter and can be moved, recorded as
 `[versions]` in the job's `publication.toml`, keyed by student id. **The chart
 is untouched**, so next week is unaffected and nothing has to be restored.
+**This paragraph was wrong; see "The preferred name, and a collision check
+that was looking elsewhere" (2026-10-01).** The collision check compared seat
+letters, so it could not see a pin at all. Left here rather than rewritten,
+because a claim that was believed for a week is part of the record.
+
 `build_handouts` consults it after `chart.order()`; the collision check still
 runs afterwards, so moving someone onto their neighbour's version is reported
 rather than silently printed.
@@ -6909,3 +6914,145 @@ breaking the code on purpose would have said so.
 Two of the five also exposed, for the second time this month, how easily
 "equivalent mutant" is reached for. Both earlier candidates turned out to
 have a testable difference after a second look.
+
+## The preferred name, and a collision check that was looking elsewhere (2026-10-01)
+
+Decision 1 of the three in `PRINT_TOOL_DESIGN.md` 12.6 is settled: the
+preferred name prints, and it prints everywhere. The instructor's words were
+that in the Sheets prototype "the nickname/preferred name put into the roster
+would be put on everything, including the seating chart and printed
+documents", and that the registrar's name should not be needed anywhere
+because matching is on ids and email.
+
+That is right about the intent and right about every join but one, and
+working out which one took most of the thinking.
+
+### The field meant something else
+
+`Student.preferred` was commented "the display first name", `roster import`
+set it from the registrar's `first`, and `to_toml` wrote it only when it
+differed from `first` -- which it never did. The GUI column was labelled
+"Nickname".
+
+So the obvious change, `display = preferred or name`, would have printed
+**one word** on the paper. The Print job view already computed exactly that
+expression inline for its table, where a short friendly name is fine; on a
+`\setname` it is not.
+
+Two ways out: keep it a first name and splice it into `name`, or redefine it
+as the whole printed name. Splicing needs a rule for where the given name
+ends, and `split_full_name` already gets a real compound surname wrong -- so
+that route puts a guess in the one place a mistake is visible to a student,
+on paper, in their hand.
+
+**What decided it was counting.** Across all eight rosters of ten or more
+students under `~/CheckItPrintIt`, including the live ones: `first`, `last`
+and `preferred` are empty on every single row. Only `name` is populated. So
+the field had no users, nothing to migrate, and its meaning was free. It is
+now the whole name to print -- "Matt Clifford", not "Matt" -- the column says
+**Prints as**, and an empty box shows the roster name greyed out as a
+placeholder so it reads as "this is what will print" rather than as missing
+data.
+
+The live hazard in that change is `classlist.parse`, which set
+`preferred=first`. Left alone, the next real class list would have given
+every student a printed name of one word. There is a test whose only job is
+that line.
+
+### One join really is made on a name
+
+`seating.toml` holds no id. A seat is a name and nothing else. So the chart
+is the single place where the instructor's "we match on SIDs and emails" does
+not hold, and it is the place they specifically asked the nickname to appear.
+
+Rather than migrate the file to ids -- a format change, with hand-written
+comments to preserve, a line editor that matches quoted names, and a live
+chart in use -- the join now accepts **either** spelling. `index_by_name`
+maps both the roster name and the printed one to a student, and the same
+index is used by `Chart.order`, by the dropped-and-still-seated check, by
+`roster drop`, and by the verifier. One function, four readers, because the
+alternative is four copies of a rule that has to agree.
+
+Two things fall out of accepting both spellings, and the tests found both:
+
+- **A seat name that matches two students is refused** rather than guessed.
+  One student's printed name can be another's roster name.
+- **One student in two seats is refused.** Previously a duplicate seat name
+  silently produced two papers; widening the match widened that hole, so it
+  is now checked.
+
+### The collision check was reading the chart, not the paper
+
+This is the find of the day, and it was not what was being looked for.
+
+A run was built deliberately colliding -- a student pinned, through 8d's
+`[versions]`, onto their neighbour's letter -- in order to test something
+else entirely: whether the verifier's neighbour check still worked once
+printed names were in play. The build printed:
+
+    built 48 students; assemble reported 0 collision(s)
+
+while `verify_run`, reading the compiled PDF, reported
+`FAIL neighbours hold different papers 1 of 35`.
+
+`Chart.collisions()` compares `a.version == b.version` on the **seats**. A
+per-run pin changes the handout and deliberately leaves the chart alone --
+that is the entire point of it, and it is why the chart does not have to be
+edited and put back. So the one mechanism that can place the same questions
+in two adjacent hands was the one mechanism the check could not see. It had
+been that way since the pin was added, and last week's notes said the
+opposite: "the collision check still runs afterwards, so moving someone onto
+their neighbour's version is reported rather than silently printed." That
+sentence was wrong, and nothing had tested it.
+
+`assemble.printed_collisions` now resolves each seat to its student, reads
+the version that student was actually handed -- by id, not by name -- and
+compares neighbours on that. The warning names the letter that printed
+rather than the letter the seat was assigned, which were different in exactly
+the case worth warning about. The same run now reports `1 collision(s)`.
+
+Worth stating plainly: **two independent checks disagreed, and the one that
+read the artifact was right.** The build was reasoning about its inputs; the
+verifier was reading the PDF. That is the whole argument for a tool that
+examines the output rather than the plan, and it has now paid for itself
+twice.
+
+### What the mutation run said
+
+Seventeen mutations, three rounds.
+
+Round one, two survivors. The roster writer's old condition
+(`preferred != first`) survived because the round-trip test's student had no
+`first` at all -- the test was right about the mechanism and wrong about the
+case. And nothing at all covered the Print job view's payload, which is where
+the nickname was first reported missing.
+
+Round two, after the collision fix, two more. One was the **wiring**: every
+test called `printed_collisions` directly, so pointing `_report_dict` back at
+`chart.collisions()` reinstated the entire bug with a green suite. Testing a
+function is not testing that anything calls it, and that is the same gap as
+last week's four survivors with the sign reversed.
+
+The other looked like an equivalent mutant -- preferring the printed name
+over the id when reading back a version. It is not. Two students can share a
+printed name, because a preferred name may be somebody else's roster name,
+and then the name lookup reads the other student's row. That is the third
+time this month a candidate "equivalent mutant" turned out to have a testable
+difference on a second look. The prior should be that it does.
+
+Round three: seventeen of seventeen caught.
+
+### Verified rather than assumed
+
+- A real 48-student build with two preferred names set: 48 `\setname` lines,
+  both printed names present, neither roster name present, 96 pages, clean
+  compile, `verify_run` 6 of 6.
+- `verify_run` has no pytest coverage, so both of its changed lookups were
+  mutated against that real output. The student lookup failed loudly
+  (`2 of 48`). The neighbour lookup survived -- on data with no collision to
+  find, a weakened check passes -- which is why the colliding run above was
+  built. Against it, as written it fails and mutated it reports
+  `ok 35 checked`, examining nothing. That is the failure mode `verify_run`
+  exists to catch, occurring inside `verify_run`.
+- The browser was checked at 530px as well as wide, and the server restarted
+  first. Both are in `checkit-printit/CLAUDE.md` because both have cost time.
