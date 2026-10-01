@@ -7192,3 +7192,80 @@ Nine mutations on the back-end half, 0 survivors.
 **The front end has no automated tests at all.** Every claim above about
 the dropdown, the resets and the note rests on driving the live page, which
 is a real gap and not one this change closes.
+
+## Save belonged to the tab, and a verification that proved nothing (2026-10-01)
+
+### Save was in the wrong place, and the reset made that visible
+
+"Reset this print job" sits at the top of the view and clears the whole
+tab. Save sat inside the "Who gets what" card. The instructor read that
+exactly as it was drawn -- a button inside a card saves that card -- and
+asked why a page-level reset and a card-level save were being described as
+one undo pair.
+
+They were one pair. The whole tab is **one draft**: title, date, the three
+selection modes, variants, extras, overrides and versions all live in one
+`job.toml`, and Save writes all of it. The layout said otherwise.
+
+Save, Discard, the unsaved-changes marker and the roster note now sit in a
+bar pinned to the bottom of the view, so the control is visible from any
+of the six cards rather than from the one it happened to live in. Sticky
+to the *bottom* rather than under the header, because the header wraps to
+two rows at a narrow width and any fixed top offset would be wrong at one
+of them.
+
+The general shape, and it is the same one as the simply-print card in
+12.6: **a control's scope is read off its position, not off its
+documentation.** If a button covers the page, it cannot live in a box.
+
+### The verification that proved nothing
+
+Worth writing down properly, because it is a failure of method rather than
+of code, and the method is one this file keeps recommending.
+
+The reported bug was that "open the folder" did nothing. The fault was a
+missing `import sys`. To show the fix worked, the endpoint was called over
+HTTP -- with a path chosen by hand:
+
+    POST /api/print/reveal  {"path": ".../CheckItPrintIt/jobs/Redo 2026-09-25"}
+
+It returned 200 and opened a window, and that was reported as verified. It
+verified nothing anyone cared about:
+
+- It opened a folder nobody asked for. The button sends the folder from
+  the run just built; the test sent a folder from two weeks ago.
+- The folder it opened held only `publication.toml`, so the instructor's
+  next message was reasonably that the build had produced nothing.
+
+Both come from printit writing **two folders per run**, which is easy to
+forget and worth stating plainly:
+
+| | holds |
+|---|---|
+| `~/CheckItPrintIt/jobs/<title> <date>/` | the **job**: `publication.toml`, the request |
+| `~/CheckItPrintIt/<course>/<title> <date>/` | the **run**: `main.pdf`, `main.tex`, `manifest.toml`, `compile.log`, a folder per skill |
+
+The button has always sent the second. The hand-written test sent the
+first, and a job folder with one file in it looks exactly like a build
+that failed.
+
+Done properly afterwards: a real build driven through the page (48
+students, 3 skills, 12 distinct papers), then **the button itself
+clicked**, with `fetch` wrapped only to record what it sent. It sent
+`.../Scratch 48/Reveal check 2026-10-01`, which holds `main.pdf` at 204
+pages with a clean log.
+
+`CLAUDE.md` already says "verify the artifact, not the dry run". This adds
+the half that was missing: **operate the control, do not call what you
+believe the control calls.** Calling the endpoint tested the endpoint. It
+could not have caught a button wired to the wrong field, which is exactly
+the class of bug being reported.
+
+### Said with less jargon
+
+"Your draft" was used repeatedly for the Print job tab's saved state and
+never defined. It is `job.toml` in the course folder -- the title, date,
+chosen skills, variants, extras, overrides and version pins, kept between
+visits. The code calls it a draft because it is edited freely and copied
+into a job folder at build time; that is an internal word and does not
+belong in a sentence to the instructor without being unpacked.
