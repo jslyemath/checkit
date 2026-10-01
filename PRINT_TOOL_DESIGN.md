@@ -967,14 +967,19 @@ All three decisions are closed.
 
 **The preferred name prints, everywhere** (2026-10-01). Above.
 
-**Responses is not a tab** (2026-10-01). The pull becomes Print job's first
-card, so the weekly flow reads top to bottom on one page: pull, see the
-choices, override, build. The failure modes the pull has of its own -- an
+**Responses is not a tab** (2026-10-01, built). The pull is Print job's
+first card, so the weekly flow reads top to bottom on one page: pull, see
+the choices, override, build. The failure modes the pull has of its own -- an
 address matching nobody, a skill no longer in the bank, a response for
 another day -- are reported in that card rather than given a view. "Who has
 not answered" comes back as its own thing when *email missing students*
 exists, which is the part of responses that is genuinely not about
-assembling a print job. **Not yet built; this is the next slice.**
+assembling a print job.
+
+The card reports counts and every reason a student might not get the paper
+they asked for, and deliberately does not list who chose what -- the table
+two cards down is the view of that, and two views of one set of facts is
+the reason this is not a tab.
 
 **Simply-print is a mode** (2026-10-01). A segmented control at the top of
 the tab, chosen over radios, a dropdown-in-a-sentence and a checkbox by
