@@ -961,69 +961,36 @@ comes out of it.
 **The nav is the authority. When a view is renamed, this table is renamed in
 the same commit.**
 
-#### Open, and blocking the next slice
+#### Settled, and what each one cost
 
-Two decisions belong to the instructor. Nothing should be built on top of
-them until they are settled, because each one changes a layout that other
-work would have to be redone against.
+All three decisions are closed.
 
-**Settled 2026-10-01 -- the preferred name prints, everywhere.**
+**The preferred name prints, everywhere** (2026-10-01). Above.
 
-As in the Sheets prototype: a preferred name put into the roster appears on
-the paper, on the seating chart and in every list in the app. `preferred` no
-longer means a first name -- it is the whole name to print, the column is
-labelled **Prints as**, and an empty box shows the roster name as a
-placeholder.
-
-Matching is unchanged and stays on sid, alt id, email and name, with one
-exception that had to be faced rather than assumed: `seating.toml` holds no
-id, so the chart is the single join made on a name. It now accepts either
-spelling, and refuses a seat that matches two students or a student that
-holds two seats. Working this out turned up a separate and worse bug -- the
-build's collision warning was reading the chart rather than the paper, so a
-per-run `[versions]` pin could seat two neighbours on one version with the
-build reporting none. Both are in the notes under "The preferred name, and a
-collision check that was looking elsewhere".
-
-**1. Does Responses stay a tab?**
-
-The roadmap has both a Responses tab (8e) and each student's choices inside
-Print job (8d). That is two views of one set of facts.
-
-*Recommendation: fold the pull into Print job as its first card, and drop
-the separate tab* until "email missing students" exists -- which is the one
-part of responses that is genuinely not about assembling a print job.
-
-The weekly flow then reads top to bottom on one page: pull, see the choices,
-override, build. Against it: the pull has failure modes of its own (an
+**Responses is not a tab** (2026-10-01). The pull becomes Print job's first
+card, so the weekly flow reads top to bottom on one page: pull, see the
+choices, override, build. The failure modes the pull has of its own -- an
 address matching nobody, a skill no longer in the bank, a response for
-another day) and they need room; and "who has not answered" is useful
-outside a print job. Both are real, and both are better served by the card
-reporting them in place than by a second tab.
+another day -- are reported in that card rather than given a view. "Who has
+not answered" comes back as its own thing when *email missing students*
+exists, which is the part of responses that is genuinely not about
+assembling a print job. **Not yet built; this is the next slice.**
 
-**2. Is "simply print" a mode rather than a card?**
+**Simply-print is a mode** (2026-10-01). A segmented control at the top of
+the tab, chosen over radios, a dropdown-in-a-sentence and a checkbox by
+rendering all four in the app's stylesheet and looking at them.
 
-Setting `simply_print` silently cancels the other two selection modes *and*
-every per-student override. The current layout shows three equal cards, one
-of which quietly disables the others -- which is a rule you have to hold in
-your head rather than something the screen tells you.
+Segmented wins because the app already contains that control -- the view
+nav is one -- so it adds no vocabulary, and switching mode changes which
+cards exist, which is what a nav-shaped control is for. It is deliberately
+smaller than the real nav, with "This run:" in front of it.
 
-*Recommendation: a mode switch at the top of the tab.*
-
-> ( ) **Everyone sits the same thing** -- pick the skills; that is the page
-> ( ) **Students chose** -- pull, defaults, append-for-everyone, overrides
-
-The first *hides* the response machinery rather than disabling it, because
-none of it applies. "Who gets what" and Build stay in both, because they are
-the same job either way.
-
-The point is not tidiness. It makes the exclusivity **structural**: you
-cannot set simply-print and then wonder why an override did nothing, because
-the override box is not on screen. A rule enforced by layout cannot be
-forgotten.
-
-These two touch the same layout, so they are cheaper done together than
-apart.
+The layout half was only half the problem. `simply_print` replaced each
+student's choices and killed `default_when_missing`, while the job folder
+carried all three keys regardless -- so a saved `publication.toml` could say
+one thing and hold settings for the other. `publication_text` now writes
+only the half the mode uses, and a draft written before the mode existed
+says which it is by whether `simply_print` has anything in it.
 
 #### What the Print job table has to say for itself
 

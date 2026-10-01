@@ -7269,3 +7269,75 @@ chosen skills, variants, extras, overrides and version pins, kept between
 visits. The code calls it a draft because it is edited freely and copied
 into a job folder at build time; that is an internal word and does not
 belong in a sentence to the instructor without being unpacked.
+
+## Simply-print becomes a mode, and two rules that were already written down (2026-10-01)
+
+Both of the decisions left open in 12.6 are settled. Responses folds into
+Print job rather than being its own tab, and simply-print is a mode rather
+than a card. The second is built; the first is the next slice.
+
+### The control
+
+Four candidates were rendered in the app's own stylesheet and looked at,
+rather than argued about in prose: segmented, a sentence with a dropdown,
+the radios the design note had proposed, and a single checkbox. The
+instructor picked segmented.
+
+The reason it wins is not aesthetic. **The app already contains that
+control** -- the view nav at the top of every page is a segmented control --
+so it introduces no new vocabulary, and switching mode genuinely changes
+which cards exist, which is what a nav-shaped control is for. Both options
+stay on screen, which a dropdown loses. It takes one line where the radios
+took four to restate what the cards below them already said; that restating
+is what read as clunky.
+
+It is deliberately *not* styled like the real nav: smaller, no accent
+border, with "This run:" in front of it, so it does not look like a second
+set of views.
+
+### The job file can no longer contradict itself
+
+The screen was only half the problem. `simply_print` replaced each
+student's choices and killed `default_when_missing`, and the job folder
+carried all three keys regardless -- so a saved `publication.toml` could
+say "everyone sits the same thing" and also hold per-student overrides that
+would never be read. Anyone opening that file later, including the tool's
+own `--replay`, would reasonably believe them.
+
+`publication_text` now writes only the half the mode uses. Variants,
+version pins and extras are in both, because those are about the papers
+rather than about where the choices came from.
+
+**Old drafts keep working**: one written before the mode existed says which
+it is by whether `simply_print` has anything in it. Without that, every
+saved job printing one list for the class would have silently switched to
+reading the students' own choices the first time it was opened. There is a
+test whose only job is that line, and a mutation that removes it is caught.
+
+### Two rules that were already written down, and still cost time
+
+Both of these are in `checkit-printit/CLAUDE.md`. Both were read this week.
+Both happened anyway, which is worth recording as plainly as the bugs.
+
+**A heredoc ate backslashes. Twice in one session.** Once writing a patch
+script, once writing a test fixture -- `'\n'.join([...])` arrived as a real
+newline inside a string literal and the file would not parse. The second
+time was ten minutes after naming the first out loud. The rule is not "be
+careful with heredocs", it is **write the file with the Write tool**, and
+the reason it keeps failing is that a heredoc is the fluent thing to reach
+for.
+
+**`pytest -q | tail && git commit` committed a red suite, and pushed it.**
+A pipeline reports the exit code of its last command, so `&&` saw tail
+succeed. Six tests were failing. The fix for the tests was one line; the
+fix for the habit is to redirect to a file, check `$?` on its own line, and
+read the file -- which is exactly what the guide says and exactly what was
+not done.
+
+What the six failures were is worth keeping too, because it is a trap in
+the fixtures rather than in the code: `runner.run` installs the theme into
+the bank by default, and `bank_dir` is **session-scoped**, so a new test
+that built anything left `TestThemeInstall` asserting against a bank that
+already had a theme. Every one of those tests passes alone. A suite that is
+green in isolation and red together is the hardest kind to read, and the
+only signal was the exit code that had been thrown away.
