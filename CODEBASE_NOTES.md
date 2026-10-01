@@ -6716,3 +6716,86 @@ The rejected alternative is worth recording: making the preview itself
 editable. It reads as obvious and it erases the distinction the whole design
 rests on -- some of that text is rewritten by every push and some of it is
 never touched -- by making all of it look equally editable.
+
+## Stage 8d: the Print job view (2026-09-30)
+
+The staging area for one sitting: title and date, the three selection modes,
+per-skill variants, extras, a per-student override, and a table saying what
+each student will actually get -- then preview, build, and open the folder.
+
+### The extraction was most of the work
+
+`build` was 113 lines inside its Click command, with `click.echo` between
+every step, so nothing but the CLI could run it. The sequence is where the
+rules live -- which seed, whether a replay may proceed, whether to write a
+theme into someone's bank, what gets recorded -- so a GUI reimplementing it
+would have reimplemented those.
+
+It is `runner.run` now, returning a `BuildResult`. The CLI prints it; the web
+app serialises it. Proven equal rather than assumed: the CLI's preview output
+for the 09-28 job is byte-identical before and after.
+
+The view **writes a job folder and builds it** rather than gaining a second
+entry point. The folder is what makes a run reproducible and what `--replay`
+reads, so inventing a way to build without one would have been the
+duplication the rule forbids. Two files, deliberately: `<course>/job.toml` is
+the editable draft, and the job folder's `publication.toml` is the record,
+written at build time and never edited because the manifest's fingerprints
+refer to it.
+
+### Three attempts at the same deletion
+
+Removing four functions from `__main__.py` went wrong three times, each more
+embarrassingly than the last. Slicing from `str.index` to the next `
+def `
+died on the last function in the file. A helper written to fix that searched
+for the next `
+
+
+def ` and **swallowed `@main.group() def form():`
+whole**, because a decorated function does not start with `def`.
+
+The third attempt stopped deleting. `default_output_root`, `_safe` and
+`_choose_run_seed` are **aliases** of the runner's versions -- one
+implementation, no surgery, and every test that names them still resolves.
+Only `_record_run` is removed, by scanning to the next line at column zero,
+which is correct whether or not what follows is decorated.
+
+The lesson is not "slice more carefully". It is that **a deletion needs a
+reason, and three of these did not have one** -- an alias was always
+available and I reached for surgery first.
+
+### A table read from the wrong place, for the second time
+
+`save_draft` wrote `simply_print` under `[selection]`; `load_draft` looked
+for it at the root, found nothing, and fell back to the default. A draft
+naming two skills produced a `publication.toml` with no `[selection]` block
+and a run that printed neither. `variants` and `overrides` had it too.
+
+CLAUDE.md already carries this: "`skills` sits under `[assessment]` -- a TOML
+table runs to the next header." What it did not say is the half that bites:
+**the bug is writing in one shape and reading in another**, which only one
+function can be wrong about. So `IN_TABLE` now names the table for each key
+and both functions consult it, and a test asserts every declared key is
+real.
+
+Found by reading the generated `publication.toml` after a preview reported
+two versions where there should have been eight -- the artifact, not the
+code.
+
+### Equivalent mutants, and the one that was not
+
+Seven mutations, five caught immediately. Two were not: reading `variants`
+and `overrides` from the root works either way, because a table named for
+its key is found by the fallback.
+
+That looked like an equivalent mutant and was nearly dismissed as one. The
+`table == key` branch does differ, though -- it checks the value is a dict,
+where the fallback takes whatever is there. A hand-edited draft with
+`variants = "not a table"` would reach the view as a string and be indexed
+as a dict. A test for that distinguishes them, and both mutations are now
+caught.
+
+Worth the care: "equivalent mutant" is the right answer often enough to be a
+comfortable one, and it is indistinguishable at a glance from "the test I
+have not written yet".
