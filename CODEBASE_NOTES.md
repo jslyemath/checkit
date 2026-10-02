@@ -7435,8 +7435,9 @@ list and the card never drew it, which is the same dead-field shape as the
 nickname and the override, caught this time by reading it back rather than
 by somebody noticing it did nothing.
 
-It is hidden on a course with no form, and in the "everyone sits the same
-thing" mode, where what students chose does not apply.
+**This paragraph was wrong within the hour; see "A feature nobody can
+find is not a feature" below.** It read: hidden on a course with no form,
+and in the "everyone sits the same thing" mode.
 
 ### Verified against the real form
 
@@ -7453,3 +7454,56 @@ The scratch course's own Google Form, through the page:
   replaced
 
 Eleven mutations, 0 survivors.
+
+## A feature nobody can find is not a feature (2026-10-02)
+
+The response pull was reported as "not in the GUI", an hour after being
+built, tested against a real Google Form, documented and pushed. It was in
+the GUI. It was also, on the course the instructor actually had open,
+invisible in every way a person could check.
+
+The card was behind two conditions:
+
+    pull-panel.hidden = !(printState.hasForm && draft.mode === "chose")
+
+and the same change had removed Responses from the nav. On `Scratch 48` --
+no form, and sitting in "everyone sits the same thing" -- both were false.
+No tab, no card, nothing anywhere saying such a thing existed. The
+verification that said it worked was run on `Scratch`, the one course where
+both conditions happen to be true.
+
+Two different mistakes, worth separating.
+
+**Hiding it when there is no form was wrong on its own terms.** An app that
+cannot do something should say why. Hiding it means the only way to learn
+the feature exists is to already have the thing that enables it, which is
+exactly backwards for a setup step. The card is now always on the tab; with
+no form it explains and disables its buttons.
+
+**Hiding it in "same" mode was a rule applied where it does not hold.** The
+mode exists so that an input which would silently not apply to this run is
+not on screen -- an override that simply-print would cancel. A pull is not
+such an input. It writes choices into the **roster**, which outlives the
+run, so pulling on a day the whole class sits one paper is a perfectly
+sensible thing to do and the choices are there next week. The card now says
+that rather than vanishing.
+
+### The pattern underneath, which has now happened three times today
+
+Each time: something was verified in the context where it works, and that
+was recorded as verified.
+
+- `verify_run`'s neighbour check passed on a run with no collision in it,
+  so the mutation that broke it survived
+- the override tests passed on a roster that already held the values the
+  pull would write, so the write was never exercised
+- the pull card was checked on the one course that has a form
+
+The useful form of the rule is not "test it" but **test it where it is
+meant to fail**. A feature checked only where its preconditions hold has
+been checked for the case nobody needed checking.
+
+There is still no automated coverage of any of this: the visibility logic
+is front-end, and the front end has no harness, deliberately, while the
+shape keeps moving. That makes "which course was it opened on" a thing to
+ask by hand, every time.
