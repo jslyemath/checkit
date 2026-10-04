@@ -7507,3 +7507,86 @@ There is still no automated coverage of any of this: the visibility logic
 is front-end, and the front end has no harness, deliberately, while the
 shape keeps moving. That makes "which course was it opened on" a thing to
 ask by hand, every time.
+
+## Setup: connecting a form without the CLI (2026-10-03)
+
+Prompted by the app telling people to go and run a CLI command. The pull
+card, on a course with no form, said "`form create` makes one; `form
+attach` wires up a form you already have" -- which is the one thing the web
+app exists to stop anybody having to know.
+
+8h, the half that connects a form. The boilerplate editor is still to come.
+
+### What was in the way
+
+`form create` and `form attach` held five helpers and twenty-one
+`click.echo` calls tangled through the rules, so none of it was callable.
+It is now `provision.py`, and the commands report. `attach` had also been
+carrying its own copy of push/deploy/ping/record -- the reason a fix to
+`_deploy_and_record` once left it unchanged while appearing to work -- and
+there is one copy.
+
+**One shape had to change, and it exposed a real bug.** `_ping_authorized`
+stopped and asked `click.confirm("authorized?")` while the instructor went
+to a browser and granted the script its permissions. A request handler
+cannot block like that.
+
+Making it non-blocking meant looking at what state exists at that moment,
+and the answer was: the form is real, the script is real, the web app is
+deployed, **and nothing has been saved**. The CLI mostly got away with it
+by prompting in-process and carrying on. Pressed in a browser, the obvious
+next move is to press the button again -- which would create a second form
+and orphan the first in the instructor's Drive.
+
+So the split is now real. Everything up to the deploy saves, and everything
+after it is `finish()`, which is safe to call again: `addItems` creates only
+what is missing, `rename` sets a title that may already be set, `configure`
+reports what it skipped. "Not authorized yet" is a **state the view can
+resume from**, not an error -- deliberately not a 400, because the sensible
+response to "that failed" is to start over, and starting over is the
+expensive mistake here.
+
+### Attaching tells you what it will overwrite
+
+`attach` clones the bound script project and writes printit's files over
+the fetched ones, so `Code.gs` and `appsscript.json` -- the names most Apps
+Script projects already use -- are replaced by the push. That matters
+immediately: MAT 106's form is still driven by the Control Center
+prototype, which was used to produce a real print run two days ago.
+
+So the view asks first. "What would this replace?" clones into a scratch
+directory and lists the project's files, split into the ones printit would
+overwrite and the ones it would leave. **Attach stays disabled until that
+has been run**, and editing the script id disables it again -- the
+structural version of a warning, the same move as the simply-print mode
+switch.
+
+### Two things the view does that the CLI does not have to
+
+**It says what the Google session is even when it is fine.** The global
+banner only appears when signed out, which is right for a warning and
+wrong for a setup step: in Setup the state is the first thing you need, so
+it is a line of text, and the connect buttons are disabled without it
+rather than failing three clicks later.
+
+**It shows the four item slots by their plain-language names** -- "the date
+confirmation checkbox", not `confirm_date` -- with the id beside each and
+the missing ones marked. `form map` prints the same information to a
+terminal nobody has open.
+
+### Verified
+
+Both states, in the pane: an unconnected course offering the two routes
+with everything correctly disabled, and a connected one listing its form
+id, script id, web app URL and all four slots. The pull card's advice now
+navigates to Setup instead of naming commands, which was checked by
+clicking it.
+
+Nothing here talked to Google. Eleven mutations, 0 survivors, on the parts
+that are not the network: that the deploy is saved before the refusal, that
+the refusal is resumable, that `finish` is repeatable, and that the view is
+told what is missing.
+
+A first slot rendered as a table and set the page six pixels wider than the
+pane; the ids are long, unbroken and only ever copied. It is four label and
+value rows now, like the ones above it.

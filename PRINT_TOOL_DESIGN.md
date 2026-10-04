@@ -1185,7 +1185,7 @@ on its own:
 | 8e | **Record**, and the response pull -- see "Open, and blocking" for whether Responses stays a tab | cheap once the shell exists |
 | 8f | **Seating**, drag and drop, plus randomise and swap | genuinely new code; the interaction needs prototyping rather than specifying |
 | 8g | **Cold call** | new, and the smallest |
-| 8h | **Setup**: create or attach a form from the app, and the boilerplate editor | both are start-of-semester work, and the editor needs somewhere the weekly views do not |
+| 8h | **Setup**: create or attach a form from the app -- **done**; the boilerplate editor still to come | both are start-of-semester work, and the editor needs somewhere the weekly views do not |
 
 Seating is deliberately not first. It was the whole of this section for three
 weeks, it is the only view whose *feel* cannot be settled in writing, and it
