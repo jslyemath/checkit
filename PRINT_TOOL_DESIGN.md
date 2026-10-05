@@ -1365,13 +1365,37 @@ instructor preferred to a converter nobody would run twice.
 |---|---|---|
 | 1 | the model, the colouring, the chart writer | **done** 2026-10-04 |
 | 2 | the canvas, read-only: shapes, cards, labels, section picker, toggles, zoom | **done** 2026-10-05 |
-| 3 | dragging -- cards between seats, shapes around the room | next |
-| 4 | the shape palette, and dragging seat anchors | |
+| 3 | dragging -- cards between seats, shapes around the room | **done** 2026-10-05 |
+| 4 | the shape palette, and dragging seat anchors | next |
 | 5 | the print-order mode | |
 | 6 | randomise, and swap two | |
 
 Stage 1 was invisible and decided everything after it. Stage 2 is
 projectable on its own.
+
+Stage 3 settled two things the plan had left open.
+
+**The tab is three modes, not one canvas with handles.** *View* moves
+nothing and is what goes on the projector; *People* drags names between
+chairs; *Desks* drags the furniture, with the name cards inert so a table
+can be grabbed through the people sitting at it. The mode is named on the
+canvas element, so "cards are not targets while desks are being moved" is
+one line of CSS rather than a condition at every handler.
+
+**Save writes the chart as well, when that is safe.** A room nothing
+reads is a toy -- `seating.toml` is what the build opens. So saving the
+tab rewrites it, under two conditions: somebody has to be seated, so an
+untouched course cannot replace a term's chart with an empty one; and the
+chart on disk has to be one this tab wrote, which `to_toml` marks and
+`seating.was_generated` reads. A chart that came from an import or a text
+editor is left exactly alone and the save bar says so **before** the
+button is pressed. That is the 10-02 lesson made structural.
+
+This also opened a hole that had been harmless until now: `set_dropped`
+cleared the chart and knew nothing about `room.json`, so the next save of
+this tab would have walked a dropped student back onto the printed list.
+A drop now empties their chair in the room too. See the notes of
+2026-10-05.
 
 ### 12.8 Decisions taken
 
