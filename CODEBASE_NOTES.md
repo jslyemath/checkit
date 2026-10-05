@@ -7800,3 +7800,53 @@ it edits source files.**
 
 A clean run is seventy seconds at 557 tests, measured rather than assumed,
 which is what the per-run bound is set against.
+
+## The export is the chart, when the export is the chart (2026-10-05)
+
+A Skill Checkpoint for 45 students, built from a Control Center export.
+Recorded for one mistake and one piece of drift.
+
+### The mistake, from the run before it
+
+On 10-02 the same kind of export was used for the roster and the
+**seating chart from an earlier job** was used for the order and the
+version letters. That was wrong, and the instructor said so: the export's
+row order is the order they want, and its `Var:` column is the chart.
+
+The lesson is not "read the CSV more carefully". It is that **an input
+that carries an order is carrying an instruction**, and reaching past it
+for a file that happens to be lying around is a decision, not a default.
+The 10-05 job pins both: row order becomes group order in `seating.toml`,
+and every seat is written with its `Var:` letter.
+
+Checked against the compiled document rather than the build's own report:
+45 students listed, 45 printed, every one in the export's position, every
+one holding the letter the export gave them.
+
+### The sheet's difficulty labels no longer match the bank
+
+Both controls in play were mislabelled, and both were resolved by reading
+the generators instead:
+
+* The export lists the Course Progress control as affecting
+  "R1, R2, W3, W4, F4". W6's own source says **only R1, R2, W4, W4-E and
+  W5** read `course_progress`. W5 is in this run and reads it, so the
+  setting of 2 means multiplication -- from a list that does not mention
+  W5.
+* The export labels a control **"W6: Allow (terminating) decimals"**. The
+  flag is named `w7_allow_terminating`, W7 is the skill that reads it, and
+  **W6 declares no variants at all**. So the control labelled W6 drives
+  W7.
+
+The values were unambiguous; only the labels have drifted. Worth saying
+plainly because the obvious reading of that sheet sets the variant on the
+wrong skill, and nothing downstream would complain.
+
+### A checker that counted the answer keys as students
+
+The order check first reported 45 expected and 46 printed. The keys carry
+`\setname` lines too. `verify_run` already splits the document on
+`% ---- extras` and `% ---- answer keys`; the checker was reading the
+whole file. Fixed by splitting on the same markers -- the point being that
+the marker names were already load-bearing somewhere else, and a second
+reader of a format should use the first one's boundaries.
