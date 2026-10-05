@@ -7590,3 +7590,128 @@ told what is missing.
 A first slot rendered as a table and set the page six pixels wider than the
 pane; the ids are long, unbroken and only ever copied. It is four label and
 value rows now, like the ones above it.
+
+## The room: stage one of the seating tab (2026-10-04)
+
+Four chart layouts were drawn and all four were rejected, for the right
+reason: they were ways of *rendering* a chart, and what is wanted is a way
+of *drawing a classroom*. A canvas, background shapes for the desks --
+2x2 tables, hexagons, trapezoids, circles -- with default seat positions
+that can be dragged, name cards two lines deep so they are square rather
+than long, group labels that sit on a table or float in the gap between
+desks, version letters that toggle for projecting, and a chart per
+section.
+
+This is the model and the rules. No canvas yet: stage one decides whether
+the rest is easy.
+
+### The shape of it, which came from the instructor
+
+Three layers, and the division is theirs:
+
+* **a desk owns its seat positions** -- so dragging a table moves its
+  seats, and a seat is an offset rather than a coordinate
+* **a group owns** its label, the version letters of the seats in it, and
+  where it comes in the print order
+* **a seat in no group is a group of one**, in every one of those rules
+
+That last line is what makes a room of loose desks in rows work without a
+second code path, and `room.group_of` leaves ungrouped seats out of its
+map precisely so the rule lives in one place.
+
+### Three things that cost nothing
+
+**`seating.toml` needs no format change.** A seat may already pin its
+version -- `{name = "X", version = "B"}` -- and `load` validates it
+against the declared list. So "choose the versions in the seating tab"
+is the app writing down what it chose, in a field that has been there all
+along. `alternate()` survives untouched as the fallback for a chart this
+tool did not write, which is exactly the role the instructor asked for.
+
+**Print order is file order**, through `Chart.order`. Writing the groups
+in the order they were clicked *is* the feature.
+
+**`collisions()` still runs** over the result, so the build's own check
+survives the app taking over the choosing.
+
+**And one thing that gets better:** `seating.toml` joins to the roster by
+*name* -- the last name-keyed join in the tool, and the reason a whole
+spelling-tolerance mechanism exists. A room holds the student's **id** and
+resolves it to a name only when writing the chart. A rename cannot break a
+room.
+
+### The version assignment is graph colouring
+
+Seats are vertices, "must differ" is an edge, letters are colours. Two
+kinds of edge, and they are different sorts of claim: **same group**, which
+is semantic and comes from the instructor and is always right; and
+**within `NEIGHBOUR_DISTANCE`**, a heuristic over the drawing, which is
+what makes the ungrouped case work at all.
+
+Greedy, most-constrained seat first, choosing at random among the legal
+letters and preferring the least-used so the stack stays balanced. When
+letters run short -- five at a table and four versions -- there is no legal
+choice, so it takes the letter rarest among that seat's own neighbours:
+"impossible" becomes "as far apart as it can be" rather than a refusal.
+Then a bounded repair pass, trading letters while the clash count drops.
+
+Known limit, worth stating: a row of desks with only **two** letters can
+still leave a clash where a perfect alternation exists, because single-seat
+repair does not always find it. Three or more is always clean.
+
+### The mutation run, which was the useful part
+
+Seventeen mutations. **Five survived, and all five were the algorithm** --
+the distance rule, avoiding what neighbours hold, the ordering, the repair
+pass, the fallback. The tests covered four seats with four letters, where
+the *balance* preference alone produces four distinct letters and none of
+the rest is ever exercised.
+
+The deeper cause is worth keeping: **`assign_versions` reports clashes
+measured against its own adjacency graph**, so a mutation that deletes an
+edge rule makes it report a clean room, and three tests believed that
+report. They were not weak-looking; they asserted real things about real
+rooms. They asked the thing under test how it had done. The tests now build
+the adjacency themselves and score the answer.
+
+Rather than contrive a test per survivor, each part was **measured**:
+
+| part | evidence it earns its place |
+|---|---|
+| the distance rule | 10 desks, 3 letters: 0 clashes every seed; 77 of 80 clash without it |
+| busiest seat first | a desk ringed by four, 2 letters: 0 clashes on 40 of 40; naive order clashes on 40 of 40 |
+| the repair pass | helps on 124 to 260 of 300 random rooms, never hurts; one room goes 57 to 53 |
+| rarest-nearby fallback | better on 18 of 30 seeds; worst case 52 to 44 |
+
+The repair pass is the one that looked most like dead code and is the most
+load-bearing of the four. Two of those numbers are now quality floors in
+the tests, so an algorithm that does better raises them and one that
+quietly does worse is caught.
+
+Second run: seventeen of seventeen caught.
+
+### A harness that lied, and why
+
+Between those runs the mutation harness was started with `&` *inside* a
+backgrounded call. That detached it twice: the wrapper saw the echo,
+reported success, and the real run carried on orphaned. Two harnesses then
+rewrote the same files at once.
+
+- `room.py` kept a mutation (`close = True`) and gained two spliced lines
+  that stopped it parsing
+- `seating.py` kept the "empty chair" mutation
+- and the next run reported **seventeen catches that meant nothing**,
+  because the suite was already failing before anything was broken on
+  purpose
+
+That last is the part to design against. A red baseline makes every
+mutation look caught, and the output is indistinguishable from a good run
+except that the "caught by" column is full of `?`. **The harness now
+refuses to start unless the baseline is green.**
+
+Two smaller things from the same hour. `git diff --stat` is what bounded
+the damage -- `seating.py` showed additions only, so nothing there was
+lost, while `room.py` is untracked and had to be read. And the baseline
+guard itself was written through a heredoc, which ate its backslashes and
+left a file that would not parse: the fourth time in one session, every
+one on a patch that felt too small to be worth a file.
