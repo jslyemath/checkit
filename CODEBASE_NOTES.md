@@ -7715,3 +7715,88 @@ lost, while `room.py` is untracked and had to be read. And the baseline
 guard itself was written through a heredoc, which ate its backslashes and
 left a file that would not parse: the fourth time in one session, every
 one on a patch that felt too small to be worth a file.
+
+## The canvas: stage two of the seating tab (2026-10-05)
+
+The room, drawn. Desks as shapes, people as two-line cards on them, group
+labels floating at the middle of their seats, a section picker, and
+toggles for the version letters and the labels because this goes on a
+projector as well as being edited. Read-only; dragging is next.
+
+### Two decisions that shape the rest
+
+**HTML and CSS, not SVG.** The cards are two lines of text that have to
+stay legible from the back of a room, and HTML lays text out far better
+than SVG does. A hexagon and a trapezoid are one `clip-path` line each.
+And a card is then a real DOM element, which is most of the work of
+dragging one.
+
+**A card is positioned on the canvas, not inside its shape.** A seat
+anchor is an offset from the shape's centre -- so moving a desk moves its
+seats -- but the card itself is placed absolutely, because a dragged seat
+has to be able to leave the desk it started on.
+
+A shape's `at` is its **centre**, not a corner. Corners are easier to
+position in CSS and wrong for everything else: rotating a table, mirroring
+a layout, and working out which seats are near each other all want the
+middle.
+
+### `.card` was already taken
+
+The seat card was given the class `.card`. The Overview's stat cards
+already had it. A second rule for a class does not scope itself to the
+markup it was written beside -- it overrode the first one everywhere, so
+the Overview's eight cards became `position: absolute` and stacked on top
+of each other.
+
+Found by measuring the Overview after changing CSS for a different view,
+which is not a habit yet and should be: **a stylesheet has one namespace,
+and a new view's class names are global.** It is now `.seatcard`.
+
+### Three shapes had overlapping cards
+
+A name card is 104 by 54. The hexagon, the oval and the trapezoid each put
+two anchors closer together than that, so two names would have sat on top
+of each other -- on a projector.
+
+Caught by a test written against the card's own size, not by looking: the
+sample room only uses 2x2 tables, so the screen showed nothing wrong. The
+shapes grew rather than the cards shrinking, because the card is sized to
+be read from the back of a room and that is the fixed quantity.
+
+Worth generalising: **a palette of constants deserves a test that checks
+them against each other.** They look right individually and the
+relationship between them is what breaks.
+
+### Nothing said the room and the chart are different files
+
+`FILENAMES["room"]` pointed at `seating.toml` and every test passed. If
+those two ever named one path, saving a room would write JSON over a
+seating chart -- the file the build reads, and the only record of where a
+class sits.
+
+This was not hypothetical by the time it was found: a killed mutation run
+had left exactly that change in the working tree. No damage, because
+nothing wrote through it, but the only reason it was noticed was a
+site-by-site grep of the mutation targets.
+
+### The mutation harness now survives being killed
+
+Three failures in one afternoon, each teaching the same lesson from a
+different angle: **the harness's own correctness is load-bearing, because
+it edits source files.**
+
+* **A `finally` does not run when the process is killed.** Two runs ended
+  that way -- one orphaned by `&` inside a backgrounded call, one stopped
+  at a time limit -- and each left a mutation in the tree. The harness now
+  copies the original beside the source and writes a sentinel before
+  mutating; on startup it restores anything a previous run left in flight.
+* **A red baseline makes every mutation look caught.** Already recorded;
+  now enforced before the first mutation.
+* **A hang is not a catch.** Each run is bounded, and a mutation whose
+  suite never finishes is reported as `HUNG` rather than counted as
+  caught -- a test that did not finish has noticed nothing, and calling it
+  a catch would hide a real survivor.
+
+A clean run is seventy seconds at 557 tests, measured rather than assumed,
+which is what the per-run bound is set against.
