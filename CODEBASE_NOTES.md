@@ -7850,3 +7850,140 @@ The order check first reported 45 expected and 46 printed. The keys carry
 whole file. Fixed by splitting on the same markers -- the point being that
 the marker names were already load-bearing somewhere else, and a second
 reader of a format should use the first one's boundaries.
+
+## Dragging: stage three of the seating tab (2026-10-05)
+
+The room became editable. Names drag between chairs, desks drag around
+the room, and Save writes both the room and -- conditionally -- the chart
+the build reads. Four bugs in this, three of which only a hand on the
+control could have found.
+
+### Three modes, because two kinds of dragging want different rules
+
+*View* moves nothing and is the projector. *People* drags names. *Desks*
+drags furniture, and there the name cards are `pointer-events: none`, so
+a table can be grabbed through the people sitting at it -- in that mode a
+card is part of the furniture rather than a thing of its own.
+
+The mode is a class on the canvas element, not a condition at each
+handler. One CSS rule then says "cards are not targets while desks are
+being moved", which is the kind of statement that stays true when a new
+element is added.
+
+### Pointer events, and a ghost in the body
+
+Not HTML5 drag-and-drop. The canvas is `transform: scale()` to fit, so
+every coordinate has to be converted anyway, and the drop target is
+"nearest chair to the pointer" -- geometry, not hit testing, because the
+cards overhang each other.
+
+The scale is measured off the DOM (`getBoundingClientRect().width /
+offsetWidth`) rather than read from `seatingZoom`, which is null while
+the zoom is "fit". One source of truth, and it cannot drift.
+
+The dragged card is a **copy appended to `document.body`**, not the card
+itself. A transformed ancestor makes `position: fixed` behave like
+`absolute`, so anything left inside the scaled canvas cannot be pinned to
+the cursor; and leaving the original in place means a drag that ends
+nowhere has nothing to undo. The copy carries a `scale()` matching what
+was grabbed, so it is exactly the size of the card under the cursor.
+
+### A click was a drop
+
+The target was computed on `pointerdown`. In a 2x2 table the chair below
+is 87 room units away and the reach is 90, so **clicking a name swapped
+them with the person behind them.** Silent, and the kind of thing an
+instructor would discover as "the chart is wrong" three weeks later.
+
+Fixed with a four-pixel threshold: nothing is lifted and no target is
+computed until the pointer has actually travelled. Confirmed both ways in
+the browser -- a click now changes nothing, a drag still swaps.
+
+### The save bar was sitting on the tray
+
+The strip of students with no chair is also where you drop somebody to
+stand them up. Dropping **into** it worked. Picking **out** of it did
+nothing at all, with the cards plainly visible the whole time.
+
+`position: sticky; bottom: 0` on the save bar. The moment the page is one
+pixel taller than the window, the bar lifts out of the flow and covers
+what is above it -- which was the tray. The asymmetry is the tell: the
+tray's drop test is a rectangle comparison, which does not care what is
+on top, while picking up needs the real hit test, which does.
+
+Underneath it, a constant: the canvas sized itself to
+`window.innerHeight - 220`, where 220 was the space above it. At 530px --
+the width this pane actually is -- the toolbars wrap and the mode hint
+runs to three lines, and the true figure is 430. Both halves are now
+measured: the wrap's own `getBoundingClientRect().top` above, and the
+tray and bar's `offsetHeight` below.
+
+Worth generalising past this view: **a sticky element overlaps its own
+page, and a magic number for "the chrome above" is a number that is right
+at one window width.**
+
+### A cancelled drag was a yes
+
+`pointercancel` and `pointerup` ran the same handler, so a gesture the
+browser took away -- a scroll starting, a context menu, a pen leaving
+range -- committed the swap. Now `finish(false)` cleans up and changes
+nothing, and for a desk, which is written to the model on every move,
+puts it back where it started.
+
+### A dropped student would have walked back onto the paper
+
+The one with real consequences, and it was created by the feature rather
+than found in it.
+
+`roster.set_dropped` empties the student's seat in `seating.toml`. It
+knew nothing about `room.json`, which did not matter while the room was
+only a drawing. Now that the seating tab writes the chart **from** the
+room, the next save of that tab would have put a dropped student back on
+the printed list -- with nothing going wrong on screen, no error, and the
+roster still correctly showing them dropped.
+
+`set_dropped` now takes a `room_path` and empties their chair there too,
+and both callers pass it. The chair is emptied rather than removed, for
+the reason the chart already gave: a seat carries its version letter, so
+taking it away would re-letter everyone else at that table because one
+person left.
+
+### Two smaller rules worth stating
+
+**A swap exchanges people, not letters.** A version belongs to the chair,
+because the colouring is of the room; if letters travelled with people a
+swap could seat the same paper next to itself.
+
+**A drop on nothing is a cancel, not an eviction.** Losing somebody out
+of the chart because a drop was a few pixels short is not a trade worth
+making, and standing them up has the tray for a target.
+
+### The guard on the way in
+
+`room.check` is the door a room arrives by from the browser, and every
+rule in it guards something that fails *quietly*: an unknown shape is
+skipped by the canvas, so the desk and everyone at it vanish from the
+drawing while staying in the file; a student in two chairs prints twice;
+a chair at a NaN coordinate is nobody's neighbour, because every
+comparison against NaN is false, so it takes an unconstrained letter and
+clashes on paper with nothing said.
+
+`save` deliberately does not call it. The CLI and the tests build partial
+rooms on purpose, so the guard sits at the one untrusted door rather than
+at every write -- and the save endpoint checks *before* it writes, so a
+refusal leaves the last good room on disk.
+
+### Fifteen mutations, and the one that passed by accident
+
+Each new rule was broken on purpose to see whether a test noticed.
+Fourteen were caught first time. The survivor was the rule that a group
+may not name a seat in another section: the test put the stray reference
+in the **first** section, and at that point the walk has not reached the
+second one, so checking against "every seat in the room" and "every seat
+in this section" give the same answer. It only fails with the group in
+the later section -- which is the ordering a real room has, because 830
+is drawn after 820. A second test in that direction, and 15 of 15.
+
+The general shape, since it is not the first time: **a test can assert
+the right thing in the one arrangement where the right and wrong
+implementations agree.** Mutation is what finds that; reading does not.
