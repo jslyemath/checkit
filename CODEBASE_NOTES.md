@@ -7914,13 +7914,23 @@ on top, while picking up needs the real hit test, which does.
 Underneath it, a constant: the canvas sized itself to
 `window.innerHeight - 220`, where 220 was the space above it. At 530px --
 the width this pane actually is -- the toolbars wrap and the mode hint
-runs to three lines, and the true figure is 430. Both halves are now
-measured: the wrap's own `getBoundingClientRect().top` above, and the
-tray and bar's `offsetHeight` below.
+runs to three lines, and the true figure is 430. Both halves are measured
+now: the wrap's own `getBoundingClientRect().top` above, and the dock's
+`offsetHeight` below.
+
+**And the arithmetic was not the fix.** Sizing the canvas so the page
+does not scroll works only while there is room for a canvas; the floor
+that stops it collapsing brought the overlap straight back at a 530-tall
+pane. The tray and the save bar are now one sticky `.dock`, so they
+cannot cover each other at any size -- the save bar keeps its own
+`sticky` for the Print job tab, and nested here it has nowhere to travel,
+which is the point. At a window too short for everything the page simply
+scrolls, and the canvas clears the dock once it does.
 
 Worth generalising past this view: **a sticky element overlaps its own
-page, and a magic number for "the chrome above" is a number that is right
-at one window width.**
+page; a magic number for "the chrome above" is right at exactly one
+window width; and when two things must not overlap, saying so in the
+markup beats arranging for it in arithmetic.**
 
 ### A cancelled drag was a yes
 
