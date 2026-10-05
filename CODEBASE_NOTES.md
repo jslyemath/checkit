@@ -7997,3 +7997,131 @@ is drawn after 820. A second test in that direction, and 15 of 15.
 The general shape, since it is not the first time: **a test can assert
 the right thing in the one arrangement where the right and wrong
 implementations agree.** Mutation is what finds that; reading does not.
+
+## Legible from the back of the room (2026-10-05)
+
+A student's first name on the seating canvas was **4.5 pixels tall**.
+Not a judgement -- measured, at the width the pane actually is. The
+complaint was that everything was tiny, that there was empty space in
+odd places, and that the projector case would be hopeless. All three
+were true and they had different causes.
+
+### What the measurements said
+
+At the pane's real size, 515 by 530:
+
+| | before | after |
+|---|---|---|
+| chrome above the canvas | 320px, 60% of the window | 200px |
+| the app banner alone | 141px | 70px |
+| fit zoom | 35% | 50% |
+| a name card | 36 x 19 | 52 x 27 |
+| **a first name** | **4.5px** | **11.3px** |
+
+On a 1920-wide projection, presenting: 155% zoom, a 32px name drawn at
+**50px**.
+
+### Fit was fitting the wrong rectangle
+
+The one that was worth finding. A section declares a canvas of 1290 by
+1220; its furniture occupies about 932 by 648. "Fit" was scaling the
+*declaration*, so a third of the scale was being thrown away across and
+nearly half of it down, and the empty remainder sat on screen looking
+like part of the room. That is the "empty space in weird places", and
+it was not a styling problem at all.
+
+The canvas is now drawn from a content box computed off the shapes and
+seats, with the declared size kept only for saying where a desk may be
+dragged to. The model stays in room coordinates; only the drawing
+subtracts the origin, and `roomPoint` adds it back, so nothing
+downstream knows the picture moved.
+
+Two smaller things in the same arithmetic. **Fit only fitted the
+width**, so a tall room still scrolled -- which is not what the word
+offers. And it was **capped at 100%**, which on a projector is exactly
+backwards: the cap is now 4, because a small class *should* be blown up
+past life size.
+
+### Counting characters is not measuring text
+
+The name was 13px in a card 54 tall -- under half the card was ink.
+Raising it needed a size per name, since one long name should not set
+the size of every short one.
+
+The first attempt counted characters and multiplied by an average
+advance. It was wrong twice over: it put the ceiling at 20px when a
+five-letter name fits at 32, and it cannot tell **"Bartholomew" from
+"Christopher"** -- same eleven letters, 13px and 17px, because letters
+are not all one width. Both errors came from the same assumption and
+they ran in opposite directions, so no amount of adjusting the constant
+would have fixed it.
+
+Now each distinct name is measured once against an off-screen copy of a
+real card -- a real `.seatcard`, not a hand-built div with a copied
+font, so what is measured is what gets drawn -- and the answer is
+cached. A class has about as many first names as students, so every
+re-draw after the first is cache hits.
+
+### A transform does not shrink the scroll area
+
+Scaling the canvas to 50% left `scrollWidth` reporting 984: the
+scroller measures the element's **layout** box, and the layout box is
+still room-sized however far it is zoomed out. So the room sat entirely
+on screen inside two scrollbars for content that was not off it.
+
+Fixed by separating the two jobs. `.canvas` is laid out at room size and
+scaled; `.canvasbox` around it is sized to the *scaled* dimensions and
+is what the scroller sees. `margin: auto` on the box then centres the
+room -- rather than `justify-content: center`, which centres equally
+well and clips the top left corner when the room really is too big.
+
+### What the category does, and what it was worth copying
+
+Event floor-plan software -- Social Tables, Prismm -- is the same
+problem as this one: drag tables, drop guests, print and present. The
+most useful was Classroom Group Generator, whose whole pitch is three
+features: paint desks on a grid, **click a name then a seat**, and
+**projector ready**.
+
+* **Fullscreen presentation** is universal -- Figma's Shift+P, Miro's
+  presentation mode, every classroom board. Taken: a Present button puts
+  the room on the whole screen with no chrome, Escape leaves, and the
+  arrows change section while you are standing at the front.
+* **Click-to-place is a headline feature, not a fallback.** On a
+  trackpad or an interactive whiteboard it beats dragging. Taken, and
+  it shares `movePerson` with the drag so the two cannot come to mean
+  different things.
+* **Zoom-to-fit-content** is Figma's default view. Taken, as above.
+
+The published legibility rules agree with each other: about an inch of
+text height per fifteen feet of viewing distance, a bare 20/20 threshold
+at distance over 500, and 24pt as a floor for projected text. A back row
+thirty feet out wants roughly two inches, which on a 100-inch screen at
+1920 is about 44px. The 50px measured above clears it.
+
+### Fullscreen is a permission, and this host refuses it
+
+`requestFullscreen` fails in the preview pane with "Permissions check
+failed". So presentation hangs off a `body.presenting` class rather than
+the `:fullscreen` pseudo-class, fullscreen is requested on top of it,
+and a refusal leaves the mode working inside the window. A Present
+button that does nothing is worse than one that does most of it, and the
+person pressing it is standing in front of a class.
+
+**The real fullscreen transition is therefore unverified.** The geometry
+either way is not: it was measured at 1920 by 1080.
+
+### Two from operating it rather than reading it
+
+**The pane does not re-lay-out for an emulated viewport bigger than
+itself.** Screenshots and the DOM disagreed for several minutes, and the
+DOM was right -- wrap 1920 by 1080, box 1526 by 1078, centred -- while
+the picture showed a small room in the corner. Worth knowing before
+chasing the next phantom: at an emulated size larger than the pane,
+measure, do not look.
+
+**A narrow window is not a small window.** The banner's 141px was two
+rows of nav wrapping, which only happens under about 820px. The fix is
+shorter labels at that width -- Overview becomes Home, Update form
+becomes Form -- rather than a menu or a scrolling strip, because both of
+those hide tabs behind a gesture and this hides nothing.
