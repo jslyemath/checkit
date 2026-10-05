@@ -1366,6 +1366,7 @@ instructor preferred to a converter nobody would run twice.
 | 1 | the model, the colouring, the chart writer | **done** 2026-10-04 |
 | 2 | the canvas, read-only: shapes, cards, labels, section picker, toggles, zoom | **done** 2026-10-05 |
 | 3 | dragging -- cards between seats, shapes around the room | **done** 2026-10-05 |
+| 3b | the sizing pass: fit to content, a projector mode, click-to-place | **done** 2026-10-05 |
 | 4 | the shape palette, and dragging seat anchors | next |
 | 5 | the print-order mode | |
 | 6 | randomise, and swap two | |
@@ -1390,6 +1391,20 @@ chart on disk has to be one this tab wrote, which `to_toml` marks and
 `seating.was_generated` reads. A chart that came from an import or a text
 editor is left exactly alone and the save bar says so **before** the
 button is pressed. That is the 10-02 lesson made structural.
+
+**Three modes, and a fourth that is not a mode.** View, People and
+Desks are what the canvas lets you move. *Present* is not one of them:
+it is the same View on the whole screen with every toolbar gone,
+because the limit on how large a name can be drawn is pixels of screen
+and the chrome was a third of them. Escape leaves; the arrows change
+section while presenting.
+
+Sizing is the thing that nearly sank the tab and it was three separate
+faults, not one: fit scaled a declared canvas twice the size of the
+furniture in it, the card's type filled under half the card, and the
+banner took a quarter of a short window. All three are measured in the
+notes of 2026-10-05, along with why counting characters is not the same
+as measuring text.
 
 This also opened a hole that had been harmless until now: `set_dropped`
 cleared the chart and knew nothing about `room.json`, so the next save of
