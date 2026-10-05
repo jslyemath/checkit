@@ -1276,6 +1276,103 @@ The script needs a `responses` op returning email, timestamp and choices;
 printit maps email to a student through `Student.all_emails()`, which is why
 addresses accumulate rather than replace.
 
+### 12.11 The seating tab, specified (2026-10-04)
+
+Four ways of *rendering* a chart were drawn and all four rejected. What is
+wanted is a way of **drawing a classroom** -- a seating-chart tool that
+would work for any class anywhere, not a view of `seating.toml`.
+
+#### What it is
+
+A canvas per section, seen from above, showing an empty classroom before
+anybody is placed in it.
+
+* **Background shapes** are dragged on to match the real room: 2x2 tables,
+  1x2, 1x3, single desks, hexagons, trapezoids, circles, ovals. A single
+  desk is a 1x1 rectangle with one seat.
+* **Each shape carries default seat positions**, and there is a mode for
+  dragging those positions around, because a real table has a side against
+  a wall.
+* **Name cards** drop onto seats. First name on the top line, surname
+  below, so the card is squarish rather than a long strip -- which is what
+  sets the spacing of the whole room.
+* **Group designators** -- a table number, a colour, a letter -- sit in the
+  middle of a table, or float in the gap for a room of loose desks. A shape
+  can carry a label and a standalone label can be dropped anywhere.
+* **Version letters toggle**, because this goes on the projector.
+* **Sections are separate charts**, chosen from a picker, and the
+  instructor says which section's papers print first.
+
+#### Who owns what
+
+The division is the instructor's, and it is the whole model:
+
+| | owns |
+|---|---|
+| a desk or table | the seat positions on it |
+| a group | its label, the version letters of its seats, and where it comes in the print order |
+| a seat in no group | behaves as a group of one, in every one of those rules |
+
+That last line is what makes a room of loose desks in rows work without a
+second code path.
+
+#### Versions are chosen here
+
+The seating tab decides the version letters and writes them down.
+`alternate()` stays only as the fallback for a chart this tool did not
+write. Within a group the letters are dealt without repeats; where a group
+is larger than the bag of letters, the repeat is placed as far away as it
+can be. There is **one bag of letters for the whole course**, across
+sections: a group of six with six available gets one of each, a pair gets
+two of the six.
+
+This is graph colouring -- see the notes of 2026-10-04 for the algorithm
+and the measurements behind each part of it.
+
+#### Print order is a mode
+
+A mode that brings up the print order, in which the instructor clicks the
+groups one at a time in the order they will hand papers out; in an
+ungrouped room, individual students. Sections are ordered too, and the
+stack is all of one section and then all of the next.
+
+A group left unplaced is a **warning, not a refusal**: the instructor may
+go ahead knowing that anyone unmarked will probably be printed out of
+order.
+
+#### Two files, and why
+
+`seating.toml` stays exactly as it is, for CLI users and for the build.
+The seating tab produces it. The app's own data -- geometry, shapes, seat
+anchors, groups, the canvas size -- lives beside it in `room.json`.
+
+JSON because it is deeply nested and nothing hand-edits it. Not SQLite,
+despite the rule that tool-authored state goes there: that rule is for
+something unbounded, queried, and written by two processes at once, and
+this is one small document read whole and written whole, worth diffing
+when a room changes.
+
+A room holds each student's **id**; names appear only in the generated
+chart. `seating.toml` is the last name-keyed join in the tool, and a room
+cannot be broken by a rename.
+
+**No migration.** The live 106 charts are being redrawn by hand, which the
+instructor preferred to a converter nobody would run twice.
+
+#### Staging
+
+| | | |
+|---|---|---|
+| 1 | the model, the colouring, the chart writer | **done** 2026-10-04 |
+| 2 | the canvas, read-only: shapes, cards, labels, section picker, toggles, zoom | **done** 2026-10-05 |
+| 3 | dragging -- cards between seats, shapes around the room | next |
+| 4 | the shape palette, and dragging seat anchors | |
+| 5 | the print-order mode | |
+| 6 | randomise, and swap two | |
+
+Stage 1 was invisible and decided everything after it. Stage 2 is
+projectable on its own.
+
 ### 12.8 Decisions taken
 
 | | |
