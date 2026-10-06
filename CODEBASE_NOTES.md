@@ -8451,3 +8451,65 @@ descendant" is the question.
 trapezoid are `clip-path` shapes, so thickening `border` did nothing
 to them; the outline had to become an inset `box-shadow`, which the
 clip keeps.
+
+## Six that came back broken (2026-10-06)
+
+A round of feedback where most of the list was faults rather than
+taste. Worth keeping because three of them share a shape.
+
+### A drag cannot re-render
+
+The resize grips moved a millimetre and went dead. `resizeShape` and
+`rotateShape` called `renderSeating()` from their `pointermove`
+handler -- and a re-render replaces every element it drew, including
+**the grip holding the pointer capture**. The first move destroyed the
+thing the rest of the moves were going to.
+
+It is an easy one to write, because re-rendering is the honest way to
+show a change everywhere else in this file. The rule a drag needs is
+the opposite: write to the model, paint the few elements that moved,
+and re-render once on release. `paintShape` does that.
+
+The earlier drags -- a name, a desk, a chair -- happened not to have
+this bug because they were written to move elements directly from the
+start. The two newest ones were written the lazy way and the lazy way
+is wrong here.
+
+### Three bugs, one cause: the thing you are touching gets replaced
+
+* **The grips** above.
+* **Double-click to rename never worked.** The first click selected
+  the group, selecting redrew the pill, and the second click landed on
+  an element the browser had never seen -- so `dblclick`, which needs
+  two clicks on *one* element, never fired. Replaced with two
+  timestamps.
+* **The anchors stayed behind** when a desk was dragged, recorded
+  already, same family: elements being tracked by hand across a
+  redraw.
+
+Worth stating as one rule: **anything the pointer is holding must
+survive the update, or the update must not happen yet.**
+
+### An inset shadow is not an outline
+
+Hexagons and trapezoids had an outline along the flat top and bottom
+and nowhere else. `box-shadow: inset` follows the element's
+*rectangle*; clipping that to a polygon keeps only the parts where the
+polygon and the rectangle coincide, which for a hexagon is exactly the
+top and bottom edges.
+
+Two clipped layers instead: the element in the edge colour, and a
+`::after` inset by three pixels with the same clip in the surface
+colour. The outline is the gap, and it follows every side because both
+layers are the same shape.
+
+### And the part that was taste, which I got wrong by not reading
+
+The furniture was asked for as an island above the mode rail. It went
+into the hamburger menu -- which is where it had explicitly been said
+not to go -- with a button in the strip that opened that menu. The
+hamburger was also meant to slide its contents out *sideways*, not
+unfold a panel downwards.
+
+No lesson about code in that, just about reading. Recorded because the
+same feedback arriving twice is a cost worth not paying again.
