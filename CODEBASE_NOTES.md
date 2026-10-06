@@ -8333,3 +8333,37 @@ offsets -- but the running server was still the old module. **Python
 does not reload a live module**, and the fix for a change under `gui/`
 is to restart the server, which is in the handoff, in CLAUDE.md, and
 was still the first thing to go wrong.
+
+## A page can be older than the server, and never say so (2026-10-06)
+
+Reported as "I'm in Desks mode and I don't see how to add a desk".
+The button was there; the page looking for it was not the page that
+had it.
+
+`gui` mints `secrets.token_urlsafe(24)` at startup and bakes it into
+`index.html`. Restart printit -- which a change under `gui/` requires,
+because Python does not reload a live module -- and every window
+opened before the restart is holding a dead token. The symptom is not
+an error screen. The page goes on showing whatever it last drew, every
+call 403s, and the only word about it is a toast that fades after nine
+seconds and may well have faded before anyone looked.
+
+So the failure presents as "a feature you said you built is missing",
+which is the worst possible phrasing of "reload the page", and it
+costs however long it takes somebody to doubt their own eyes.
+
+A 403 now raises a bar that does not fade, says the page is out of
+date, and carries the Reload button. **A condition is not an event**:
+a toast is right for "that did not work" and wrong for "nothing will
+work until you do something".
+
+### And the half of it that was a real fault
+
+Adding furniture lived only in the selection strip. The strip is thin,
+sits above the rail, and reads as a status line, so the first thing a
+new room needs depended on noticing it and then guessing it had
+buttons in it. It is in the menu too now -- which is where the menu's
+own rule put it all along, since it changes what the canvas *is*.
+
+Two ways to reach a thing is not redundancy when one of them is the
+only way a newcomer finds it.
