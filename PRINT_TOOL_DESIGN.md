@@ -1653,13 +1653,13 @@ one that makes it read incompletely.
 
 | | | leaves it working |
 |---|---|---|
-| **A** | the shell: islands, mode rail, Present = host header off | yes, no new features |
-| **B** | selection, and the thin strip | yes |
-| **C** | the paper: light canvas, menu, papers | yes |
-| **D** | group hue, three roles, grey for ungrouped | yes |
-| **E** | the pill and its anchors | yes |
-| **F** | the unseated rail moves right and becomes cards | yes |
-| **G** | Up Next folded in, the Cold call tab deleted | yes |
+| **A** | the shell: islands, mode rail, Present = host header off | **done** 2026-10-06 |
+| **B** | selection, and the thin strip | **done** 2026-10-06 |
+| **C** | the paper: light canvas, menu | **done** 2026-10-06; the choice of papers is still to come |
+| **D** | group hue, three roles, grey for ungrouped | **done** 2026-10-06 |
+| **E** | the pill and its anchors | **done** 2026-10-06 |
+| **F** | the unseated rail moves right and becomes cards | **done** 2026-10-06 |
+| **G** | Up Next folded in, the Cold call tab deleted | **done** 2026-10-06 |
 | then | 12.11's stages 4-6 land into the shell rather than beside it | |
 
 A first because everything after it needs somewhere to live, C before D

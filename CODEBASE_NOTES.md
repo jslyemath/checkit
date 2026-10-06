@@ -8125,3 +8125,111 @@ rows of nav wrapping, which only happens under about 820px. The fix is
 shorter labels at that width -- Overview becomes Home, Update form
 becomes Form -- rather than a menu or a scrolling strip, because both of
 those hide tabs behind a gesture and this hides nothing.
+
+## The seating app gets a shell, and Cold call disappears (2026-10-06)
+
+Stages A to G of 12.12, built in two passes. The seating view is now an
+application embedded in checkit-printit rather than a page with
+controls around a canvas, and the Cold call tab no longer exists.
+
+### The move came first, and it was mechanical on purpose
+
+865 lines out of `app.js` into `seating/seating.js`, 307 out of
+`style.css` into `seating/seating.css`, both by a script that asserts
+every boundary, so the commit is a move and the rewrite is separate.
+The module leans on exactly two host globals, `api` and `toast`. That
+is the seam the spin-off will be cut along, and it is worth keeping
+narrow: anything else it reaches for becomes something to port.
+
+### Five positions, each answering one question
+
+Top left which room and is it saved, top right Present and nothing
+else, bottom left zoom, bottom centre the mode rail, a thin strip
+above it, and the unseated on the right edge. Nothing lands in a
+position because there was room for it there.
+
+**Save is absent until there is something to save.** The question "why
+is that button there" had a better answer than a better position: most
+of the time it is a button with nothing to do.
+
+**The display toggles came out of the document.** Put in the room,
+"hide the version letters for a minute" was an unsaved change and the
+Save button appeared for having looked at something differently. They
+are the viewer's, not the room's.
+
+### Selection was the backbone, and it did not exist
+
+Nothing in the app could say "this group is selected", and the colour,
+the label, the anchors and the print position all hang off it. Built
+before any of them. A table selects its group; a desk in no group
+selects itself, which is the rule the print order already uses -- a
+seat in no group is a group of one.
+
+### Colour: one hue in, three shades out
+
+`oklch(0.935 calc(0.048 * var(--c)) var(--h))` and five more like it.
+Lightness and chroma are fixed per role and only the hue varies, so
+every group is the same design in a different colour, and `--c` scales
+the chroma so an ungrouped student is the same three roles at **zero**:
+being grey is the status, which is what let the unseated rail stop
+captioning itself.
+
+A group with no hue takes one off an eight-hue palette by position, so
+rooms drawn before colour existed came up coloured with nothing
+migrated. `group.hue` and `group.label_at` are additive, so
+`room.VERSION` did not move -- a version bump is for a change that
+makes an old file read *wrongly*, not one that makes it read
+incompletely.
+
+### The anchors are the control
+
+Nine places on a desk -- eight around the perimeter and the middle, the
+same nine for every shape, because a hexagon's corners are not where a
+label wants to be. Selecting a group shows them; dragging the pill onto
+one sets it.
+
+The first design had a nine-cell picker in a properties panel. It went,
+because selecting a group already puts the nine anchors on screen, and
+a grid that does the same thing is a second way to say it. The same cut
+took a swatch row down to one dot and a label field down to clicking
+the heading.
+
+**Two copies in two languages.** The nine names are in `room.ANCHORS`
+so they can be checked on the way in; the nine positions are in
+`seating.js` because it draws them. A test compares the two lists,
+since nothing else can.
+
+### Up Next, which used to be Cold call
+
+Folded in as a mode, it stops being a list of names beside the room and
+becomes **the room with one chair lit up**: everything else dims, the
+chosen card grows, and the people already called stay visible but
+faded, because the point of a call list is being able to see it has
+been fair.
+
+Renamed because the students are looking at it. "Cold call" names the
+technique from the instructor's side and reads, to the person whose
+name is on the board, as being put on the spot.
+
+Space picks the next. It survives Present -- Up Next is a mode *for*
+presenting, not one for editing -- and while presenting the stage bar
+carries the count, because the islands are gone and how far through the
+class has been is the one thing the room cannot show.
+
+The call list is in memory only. A list that survived a reload would
+quietly be about last week.
+
+### Three found by operating it
+
+* **The rail overlapped the zoom island by 21px** at 515. The fix was
+  not to move zoom out of its corner -- that was the fault in the first
+  mockup -- but to centre the rail in the space actually free, measured,
+  because "100%" is a wider island than "39%".
+* **A one-seat group put its pill exactly on its own card.** The middle
+  of one seat is that seat. A label that would cover a name now drops
+  below the group, which is a default rather than a rule and is
+  overridden the moment an anchor is set.
+* **`event.target.closest` is not a function** when nothing has focus,
+  because the target is then the document. It threw, and silently took
+  the whole keydown handler with it, so Space did nothing and no error
+  reached the UI. A keydown's target is not always an element.
