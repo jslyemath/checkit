@@ -8513,3 +8513,95 @@ unfold a panel downwards.
 
 No lesson about code in that, just about reading. Recorded because the
 same feedback arriving twice is a cost worth not paying again.
+
+## One island, and seats that change hands (2026-10-06)
+
+### The island was two islands wearing the same box
+
+It showed a group's colour, name and print position in People, and a
+desk's kind and chair-count in Groups and Seats. Changing mode
+rearranged it, and sometimes took away the control just used. Reported
+as "some sort of inconsistency", which it was.
+
+It is the same strip in every mode now -- **colour, label, seats,
+print position** -- and what varies is one button at the right-hand
+end. That is the right axis to vary on: what changes between modes is
+what you are about to *do*, not what you are looking at.
+
+The plus is the palette in Groups and "one more seat" in Seats, which
+is the same sentence both times: *one more of the thing this mode is
+about*.
+
+### A new desk had no group, so half the strip had nothing to show
+
+The real cause of the inconsistency. `addShape` created a shape and no
+group, so a new desk had no colour, no label and no place in the print
+order -- the strip fell back to "table, 2 by 2, 4 chairs" because that
+was all there was. An old desk, which came from a file that did have
+groups, showed the full set.
+
+Every desk now arrives as a group of its own. "A seat in no group is a
+group of one" was already the model's rule for printing; this makes it
+true at the moment of creation rather than only at the moment of
+reading.
+
+### Desks became Groups and Chairs became Seats
+
+Including the values, not just the labels. A mode called `"chairs"`
+displaying "Seats" is a translation every reader has to do forever,
+and it is cheapest to pay once.
+
+The rename caught the icon keys too, because they were quoted strings
+in the same file -- `icon: "desks"` became `icon: "groups"` while the
+`ICON` object still said `desks:`, which is an undefined lookup and a
+crash. Worth noting that a careful mechanical rename still needs the
+suite run afterwards: the assertion that every old string was gone
+passed, and the code was still broken.
+
+### Where snapping is right, revisited
+
+An earlier note argued that desks snap because desks line up with
+walls, while chairs line up with nothing. True, and unhelpful: what
+lines up is the **drawing**, and a chart with seats at arbitrary
+half-units looks like a mistake rather than like a room. Seats snap to
+the same grid now, and the grid is drawn in that mode too.
+
+A reversal worth recording as a reversal. The earlier reasoning was
+about real furniture; the thing being made is a diagram.
+
+### Reparenting, and when not to
+
+A seat dragged over another group joins it -- the group whose box
+covers the most of the seat's card. Three rules keep it from being
+surprising:
+
+* **A tie leaves it alone.** Anything within a twentieth of the
+  leader counts as a tie. A seat straddling two desks equally has no
+  right answer, and guessing is worse than waiting for the instructor
+  to be a few pixels clearer.
+* **Only in Seats mode.** Shoving two groups together in Groups mode
+  must not quietly rearrange who belongs to whom; overlapping
+  furniture is a drawing, not an instruction.
+* **The target says so first.** The receiving group is outlined while
+  the seat is still in the air, so the answer is visible before the
+  decision is committed.
+
+Bounding boxes rather than true rotated polygons: the test only has to
+pick a winner, and a polygon intersection is a lot of arithmetic to
+reach the same answer in every room anybody will draw.
+
+### Three visual faults, one of them a real CSS trap
+
+* **Empty seats were invisible** -- a faint dashed line on a pale
+  table. They are the whole point of the mode that places people, so
+  they now carry a 2px dashed edge in the group's own hue over a light
+  fill. On a round table the ring of invisible ones had also been
+  reported as the furniture having a "double outline".
+* **Circles really did have a double outline.** `outline` with
+  `outline-offset` draws a second concentric ring; on a rectangle that
+  reads as a halo, on a circle as a second edge. The selection is a
+  rectangular bounding box now, which is the convention and is where
+  the resize grips already sit.
+* **Labels were being shouted.** `text-transform: uppercase` on the
+  pill meant the chart could not say "Window side" -- it said WINDOW
+  SIDE. A label belongs to the person who typed it.

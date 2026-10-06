@@ -1485,8 +1485,8 @@ that the whole verb list is the rail:
 |---|---|
 | **View** | nothing moves. The projector |
 | **People** | names between chairs |
-| **Desks** | the furniture |
-| **Chairs** | where the seats sit on a desk, and how many there are |
+| **Groups** | the furniture: add, move, resize, turn |
+| **Seats** | where the seats sit on a group, how many, and which group they belong to |
 | **Order** | the order papers are handed out in |
 | **Up Next** | pick somebody |
 
