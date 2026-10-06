@@ -8233,3 +8233,103 @@ quietly be about last week.
   because the target is then the document. It threw, and silently took
   the whole keydown handler with it, so Space did nothing and no error
   reached the UI. A keydown's target is not always an element.
+
+## Hiding the controls, and furniture you can actually buy (2026-10-06)
+
+Three asks and one bug report, and two of them turned out to be the
+same answer.
+
+### The Save button was not misaligned
+
+The span around it was. `#seat-saving` groups the dot, the separator
+and the button so one attribute can hide all three; left as a plain
+span it was a flex *item*, so those three laid out inline inside it
+and its line box came out **58px against siblings of 30**, stretching
+the island from 47 to 70. Save looked low because the box holding it
+was twice the height of everything beside it.
+
+`display: contents` puts the children in the island's own flex row,
+where they were always meant to be. Qualified `:not([hidden])`,
+because a `display` set in a stylesheet beats the browser's own rule
+for the `hidden` attribute and the group would never hide again.
+
+**The generalisable bit:** a wrapper added for show-and-hide is still
+a box, and in a flex row it is a box with its own layout. `display:
+contents` is what "this element is only a handle" looks like in CSS.
+
+### The lone button and the locked projector were one problem
+
+Two separate complaints -- Present looked odd alone in an island of
+one, and presenting hid every control so no mode was reachable -- and
+one control fixed both. The top right now holds **an eye that hides
+the controls**, beside Present.
+
+They belong together: *get out of the way* and *put this on a wall*
+are both about how the room is being shown, as against what is in it.
+Present is no longer alone, and the eye works outside presenting too,
+which is a real gain on a 515px pane.
+
+Bare and presenting are **separate states**. Presenting turns bare on;
+turning it off again while still presenting is how every mode stays
+reachable on the projector. And the top-right island is the one thing
+bare does not hide, because a mode with no visible way out is a trap --
+on a projector especially, where the way back has to be visible rather
+than remembered. It rests at 16% opacity when nothing is happening and
+returns on any movement, which is a video player's controls and works
+for the same reason.
+
+The stage bar then shows **only when the controls are away**. With them
+back it was a second answer to the same question, printed underneath
+the first and overlapping the rail.
+
+### A room you can build from nothing
+
+Until now the tab could rearrange a room but not create one, which
+made it useless for a new course. Desks mode with nothing selected now
+offers **Add a desk**, opening a palette of the eight shapes drawn at
+their real proportions -- a picture of the furniture rather than a list
+of words about furniture.
+
+**The anchors come over the wire.** `api_seating` sends each shape's
+default seat offsets along with its size, so the browser builds a new
+desk from `room.SHAPES` rather than from a copy of it. Where chairs go
+on a table stays defined in one place, which is the same rule as every
+GUI handler calling the function the CLI calls.
+
+Removing a desk **stands its people up** rather than refusing. A desk
+you cannot delete until you have moved four people first is a desk you
+delete anyway, one person at a time, and they all end up on the
+unseated rail regardless.
+
+### Chairs mode, and the one place snapping is wrong
+
+Dragging a chair writes `seat.at`, an offset from its desk's centre, so
+the desk can still be moved afterwards without the chairs coming
+loose.
+
+**No grid.** Desks snap to twenty units because desks line up with
+walls; a chair does not line up with anything, and snapping one is a
+tidiness nobody asked for. The same codebase, two drags, two different
+right answers -- worth stating because "be consistent" would have got
+this wrong.
+
+A chair is kept within arm's reach of its own desk. One dragged three
+metres away belongs to another table, and would be a quiet way to lose
+it.
+
+### Clicking a selected thing no longer deselects it
+
+The toggle was wrong and the symptom was confusing: switch from Desks
+to Chairs, click the desk you were already working on, and nothing
+appears to happen -- because the click had turned the selection *off*.
+Selecting is now idempotent, and clearing is the paper or Escape. One
+gesture for one job, which is what every canvas editor does.
+
+### And the trap that is written down twice and still caught me
+
+A new desk came out with **zero chairs**. The palette was right, the
+browser was right, and `api_seating` had been taught to send the seat
+offsets -- but the running server was still the old module. **Python
+does not reload a live module**, and the fix for a change under `gui/`
+is to restart the server, which is in the handoff, in CLAUDE.md, and
+was still the first thing to go wrong.

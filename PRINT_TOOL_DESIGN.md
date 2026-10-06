@@ -1486,7 +1486,7 @@ that the whole verb list is the rail:
 | **View** | nothing moves. The projector |
 | **People** | names between chairs |
 | **Desks** | the furniture |
-| **Chairs** | where the seats sit on a desk |
+| **Chairs** | where the seats sit on a desk, and how many there are |
 | **Order** | the order papers are handed out in |
 | **Up Next** | pick somebody |
 
@@ -1494,6 +1494,22 @@ Modes only. **Shuffle is not on the rail** -- it is an action, and an
 action among modes is a category error; it moves to the menu. The same
 test keeps the rail honest as features arrive: if it does not change
 what a click on the canvas means, it is not a mode.
+
+#### Bare, which is not the same as presenting
+
+The top right holds two buttons, not one: an eye that hides every
+control, and Present. They belong together because both are about how
+the room is being shown rather than what is in it -- and it means
+Present is not alone in an island of one.
+
+The two states are separate. Presenting turns bare on; turning bare
+off while still presenting is how every mode stays reachable on a
+projector. **The top-right island is the one thing bare does not
+hide**, because a mode with no visible way out is a trap. It rests at
+low opacity when nothing is happening and returns on any movement.
+
+The stage bar shows only while bare: with the islands back it is a
+second answer to the same question.
 
 #### Up Next, which used to be Cold call
 
