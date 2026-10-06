@@ -8367,3 +8367,87 @@ own rule put it all along, since it changes what the canvas *is*.
 
 Two ways to reach a thing is not redundancy when one of them is the
 only way a newcomer finds it.
+
+## Desks that resize and turn, and a menu that became a drawer (2026-10-06)
+
+### A menu with one thing in it is a lid
+
+"Add a desk" under a hamburger was a submenu of one. The hamburger now
+unfolds the island it already sits in: the furniture palette and the
+two display toggles appear beneath the room's identity, in the same
+box, and fold away again. Discard moved next to Save, both in the row
+that is always there.
+
+The palette lost its captions. The names were saying what the pictures
+already said -- and the four rectangle entries differed only in size,
+which is something you drag, not something you pick off a list. One
+rectangle now, plus the silhouettes that are genuinely different
+silhouettes. `table-1x2` and `table-1x3` still load; they are simply
+not offered.
+
+### The desk became a frame with things inside it
+
+The anchors stayed behind when a desk was dragged. The cause was that
+they were separate elements on the canvas being moved by hand, and the
+hand only knew about the cards and the labels.
+
+The fix is structural rather than another entry in that list. A desk
+is now `.deskwrap` -- position, size and rotation -- holding its
+silhouette, its eight grips, its rotation handle and its nine anchors.
+All of it moves and turns together because all of it is inside the
+thing that moves and turns.
+
+**The general shape of that bug:** a list of "things to also update"
+is a list that will be missed. If several elements must move as one,
+make them one element's children and let layout do it.
+
+### Rotation is stored in the chairs, not above them
+
+Turning a desk rewrites each chair's own offset and keeps `angle` only
+so the silhouette stays turned.
+
+The alternative -- store the angle and apply it wherever seats are
+read -- would have reached `room.seats_of`, the neighbour distances,
+the version colouring and `seating.toml`, and every one of those would
+have had to agree about the same rotation. Baking it into the offsets
+means **a seat is always simply where it says it is**, and nothing
+downstream learns a new concept. A test pins it: `seats_of` must give
+the same answer before and after `angle` is set.
+
+The cost is a rounding per turn, so offsets are rounded to whole units
+and a drag recomputes from where it started rather than from the last
+frame.
+
+The name cards do not turn. A card is read by a person standing up,
+not by the desk.
+
+### Resizing scales the chairs with the desk
+
+Pulling an edge scales each chair's offset by the same factor, so
+widening a table of four spreads the four out instead of leaving them
+huddled at the old spacing. The far edge stays put, so the desk grows
+from the side you pulled.
+
+The pointer's travel is **un-rotated before it is used**, which is the
+one piece of arithmetic here that is easy to get wrong: without it,
+dragging the right-hand grip of a desk turned forty degrees widens it
+along the screen rather than along the desk.
+
+The instructor suggested enlarging might also *add* chairs. Not done:
+dragging for room and finding two new people's worth of chairs is a
+surprise, and adding one is already a button. Worth revisiting if
+building a big room turns out to be tedious.
+
+### Two small ones with general shapes
+
+**A custom property set on an element does not reach its siblings.**
+The grips came out invisible -- white dots on white paper -- because
+`--solid` was defined on the silhouette and the grips are beside it,
+not inside it. The tint moved to the wrap, which is the parent of
+both. "Where is this variable defined, and is the thing reading it a
+descendant" is the question.
+
+**A clipped element cannot carry a border.** The hexagon and the
+trapezoid are `clip-path` shapes, so thickening `border` did nothing
+to them; the outline had to become an inset `box-shadow`, which the
+clip keeps.

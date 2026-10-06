@@ -1495,6 +1495,29 @@ action among modes is a category error; it moves to the menu. The same
 test keeps the rail honest as features arrive: if it does not change
 what a click on the canvas means, it is not a mode.
 
+#### A desk is a frame, and rotation lives in the chairs
+
+A desk on the canvas is a wrapper carrying its position, its size and
+its angle, with its silhouette, its eight resize grips, its rotation
+handle and its nine label anchors inside it. They move and turn
+together because they are one element's children -- the alternative,
+a list of things to also update when a desk moves, is a list that
+gets missed, which is how the anchors came to stay behind.
+
+`shape.w`, `shape.h` and `shape.angle` are all optional and all
+additive, so `room.VERSION` does not move.
+
+**Rotating rewrites the chairs' own offsets** rather than storing an
+angle for everything downstream to apply. `room.seats_of`, the
+neighbour distances, the colouring and `seating.toml` therefore need
+to know nothing about rotation: a seat is always simply where it says
+it is. `angle` is kept only for the silhouette and for the next turn.
+
+Resizing scales the chair offsets by the same factor, so a widened
+table spreads its people out. It does not add chairs; adding one is a
+button, and finding two new ones after dragging for room is a
+surprise.
+
 #### Bare, which is not the same as presenting
 
 The top right holds two buttons, not one: an eye that hides every
