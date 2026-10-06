@@ -1412,6 +1412,264 @@ this tab would have walked a dropped student back onto the printed list.
 A drop now empties their chair in the room too. See the notes of
 2026-10-05.
 
+### 12.12 The seating app: a shell of its own (2026-10-06)
+
+Everything in 12.11 assumed the seating tab was a page with controls
+arranged around a canvas. It is not going to be that. The instructor's
+framing, which settles the whole design:
+
+> The fullscreen version **is** the regular version, except without
+> checkit-printit's header bar stuff.
+
+So the seating tab is **an application that happens to be embedded in
+checkit-printit**. Its canvas runs edge to edge, its own controls float
+over that canvas, and Present does exactly one thing: hide the host's
+header. Nothing else moves, nothing else changes size, nothing appears
+or disappears.
+
+That is also what makes the eventual spin-off cheap. Seating and
+Up Next are to become their own application; if every control already
+lives inside the seating component, extracting it is deleting the host
+header rather than rebuilding a UI.
+
+#### Where this came from
+
+Two canvas editors were read closely, because they have solved this:
+
+* **Excalidraw** -- tools top centre, zoom bottom left, and a
+  **contextual property island** that appears only when something is
+  selected. The lesson taken: properties are about the selection and
+  nothing else. There is no settings panel.
+* **tldraw** -- tool strip **bottom centre**, style panel to one side,
+  zoom bottom left, app menu top left. The lesson taken: the overall
+  placement, and that every panel is a small floating "island" over a
+  full-bleed canvas rather than a region docked into a page.
+
+**Radix Colors** supplied the colour model, and the classroom tools
+surveyed in the notes of 2026-10-05 supplied click-to-place.
+
+#### The islands, and what each one is for
+
+Five fixed positions. Each answers one question, and nothing lands in a
+position because there was room for it there.
+
+| where | question it answers | holds |
+|---|---|---|
+| top left | *which room am I in, and is it saved* | the menu, the section switcher, and -- only when there are unsaved changes -- a dot and **Save** |
+| top right | *take this somewhere else* | **Present**, and nothing else, ever |
+| bottom left | *what am I looking at* | zoom out, the percentage, zoom in, fit |
+| bottom centre | *what am I doing* | the mode rail |
+| just above the rail | *what is selected* | one thin strip, described below |
+| the right edge | *who is not seated yet* | the unseated rail, in People mode |
+
+**Save sits with the document, not with Present.** What is saved is this
+room, and the room's identity -- the menu, which section -- is top left.
+Figma puts the file name and the file's own menu in the same corner for
+the same reason. Save is also **absent until there is something to
+save**, which is the real answer to "why is that button there": most of
+the time it should not be.
+
+**Zoom is bottom left and Present is top right, at every width.** An
+earlier draft moved zoom into the top right when the window got narrow,
+so the same two controls were in two different places depending on the
+window. The fix is not to move the control, it is to make the rail
+narrower: below 760px the rail drops its words and keeps its icons,
+which leaves the bottom edge wide enough for both.
+
+#### The mode rail
+
+Six modes, all of them visible at once, because the point of a rail is
+that the whole verb list is the rail:
+
+| | |
+|---|---|
+| **View** | nothing moves. The projector |
+| **People** | names between chairs |
+| **Desks** | the furniture |
+| **Chairs** | where the seats sit on a desk |
+| **Order** | the order papers are handed out in |
+| **Up Next** | pick somebody |
+
+Modes only. **Shuffle is not on the rail** -- it is an action, and an
+action among modes is a category error; it moves to the menu. The same
+test keeps the rail honest as features arrive: if it does not change
+what a click on the canvas means, it is not a mode.
+
+#### Up Next, which used to be Cold call
+
+The Cold call tab is **deleted**, not moved. Folded in as a mode it
+stops being a list of names beside the room and becomes what it
+actually is: **the room, with one chair lit up**. The chart is already
+on the projector; picking somebody should light a chair, not replace
+the screen with a different view.
+
+Renamed because the students are looking at it. "Cold call" names the
+teaching technique from the instructor's side and reads, to the person
+whose name is on the board, as being put on the spot. **Up Next** is
+the default -- it describes a state rather than pointing at somebody,
+and it is short enough for the rail. "Who's Up" is the alternative and
+is a one-word change.
+
+#### The selection strip
+
+The contextual panel in the first mockup was a tall island on the right
+with four labelled sections, and it was wrong in both sizes. Most of it
+was not needed:
+
+* **The label-position picker is deleted.** Selecting a group already
+  reveals the anchor points on its shape. Dragging the label pill onto
+  one is the control; a nine-cell grid that does the same thing is a
+  second way to say it.
+* **Six colour swatches in a row are deleted.** One filled dot showing
+  the group's colour, which opens the swatches when clicked.
+* **The label does not need a text field and a heading.** The heading
+  *is* the label; click it to edit it.
+* **The print position does not need the words "Prints 2nd of 7".**
+  `2/7`.
+
+What is left is one thin strip above the rail, in both sizes, with no
+expanded state:
+
+```
+  ●  Table 2            4 seats    2/7
+  ^  ^                  ^          ^
+  |  click to rename    read-only  print position
+  colour
+```
+
+Nothing in it needs opening, so there is no sheet to pull up and no
+panel to collapse, which is what made it awkward at 515px.
+
+#### The unseated are students, not a status line
+
+They were a strip along the bottom labelled "2 standing". Two faults.
+The strip said in words -- in slightly odd words -- what the design
+should carry; and the cards in it were a different shape from the cards
+in the room, so nothing about them suggested that one could be dragged
+into a chair.
+
+The rule: **an unseated student is the same object as a seated one.**
+Same card, same size, same two lines. The only difference is that it
+has no group, so it is drawn in the grey of the palette -- the same
+three roles at zero chroma. Being grey *is* the status; no sentence is
+needed.
+
+It moves to **the right edge**, as a vertical rail, because a class
+list is a list and because the left corners are already spoken for by
+the document island and the zoom. The rail **has no header**, and
+**hides itself when everybody is seated** -- except while a name is
+being dragged, when it reappears as a drop target, because that is
+exactly when somewhere to put a person is needed.
+
+#### Under the menu
+
+Everything that is neither a mode nor frequent:
+
+* **Paper** -- the canvas colour
+* **Show** -- version letters, group labels
+* **Deal the version letters again** -- the shuffle
+* **Write the chart now** -- `seating.toml`, for when Save left it alone
+* **Discard changes**
+* **Room size**
+* **Keyboard shortcuts**
+
+The rule for the menu is the inverse of the rule for the rail: if it
+changes what the canvas *is* rather than what a click *does*, and it is
+not done every few minutes, it belongs here.
+
+#### Colour: one hue, three jobs
+
+A group owns a hue. Three shades are derived from it, and they are
+derived rather than chosen so that every group is the same design in a
+different colour. Radix Colors' twelve-step scale gives each shade a
+job; the three the room needs are:
+
+| drawn thing | job | step |
+|---|---|---|
+| the table or desk | the largest area, so it must recede | **3** surface, **6** border |
+| a name card | sits *on* the table, so it must lift off it | **1-2** surface, **7** border |
+| the group's pill | smallest, must be found instantly | **9** solid, white text |
+
+Generated in OKLCH with lightness and chroma fixed per role and only
+the hue varying -- `oklch(0.935 0.048 var(--hue))` and so on -- which is
+about ten lines of custom properties and holds up on a light or a dark
+canvas. An ungrouped seat uses the same three roles at **zero chroma**,
+which is what makes the unseated rail consistent for free.
+
+Colour is never the only carrier: the pill still says "Table 2".
+
+#### The canvas is a document; the chrome is a tool
+
+The canvas gets its own light paper -- a very pale grey by default,
+with other papers in the menu -- while the islands stay dark. That is
+Figma's split, and it earns itself here twice over: it separates the
+thing being made from the thing making it, and a light room is what a
+projector wants.
+
+It does mean **two visual languages inside checkit-printit**: Seating is
+a canvas tool, the other tabs are forms and tables. That is deliberate,
+and it is also the seam the spin-off will be cut along.
+
+#### The label pill
+
+Its silhouette is the point. Everything else in the room is a rounded
+rectangle, so the one thing that is not reads as a label rather than as
+another object: a full pill radius, solid, uppercase, and about 16 room
+units rather than 11. Nine anchors per shape -- eight around the
+perimeter and the centre -- shown as dots when the group is selected,
+set by dragging the pill onto one. A group with no anchor set keeps the
+present behaviour and floats at the middle of its seats, which is what
+a room of loose desks needs.
+
+#### What is narrow, and what changes
+
+One breakpoint, at 760px. Below it:
+
+* the rail keeps its icons and drops its words;
+* the section switcher folds into the menu;
+* the unseated rail narrows to one card wide;
+* **nothing moves to a different corner.**
+
+Zoom and pan is the accepted answer for a small pane, confirmed by the
+instructor: the room is worked on zoomed in and read at Present. The
+canvas does not try to show twenty-five legible names in 515px, because
+it cannot.
+
+#### What has to exist first
+
+**There is no selection model.** Nothing in the app can currently say
+"this group is selected", and the selection strip, the colour dot, the
+label anchors and the print position all hang off it. It is the
+backbone and it comes before any of the features that need it.
+
+#### Model changes, all additive
+
+`group.hue`, `group.label_at`, `section.canvas.paper`. Old rooms load
+with sensible defaults, so `room.VERSION` does not move -- a version
+bump is for a change that would make an old file read wrongly, not for
+one that makes it read incompletely.
+
+#### Staging
+
+| | | leaves it working |
+|---|---|---|
+| **A** | the shell: islands, mode rail, Present = host header off | yes, no new features |
+| **B** | selection, and the thin strip | yes |
+| **C** | the paper: light canvas, menu, papers | yes |
+| **D** | group hue, three roles, grey for ungrouped | yes |
+| **E** | the pill and its anchors | yes |
+| **F** | the unseated rail moves right and becomes cards | yes |
+| **G** | Up Next folded in, the Cold call tab deleted | yes |
+| then | 12.11's stages 4-6 land into the shell rather than beside it | |
+
+A first because everything after it needs somewhere to live, C before D
+because the colours have to be designed against the paper they sit on,
+and G last because it is the only one that removes a tab.
+
+Written as a self-contained `seating/` module with its own stylesheet
+from the start. That is the difference between the spin-off being a
+move and being a rewrite.
+
 ### 12.8 Decisions taken
 
 | | |
