@@ -9165,3 +9165,88 @@ repeating them underneath in small grey text.
 still enforced, by `buildUpnext` reading `drawn.seats` for the same
 reason; the patch script asserted that before deleting it, which is
 the habit that would have caught the three orphaned icons last round.
+
+## Three walks, each keeping its own place (2026-10-07)
+
+Four corrections to Up Next, all of them about state that was being
+thrown away or never created.
+
+### One position between three walks is no position at all
+
+`upnextAt` was a single number, and `upnextOrder` reset it to -1
+whenever the key it was built against changed -- which included the
+kind. So moving from people to groups and back started the people walk
+again from the top. Moving between the three during a lesson is the
+entire reason there are three.
+
+`upnextWalks` is a `Map` from `section|kind` to `{ line, at, of }`.
+Keyed by section as well as kind, and that is the better answer to the
+thing the old reset was worried about: a position counted against one
+roomful of people means nothing in the other room, but throwing the
+walk away when you switch rooms loses it for the room you came back
+to as well. Each room keeps its own three.
+
+Turning Up Next off keeps them too. Coming back to it mid-lesson and
+finding the class half-called again is not a fresh start, it is lost
+work.
+
+Verified by walking person to 4/25, going group -> rep -> person, and
+reading back 4/25 and the same name; and group to 2/7, away and back,
+2/7 and the same table. And off, on, same count.
+
+### "Ready" was a state with nothing in it
+
+A walk started at -1, which the strip drew as "Ready" and a dash for
+the count. The only thing anybody ever did from there was press next
+to leave it. Walks start at 0 now, so switching Up Next on lights
+somebody immediately and the count reads 1/25.
+
+That moved one decision: the canvas's `hushed` class was being set at
+the top of `drawRoom` from `upnextAt >= 0`, and with a position that
+is always >= 0 the test had nothing left to say. It cannot simply
+become `upnext`, because dimming a room with nobody to light is
+dimming it for nothing -- and at the top of `drawRoom` the line has
+not been built, because building it reads `drawn.seats`, which that
+function is about to fill. So the class is toggled in `paintUpnext`,
+which runs after the room is drawn and knows whether there is anybody
+to show.
+
+### Only one of the three was actually shuffled
+
+Groups went in print order and representatives in version order, both
+deliberately -- the first draft's reasoning was that print order is an
+order the room already has an opinion about, and a second arbitrary
+order is one more thing nobody can predict.
+
+That reasoning is backwards for this feature. An order anybody can
+predict is an order the back row has worked out by the third table,
+and then being called on stops being a reason to pay attention. All
+three are shuffled now, through one `shuffled()` helper so there is
+one Fisher-Yates in the file rather than three.
+
+For representatives it is the *steps* that are shuffled, not the seats
+inside them: each step is still "everybody's C", because that is the
+thing being shown. What moves is which letter comes up when.
+
+Verified by rebuilding each line ten times: ten distinct group orders
+out of ten, eight distinct letter orders out of ten against the
+twenty-four that exist.
+
+### A specificity tie, lost silently
+
+The kind glyph was 17px in a 26px box, which the instructor read as a
+mark rather than a picture. The first fix set
+`.strip .kindbtn { width: 38px; height: 32px }` and a 24px glyph.
+
+`.strip .tiny` also sets a height, ties with it on specificity, and
+sits further down the file -- so `.tiny` won and the box stayed 26
+tall. The glyph grew anyway, to 24 inside a 26 box, and an svg in a
+flex row is a shrinkable item: it came out 22 wide by 24 tall. The
+same mark, slightly squashed, which is exactly the kind of change that
+looks like it worked.
+
+`.strip .ibtn.kindbtn` wins the tie on its own merits, and
+`flex: 0 0 auto` on the svg stops it being squeezed. 22px square in a
+38 by 30 button; the strip goes 35 to 40 tall, which is the cost of
+the glyph being legible and is the one strip whose job is to be read
+from across a room.
