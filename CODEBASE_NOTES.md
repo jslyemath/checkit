@@ -8998,3 +8998,170 @@ whose turn it is.
 The lit card in Up Next was `z-index: 3`, tying with `.canvas > .pill`
 and losing on DOM order -- so a group's label sat across the one card
 the room was being asked to look at. 4.
+
+## Measuring a thing is not supposed to move it (2026-10-07)
+
+### The rail flickered on every render, and I had written down why
+
+Reported as "anytime I resize the window or do any action at all on
+the canvas, it pops out and then pops back in".
+
+`layoutRail` decided whether to furl by taking `.furled` off the real
+rail, reading `offsetWidth`, and putting it back. The comment I wrote
+beside it said this could not flicker because nothing had yielded, so
+no paint could happen in between.
+
+That is true about painting and beside the point. Reading
+`offsetWidth` forces a style recalc, and the recalc *commits* the
+unfurled style -- which starts every transition on the way to it.
+Putting the class back a line later starts them all again in reverse.
+Transitions are driven by the clock, not by paints, so both of them
+run to the screen. Measuring the rail was indistinguishable from
+opening it, on every render: every drag, every selection, every
+resize.
+
+`railWidthUnfurled` measures a detached clone instead. Same ancestors
+and same classes, so every media query that applies to the rail
+applies to it; transitions switched off on it and all its children;
+never on screen. Verified by running six renders and a resize back to
+back and watching the height: it stayed at 52 throughout, where before
+each one would have travelled to 223 and back.
+
+The lesson is narrower than "do not read layout in a handler", which
+is the usual version and is about cost. This was not about cost. A
+read is not neutral when something between you and the read is
+*animated*: committing an intermediate style is a side effect, and the
+only safe place to put an intermediate style is on an element nobody
+is looking at.
+
+### Hovering it open, and motion worth watching
+
+Hover opens the furled rail, with a click still opening it for touch.
+Hover intent on both edges: 100ms before opening, so sweeping the
+pointer across the corner on the way somewhere else does not unroll a
+menu, and 350ms before closing, so leaving the pill for a moment --
+or crossing the gap between two rows -- does not throw the list away
+mid-reach. A click sets `.open`, which zeroes both delays, because a
+deliberate press should not be kept waiting.
+
+One hazard to know about: the list grows upward with the current mode
+in its own slot, so the row under the pointer when you hover the
+closed pill is not the row under it a moment later. That is inherent
+to "expand upward, keep the order" and cannot be designed away without
+giving up one of the two.
+
+The easing was `.18s ease` everywhere. `ease` is symmetrical, so an
+opening panel decelerates as gently as it accelerated, which reads as
+a jerk at any duration short enough not to feel slow. Two curves and
+two durations now, as custom properties: `--in-curve` /
+`--in-time: .28s` for something arriving, `--out-curve` /
+`--out-time: .2s` for something leaving. They are Material 3's
+emphasized pair, which is roughly what Figma's and Apple's panels do.
+180ms was also simply too short for 220px of travel -- the rule of
+thumb is that the further it moves, the longer it takes.
+
+### A/B was two bugs on a windscreen
+
+At 22px there is room for one letterform drawn properly or two drawn
+badly. One A on a card.
+
+### The zoom readout was paying for its width twice
+
+A fixed `width: 54px` and `padding: 0 10px`. The box already says how
+much room the number gets; the padding added ten more pixels on each
+side of a number that was already centred in it, and with the island's
+own 4px gap that put sixteen pixels between the minus sign and the
+first digit. `width: 44px; padding: 0`. Island 186 to 177.
+
+### A tenth swatch, and what a colour picker is allowed to choose
+
+Nine built-in hues now, and a tenth slot that opens
+`input type="color"`.
+
+The platform's own picker rather than one built here: it already has a
+visual field, hex, RGB and an eyedropper, in the conventions of
+whatever machine the instructor is sitting at, with nothing to
+maintain. "Is there an off-the-shelf solution" -- there is, and it
+ships with the browser.
+
+What it returns is a full colour and what is kept is the **hue and the
+chroma**. `oklchOf` does sRGB to Oklab with Ottosson's matrices, which
+is the same conversion the browser does for the `oklch()` already in
+the stylesheet, so a colour picked here and a colour written there
+mean the same thing. Chroma is divided by 0.155 -- the chroma of the
+solid shade -- so a colour as vivid as the built-ins comes back as 1.
+
+The lightness is thrown away, on purpose, and this is the part worth
+defending. The three shades a group draws are built at fixed
+lightnesses chosen so a name is readable on the card and the card is
+visible against the paper, on a screen and on a projector and in
+print. Let the instructor set lightness and the first dark colour
+anybody picks makes a table whose names cannot be read from the back
+of the room. So the picker chooses *which* colour and *how vivid*, and
+the design system keeps deciding how light. `group.chroma` is new in
+the model, optional, 0 to 1.4, and absent means the standard strength
+-- so every group drawn before the picker existed is byte-for-byte
+unchanged.
+
+The test was mutation-checked: with the chroma range replaced by
+`if False:` it fails, so it is testing the rule and not the parser.
+
+### Up Next stopped being a mode
+
+It was in the rail, and the rail's own test for belonging -- written
+in the comment above `MODES` -- is whether an entry changes what a
+click on the canvas means. Up Next never did. It is a switch in the
+top-right island now, which is the island that answers "how is the
+room being shown" and the only one that survives projector mode.
+
+**A line, not a hat.** The old version drew at random from a set of
+who had not been called. With a back arrow and an x/y count that does
+not work: stepping back has to show the person you just had, and a
+fresh draw each time would make the back arrow a second forward arrow.
+So the order is built once and kept until the room or the kind
+changes. People are still shuffled, with Fisher-Yates rather than
+`sort(() => Math.random() - 0.5)` -- that is not a shuffle, it is a
+comparison function that lies, and it leaves the first few in place
+more often than chance. In a classroom that is the difference between
+being fair and looking fair.
+
+**Three kinds**, cycled by one glyph at the left of the strip. A menu
+over a strip that is itself over a projected room is two layers of
+chrome for a question with three answers.
+
+* *One at a time* -- a shuffled person.
+* *A group at a time* -- print order.
+* *One from each group* -- each group's seats sorted into the room's
+  version order, and step `i` takes seat `i % however many it has`.
+  With letters A-E and a group of three, step D lands on the same seat
+  as step A. That is the instructor's rule and it is also the only
+  answer that gives every seat in a small group the same number of
+  turns. The number of steps is the longer of the version list and the
+  biggest group, because otherwise a group with more seats than there
+  are letters would have seats that never came up.
+
+**Growing a group about its own centre.** A desk and its cards are
+siblings on the canvas -- that is the three-layer model -- so scaling
+each in place would grow them all while leaving the cards where they
+were, creeping inward as the desk got bigger. Each piece is moved out
+by `(k - 1)` of its distance from the group's centre and then scaled,
+which is what makes the whole thing read as one object coming forward.
+The rotation stays last in the transform list or a turned desk shears.
+The label pill grows too, and getting that right meant moving the
+highlight pass to *after* the labels are drawn: it was running before
+they existed, so the one thing naming the highlighted group stayed its
+ordinary size inside it.
+
+**The arrows stopped changing section.** A projected chart is one
+room, and there is no moment at the front of a class where the next
+thing you want is the other section. Switching rooms is a decision
+taken before you start, with the controls up. The stage bar says
+"esc to leave" and nothing else; the count and the arrows are in the
+strip, which is on screen whenever they mean anything, and the bar was
+repeating them underneath in small grey text.
+
+`whoCanBeCalled` and `pickNext` went with the hat. The one rule
+`whoCanBeCalled` carried -- only people in the room on screen -- is
+still enforced, by `buildUpnext` reading `drawn.seats` for the same
+reason; the patch script asserted that before deleting it, which is
+the habit that would have caught the three orphaned icons last round.
