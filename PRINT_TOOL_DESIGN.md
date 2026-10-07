@@ -1456,9 +1456,9 @@ position because there was room for it there.
 | where | question it answers | holds |
 |---|---|---|
 | top left | *which room am I in, and is it saved* | the section switcher, and -- only when there are unsaved changes -- **Save** and **Discard** |
-| top right | *how is the room being shown* | version letters, group labels, **Projector mode** |
+| top right | *how is the room being shown* | version letters, group labels, **Up Next**, **Projector mode** |
 | bottom left | *what am I looking at* | zoom out, the percentage (click to fit), zoom in, **fullscreen** |
-| bottom centre | *what am I doing* | the mode rail |
+| bottom centre | *what am I doing* | the mode rail, which furls to the current mode below ~760 |
 | just above the rail | *what is selected* | one thin strip, described below |
 | bottom right | *one more of these* | the plus: a group in Groups, a seat in Seats |
 | the right edge | *who is not seated yet* | the unseated rail, in People mode |
@@ -1476,6 +1476,12 @@ tldraw and Miro both keep theirs.
 
 **No unsaved-changes dot.** It announced a state that the presence of
 Save and Discard already announces.
+
+**Up Next is not a mode.** The rail's test for belonging is whether an
+entry changes what a click on the canvas means; Up Next never did, it
+changes what the room is *showing*. It is a switch in the top right
+with the other two, and it works while projecting because that island
+is the one that survives.
 
 **The accent colour means one thing: the state you are in.** Not "look
 at me". A switch that is lit while unused has nothing left to say when
@@ -1715,10 +1721,21 @@ backbone and it comes before any of the features that need it.
 
 #### Model changes, all additive
 
-`group.hue`, `group.label_at`, `section.canvas.paper`. Old rooms load
-with sensible defaults, so `room.VERSION` does not move -- a version
-bump is for a change that would make an old file read wrongly, not for
-one that makes it read incompletely.
+`group.hue`, `group.chroma`, `group.label_at`, `section.canvas.paper`.
+Old rooms load with sensible defaults, so `room.VERSION` does not move
+-- a version bump is for a change that would make an old file read
+wrongly, not for one that makes it read incompletely.
+
+**A colour is two numbers and never three.** `hue` says which colour,
+`chroma` says how vivid, and lightness is not stored at all. The three
+shades a group draws are built at fixed lightnesses chosen so a name
+is readable on the card and the card is visible against the paper, on
+a screen and on a projector and in print. Let the instructor set
+lightness and the first dark colour anybody picks makes a table whose
+names cannot be read from the back of the room. The custom-colour slot
+therefore opens the platform's own `input type="color"` -- a visual
+field, hex, RGB and an eyedropper, none of it to maintain -- and keeps
+the hue and the chroma of whatever comes back.
 
 #### Staging
 
@@ -1733,6 +1750,9 @@ one that makes it read incompletely.
 | **G** | Up Next folded in, the Cold call tab deleted | **done** 2026-10-06 |
 | **H** | the camera: grab-to-pan, no scrollbars, one free band | **done** 2026-10-06 |
 | **I** | Duplicate a group, with its seats, letters and label | **done** 2026-10-06 |
+| **J** | the rail furls; hover to open; one motion vocabulary | **done** 2026-10-07 |
+| **K** | nine hues and a custom one; `group.chroma` | **done** 2026-10-07 |
+| **L** | Up Next out of the rail: one, a group, or one per group | **done** 2026-10-07 |
 | then | 12.11's stages 4-6 land into the shell rather than beside it | |
 
 A first because everything after it needs somewhere to live, C before D
