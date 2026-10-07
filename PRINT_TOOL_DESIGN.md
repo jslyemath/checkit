@@ -1455,12 +1455,44 @@ position because there was room for it there.
 
 | where | question it answers | holds |
 |---|---|---|
-| top left | *which room am I in, and is it saved* | the menu, the section switcher, and -- only when there are unsaved changes -- a dot and **Save** |
-| top right | *take this somewhere else* | **Present**, and nothing else, ever |
-| bottom left | *what am I looking at* | zoom out, the percentage, zoom in, fit |
+| top left | *which room am I in, and is it saved* | the section switcher, and -- only when there are unsaved changes -- **Save** and **Discard** |
+| top right | *how is the room being shown* | version letters, group labels, **Projector mode** |
+| bottom left | *what am I looking at* | zoom out, the percentage (click to fit), zoom in, **fullscreen** |
 | bottom centre | *what am I doing* | the mode rail |
 | just above the rail | *what is selected* | one thin strip, described below |
+| bottom right | *one more of these* | the plus: a group in Groups, a seat in Seats |
 | the right edge | *who is not seated yet* | the unseated rail, in People mode |
+
+Three corrections to the first draft of this table, each from using it.
+
+**The hamburger is gone.** It hid two switches, and two switches are
+cheaper to show than to hide.
+
+**Top right is not Present alone.** Getting the chrome out of the way
+and putting the room on a wall are the same question, so the display
+switches live there with it -- and fullscreen does not, because that is
+a question about the view and belongs with the zoom, which is where
+tldraw and Miro both keep theirs.
+
+**No unsaved-changes dot.** It announced a state that the presence of
+Save and Discard already announces.
+
+**The accent colour means one thing: the state you are in.** Not "look
+at me". A switch that is lit while unused has nothing left to say when
+it is used. The plus is the one exception, because it is the only
+control that makes something that was not there.
+
+#### The camera
+
+The canvas does not scroll. There are no scrollbars at any size: the
+room is panned by taking hold of the paper, and zoomed with the zoom
+island. Two numbers say where the view is -- a scale, and a pan offset
+in screen pixels from where Fit would put the room -- and one function,
+`freeBand`, returns the rectangle the room is both **fitted into and
+centred in**. Those must be the same rectangle or the room is neither.
+
+Fit resets both. Zoom holds the middle of the window rather than the
+room's centre, so what you were looking at stays in front of you.
 
 **Save sits with the document, not with Present.** What is saved is this
 room, and the room's identity -- the menu, which section -- is top left.
@@ -1699,6 +1731,8 @@ one that makes it read incompletely.
 | **E** | the pill and its anchors | **done** 2026-10-06 |
 | **F** | the unseated rail moves right and becomes cards | **done** 2026-10-06 |
 | **G** | Up Next folded in, the Cold call tab deleted | **done** 2026-10-06 |
+| **H** | the camera: grab-to-pan, no scrollbars, one free band | **done** 2026-10-06 |
+| **I** | Duplicate a group, with its seats, letters and label | **done** 2026-10-06 |
 | then | 12.11's stages 4-6 land into the shell rather than beside it | |
 
 A first because everything after it needs somewhere to live, C before D
