@@ -8672,3 +8672,210 @@ The assertion to write is the one about what should still be there. A
 cut by line range needs a list of what is expected to survive it, not
 only a list of what is expected to die -- and failing that, loading
 the page is what finds it, in about four seconds.
+
+## A camera instead of scrollbars, and a dot half a cell out (2026-10-06)
+
+Eight pieces of feedback on the seating shell, and four of them turned
+out to be the same mistake wearing different clothes: something was
+being positioned by inference instead of by arithmetic.
+
+### The dot and the line were at the right spacing and the wrong place
+
+`paintPaper` draws the fine grid, the heavy grid and the dots as one
+set of background layers on the paper, all stepped off the room's own
+origin. The spacing was right. The dots were still sitting in the
+middle of each heavy square.
+
+The cause is a difference between two kinds of CSS gradient that is
+easy to read past. A `linear-gradient(to right, c 1px, transparent
+1px)` starts drawing at the left edge of its background tile, so a 1px
+line lands exactly on the background position. A `radial-gradient` is
+positioned at the **centre** of its tile. Give both the same
+`background-position` and the dot comes out half a tile away from the
+line it is meant to sit on -- which is precisely half a cell, at the
+right spacing, every time.
+
+Measured in the browser before touching it: the heavy vertical line sat
+at x = 3.51 with a tile of 16.22, and the dot's centre at 2.51 + 16.22/2
+= 10.62. Off by 7.11 against a half-cell of 8.11.
+
+The fix is to position the dot layer half a tile back, plus half a pixel
+to aim at the middle of the 1px line rather than its left edge:
+
+```js
+const mid = big / 2 - 0.5;
+spots.push(`${at(x0 - mid, big)}px ${at(y0 - mid, big)}px`);
+```
+
+Measured after: offset 0.5 on both axes, before and after panning. The
+half-pixel is the whole remaining difference, and it is the right half
+pixel.
+
+### Scrollbars, and why the room kept sliding right
+
+The paper scrolled (`overflow: auto`) and the content box was centred
+with `margin: auto`. Then `applyZoom` set `box.style.marginRight` to
+clear the unseated rail.
+
+Setting one side of an `auto` margin is not a nudge. `margin-left: auto`
+with `margin-right: 0` is not centring with a small correction -- it is
+right alignment. Every window size put the room against the right edge,
+and because the amount of slack changes as you resize, that is what
+showed up as "the desks all end up on the right" after a resize rather
+than all the time. Measured before the fix: `margin-left: 882.667px`,
+`margin-right: 0px`, in a paper 1067 wide.
+
+Both problems -- the scrollbars and the alignment -- are the same
+problem, which is that where the room sits was being inferred from a
+layout rule rather than decided. So the room has a camera now:
+
+- `seatingZoom` is how close you are standing. `pan` is where you are
+  standing, in screen pixels, measured from where Fit would put it.
+- `freeBand(paper)` returns the one rectangle the room is **fitted
+  into and centred in**. One function for both, deliberately: a room
+  fitted to one rectangle and centred in another is neither.
+- `placeBox(zoom, area)` sets `left` and `top` to
+  `band.x + (band.w - w) / 2 + pan.x` and the same down the other axis.
+- `.paper` is `overflow: hidden` with `cursor: grab`, and `panPaper`
+  drags the room by the paper.
+
+`refit()` sets zoom to automatic **and** pan to zero, because Fit that
+left the room dragged half off the window is answering half the
+question. It replaced five separate `seatingZoom = null` statements, so
+a sixth cannot be added that resets one and forgets the other.
+
+Zoom holds the middle of the window rather than the room's own centre,
+and the arithmetic for that is one line. Writing `S(u)` for where an
+area-local point `u` lands on screen,
+
+```
+S(u) = band.w/2 - area.w*z/2 + u*z + pan.x
+```
+
+so `S(u)` is the band's centre exactly when `z*(u - area.w/2) + pan.x =
+0`. Holding the same `u` at the centre through a zoom from `z` to `z'`
+therefore needs `pan.x' = pan.x * z'/z` -- no screen-to-room conversion
+anywhere. Checked by measuring the room point under the band centre
+across a 1.25x step: (388.9, 369.1) before, (388.8, 368.8) after.
+
+`clampPan` keeps 110 pixels of the room on the paper in every
+direction, computed from the room's own size rather than from a fixed
+box, so every corner stays reachable and nothing in normal use touches
+the limit. The alternative -- no stop at all -- has a flick of the
+wrist that loses the room and leaves a blank grid with no clue which
+way to drag back.
+
+A press that does not travel four pixels is still a click, and still
+clears the selection. Same threshold the name cards use, same reason: a
+mouse drifts while a button is going down.
+
+Nothing in the pan path re-renders. `applyZoom` moves and repaints, and
+the element holding the pointer capture is the paper itself, which no
+redraw replaces. That is the resize-grip lesson from two rounds ago
+applied in advance rather than after the bug.
+
+**And one regression it introduced, caught by asking rather than by
+noticing.** `cursor: grab` on the paper is inherited by everything
+drawn on it. In Groups mode a name card neither moves nor pans, so it
+was offering a grabbing hand that nothing would accept. `.shape,
+.seatcard { cursor: default }` sits before `.movable` in the file, so
+whatever really is draggable still says so. Verified per mode: People
+has cards `grab` and shapes `default`, Groups has it the other way
+round.
+
+### Four islands, three of which should match
+
+Measured at 1280x860 the three corner islands were all 45.3px and the
+rail 63.2 -- fine. Measured at 533x300 they were 37, 35, **43** and 35.
+
+`.ibtn` had `min-height: 34px` and `padding: 5px 10px`. A button holding
+an icon is 17px of SVG and the min-height decides it. A button holding
+"100%" is a 22.5px line box, and line box plus padding plus border
+beats the minimum. So the zoom island -- the only one made of
+characters -- was taller than its neighbours, and a media query that
+trimmed `.ibtn` padding at short heights was out-specified by
+`.at-bl .ibtn { padding: 6px 8px }` in the width query, which made the
+gap worse at exactly the size where space was tightest.
+
+`height: 34px` with `line-height: 1` and horizontal-only padding. A
+character cannot out-grow an icon, and no media query can bring it
+back by adjusting padding. The rail keeps a taller fixed height (52),
+on purpose: it stacks a glyph over a word, and being the tallest thing
+on the bottom edge is how it reads as the primary control.
+
+Icon-only buttons are square via `aspect-ratio: 1` rather than a width,
+so they follow the height through the short-window query instead of
+needing the number written twice.
+
+The rail's narrow-width state is **deleted**. It used to drop its words
+and shrink, so the island you look at most changed shape and height
+partway through a resize while the three corner islands did not.
+`layoutBottom` -- which re-centred the rail in the gap the zoom island
+left -- is deleted with it. It also meant the rail slid sideways as the
+zoom readout changed width, because "100%" is wider than "39%", and
+that movement was more distracting than the overlap it avoided.
+
+The overlap is real and is now visible: at 530px the zoom island and
+the rail share 99 pixels. That is the state that was asked for, to be
+looked at before deciding.
+
+### The unsaved dot
+
+Gone. It said "there are unsaved changes" beside two buttons that only
+exist when there are unsaved changes. One of the three was doing the
+work.
+
+### Duplicate
+
+`duplicateGroup(section, group)` in Groups mode: the same furniture at
+the same size and angle, the same seats at the same offsets, the same
+version letters, the same label in the same anchor, labelled
+`"<old> (copy)"`.
+
+Three decisions worth writing down.
+
+**Empty of people.** Not a shortcut -- `room.check` refuses a room
+where anyone sits in two seats, so there is nothing else a copy could
+do with them.
+
+**The letters come along.** They are most of the reason to duplicate: a
+second table arranged like the first wants the same pattern of papers
+around it, not a fresh colouring that happens to be legal.
+
+**The hue is copied only if the original chose one.** A group with no
+`hue` takes its colour from its position in the list; writing that
+colour down on the copy would freeze it to a shade the original would
+abandon the moment a group before it was deleted.
+
+Seats are filtered to the group's own: one desk can hold seats
+belonging to two groups, and duplicating one must not quietly take the
+other's chairs along.
+
+`freeSpotFor` looks for somewhere to put it. Bounding rectangles and a
+short search rather than real packing -- eight candidates a ring, six
+rings, against a few dozen boxes. The step is the group's footprint
+plus a whole name card, because `boxOf` measures the furniture and the
+cards hang off its edges; stepping by the table alone drops the copy's
+chairs onto the original's while the tables themselves miss each other.
+The search runs twice, once insisting on staying inside the declared
+canvas and once not, so a full room still gets a copy it can see and
+drag rather than a button that silently does nothing.
+
+Verified end to end rather than by unit test: duplicated a 2x2 that had
+been given `w: 150`, `angle: 15`, `hue: 35` and `label_at: {s1-0, ne}`,
+confirmed the copy carried all four with `label_at` repointed at the
+new shape id, then saved through the real endpoint -- which runs
+`room.check` -- and read back "Room saved." The Scratch 48 fixture was
+copied aside first and restored after; both `room.json` and
+`seating.toml` hash to what they did before
+(`d13caeaf...`, `1bae8e12...`).
+
+### Three icons that outlived their features
+
+`ICON.view`, `ICON.hide` and `ICON.show` were still in the table. View
+mode and the hamburger's eye toggle were both deleted last round, and
+their icons were not, because a block delete takes what is between its
+markers and nothing else. The same shape of leftover as `seatingDirty`
+and `togglePalette` going out with their neighbours -- the opposite
+direction, but the same cause: a cut by markers knows nothing about
+what belongs together.
