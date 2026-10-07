@@ -8879,3 +8879,122 @@ markers and nothing else. The same shape of leftover as `seatingDirty`
 and `togglePalette` going out with their neighbours -- the opposite
 direction, but the same cause: a cut by markers knows nothing about
 what belongs together.
+
+## A rail that furls, and one vocabulary in the strip (2026-10-06)
+
+### Collapsing to the current mode
+
+The rail is five words wide and the bottom edge of a 530px window has
+about 230px to spare between the zoom island and the plus. The
+instructor's proposal: collapse to the current mode with a chevron,
+and unroll the list upward, with the current mode landing in its own
+place in the lineup.
+
+The landing is the part that sounds hard and is not, if the list is
+never rebuilt. All five modes are always in the DOM, in order, in a
+bottom-anchored column; furling gives the four you are not in
+`height: 0`. The current mode is then the only row left and is already
+at the bottom. Opening grows the rows above it, which lifts it into
+its own slot. Nothing moves it there, nothing animates a reorder, and
+there is no frame where the order is wrong -- because the order was
+never touched.
+
+Three details that each cost a measurement:
+
+* A `height: 0` button with a 1px border is not zero: a border cannot
+  shrink below itself. Four of them put 8px of invisible rows in the
+  closed pill. `border-width: 0` while collapsed, back to 1 when open.
+* A column keeps its `gap` between rows of nothing. 4 x 3px is another
+  12px. `gap: 0` while closed, transitioned, so it still unrolls.
+* `drawRail` set the `open` class *after* appending the rows. A fresh
+  row inserted while `.open` is still on computes to 40px and then
+  transitions down to 0 when the class comes off a moment later, so
+  picking a mode left the list standing for a fifth of a second before
+  it fell. Class first, children second.
+
+The chevron went inside the current mode's own button rather than
+beside the column. A separate button cost 40px of the edge that had
+none, and put two targets on screen for one question: when only one
+mode is visible, "which mode" and "show me the modes" are the same
+question.
+
+Closed pill: 51px tall, 122-125 wide, against 63 x 302 unfurled.
+
+### Furling was not enough, and the fix is the thing deleted last round
+
+At 530 the two corners take two thirds of the bottom edge, so even a
+125px pill centred on the window sits 8px inside the zoom island.
+There is room -- 226px of it -- just not in the middle.
+
+So `layoutRail` wants the window's centre and clamps it into what is
+free. Above about 545 the clamp never bites and the pill is exactly
+centred; below it the pill slides the smallest distance that clears.
+Clamping rather than re-centring in the gap matters: re-centring would
+put the pill visibly off to one side at every narrow width, while a
+clamp leaves it where it belongs until it cannot be there.
+
+This is the idea deleted last round, and it was deleted for a reason
+that has now been removed rather than worked around. The complaint was
+that the rail crept sideways as the zoom readout changed width --
+"100%" is wider than "39%". `.zoomnum` is a fixed 54px now, so the
+left bound is a constant for a given window. Verified: three zoom
+steps, 48% to 93%, moved the pill 0px. The plus is reserved whether or
+not it is on screen, for the same reason -- a bound that changed with
+the mode would walk the pill about as you worked. Verified: 0px when
+switching into Groups, where the plus appears.
+
+### The strip had four ways of saying a number
+
+"4 seats" (prose), "1/7" (a filled chip), a duplicate glyph, and a
+typographic X. Four vocabularies in one row of six things.
+
+One shape now: a glyph and a value. Both glyphs are borrowed from the
+mode rail -- the Seats icon for seats, the Order icon for the print
+order -- so the strip is spelled in a vocabulary the window has
+already taught rather than one of its own. The X became a trash can,
+because "close" standing where a verb should be is what made it read
+as a stray. Dividers separate identity, facts and actions.
+
+The strip's height is unchanged at 35.3px, which was the constraint.
+
+### Typing a print position
+
+`reorderGroup` takes the group out of the line, puts it back at the
+position asked for, and numbers what is left 1..N. One rule covers
+both directions the instructor described: 5 to 3 pushes the old 3 and
+4 down one; 1 to 3 pulls the old 2 and 3 up one. Doing it by
+remove-and-insert rather than by arithmetic on the numbers is why
+there is no off-by-one to get wrong.
+
+Everything comes out numbered, including groups that had none.
+`room.ordered_groups` already prints unplaced groups after the placed
+ones, so writing that down changes nothing about the paper and leaves
+no gaps for the next edit to reason about. `printOrder` is that rule
+restated on the browser side, which is also what lets the strip show a
+position for a group that has not chosen one -- more use than a dash
+saying it has no opinion.
+
+Verified: 5 to 3 gave T3:4 T4:5 with T6 and T7 untouched; 2 to 6 pulled
+T3..T6 up one with T7 untouched; 99 clamped to last; Escape left the
+numbers alone and did not take the strip with it.
+
+### Smaller things
+
+The corner islands' icons went 17px to 22px. 17px of line art reads
+optically smaller than the 15px capitals of "820" beside it, and a
+button is a fixed 34px tall with no vertical padding, so the islands
+did not change height. Applied to the zoom island too, not only the
+top-right one that was raised: it stands the same icon beside the same
+size of number, and fixing one would have moved the imbalance rather
+than removed it.
+
+The Versions icon is A/B on a card. It was an A with a small arrow,
+which at 17px was a smudge beside a smudge.
+
+Up Next is a speech bubble. The sparkles said "magic", which is the
+wrong promise for a list whose whole point is being visibly fair about
+whose turn it is.
+
+The lit card in Up Next was `z-index: 3`, tying with `.canvas > .pill`
+and losing on DOM order -- so a group's label sat across the one card
+the room was being asked to look at. 4.
