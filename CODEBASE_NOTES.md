@@ -9250,3 +9250,63 @@ looks like it worked.
 38 by 30 button; the strip goes 35 to 40 tall, which is the cost of
 the glyph being legible and is the one strip whose job is to be read
 from across a room.
+
+## The eight pixels that arrived early (2026-10-07)
+
+### A hitch, described from the outside and found by measuring
+
+Reported as: "we gain a bit of gray space, then the hitch occurs
+before all the options fan out", with the instructor unsure whether
+the height was jumping mid-tween or the tween was pausing.
+
+It was neither, quite. The furled rail animated `height`, `opacity`
+and `gap`, all with a delay and a curve. It also toggled
+`border-width` between 0 and 1 on the collapsed rows -- and that was
+not in any transition list, so it applied the instant the class
+landed, while everything else was still waiting out its delay.
+
+Four hidden rows times a top and bottom border is eight pixels of
+empty grey, arriving in one frame and then sitting there until the
+real animation started. That is the grey space, and the wait after it
+is the hitch.
+
+Measured rather than reasoned about, which mattered because the first
+measurement was wrong: sampling "a row" caught the *current* mode's
+row, which is open at all times, so it read 40px throughout and
+proved nothing. Sampling a row that is not `.on` gave it immediately
+-- one frame after the class, `height: 2px`, `border-top-width: 1px`,
+`row-gap: 0px`, `opacity: 0`. The border had arrived; nothing else
+had moved.
+
+The fix is not to animate the border. It is to not have one: nothing
+in the rail ever gives it a colour, because `.ibtn` sets
+`1px solid transparent` and `.ibtn.on` colours the background rather
+than the edge. It was drawing nothing and costing a jump.
+`.rail.furled .ibtn { border-width: 0 }`, and the two toggles go.
+Afterwards, two frames in: height 19.6, gap 1.47, border 0 -- all
+three moving together.
+
+The general shape of this one is worth keeping: **a transition list is
+a list of the properties that are allowed to change smoothly, and
+anything a rule changes that is not on it changes at once.** A rule
+that sets five properties and transitions four is not four-fifths
+animated; it is animated with a jump in it.
+
+### Up Next takes the room out of editing
+
+Projector mode already does this, and Up Next is the same kind of
+thing: a way of looking at the room rather than a way of working on
+it. While it is on there is no mode rail, no plus, no furniture
+drawer, no grid, no drag handles and nothing movable -- the dotted
+paper and the room, which is what the deleted View mode was for.
+
+The mode underneath is untouched, so switching Up Next off puts you
+back exactly where you were with nothing to remember. Verified by
+forcing Groups while Up Next was on: still one background layer
+rather than five, still no grips, still no rail -- and on switching
+off, mode still `groups`, five layers back, rail back.
+
+That is twice now that "nothing moves" has turned out to be a state
+rather than a mode, which is the whole argument for having deleted
+View: two states already exist and neither of them needed a seat in
+the rail to do it.
