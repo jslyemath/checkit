@@ -8605,3 +8605,70 @@ reach the same answer in every room anybody will draw.
 * **Labels were being shouted.** `text-transform: uppercase` on the
   pill meant the chart could not say "Window side" -- it said WINDOW
   SIDE. A label belongs to the person who typed it.
+
+## Two wishes in one button, and a room on a mat (2026-10-06)
+
+### Projector mode is not fullscreen
+
+They were the same button and they are different questions.
+*Projecting* is "show the room and let me touch nothing"; *fullscreen*
+is "use the whole screen". Either is wanted without the other -- a
+projector mirroring a window needs the first, a big room on a second
+monitor the second.
+
+So they are two controls in two places: projector mode beside the
+display switches, and fullscreen in the zoom cluster, because it is a
+question about the view. Checked against the references first:
+tldraw's bottom-left zoom island expands into a cluster of view
+controls, and Miro's "canvas controls bar" does the same bottom-right.
+One corner for *how am I looking at this* is the convention.
+
+**View mode is gone.** A mode whose only job was to turn editing off
+is a mode for not using the application; projecting is that state, and
+leaving it returns you to the mode you were in rather than to
+somewhere neutral.
+
+### Accent was doing two jobs
+
+It meant both "selected" and "look at me", so the Present button was
+accented while it was *off* -- which leaves a switch nothing left to
+say when it is on. Accent now means one thing: the state you are in.
+The new plus keeps it, because it is the one control on screen that
+makes something that was not there.
+
+### A list of things to also update, again
+
+A seat could vanish under a table on its way to it. Desks were drawn
+one after another, each followed by its own people, so a desk drawn
+later covered an earlier desk's cards. The order things happened to be
+drawn in was carrying meaning it could not carry.
+
+Three layers settle it: furniture, then seats, then labels. **The same
+lesson as the anchors that stayed behind** -- when the answer depends
+on remembering to do something in the right order, give it a structure
+instead.
+
+### The room was sitting on a mat
+
+The dots lived on the paper at 26 screen pixels; the grid lived on the
+canvas at 20 room units. So they never lined up, the dots did not move
+with the room, and the grid stopped at the edge of the furniture --
+which made the room look like it was on a mat rather than on a floor.
+
+Both are one pattern on the paper now, laid out from the room's own
+origin at the room's own step, computed per frame from the zoom. They
+tile for ever and the dots land on the intersections, because they are
+measured from the same corner with the same ruler.
+
+### Deleting a block deletes everything in it
+
+Two functions were removed by scripts that cut from one marker to the
+next: `seatingDirty` went with the presenting pair, `togglePalette`
+with the hamburger. Both scripts asserted that the *old* names were
+gone and both passed. Neither could notice that a bystander had gone
+too.
+
+The assertion to write is the one about what should still be there. A
+cut by line range needs a list of what is expected to survive it, not
+only a list of what is expected to die -- and failing that, loading
+the page is what finds it, in about four seconds.
