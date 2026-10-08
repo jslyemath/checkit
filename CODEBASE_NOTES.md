@@ -9310,3 +9310,78 @@ That is twice now that "nothing moves" has turned out to be a state
 rather than a mode, which is the whole argument for having deleted
 View: two states already exist and neither of them needed a seat in
 the rail to do it.
+
+## Measuring something that is not there (2026-10-08)
+
+### The rail arrived unfurled and then folded away in front of you
+
+Two reports, one cause. Narrowing the window past the threshold stood
+the rail up as a full column and then collapsed it; leaving Up Next
+did the same.
+
+`layoutRail` ran whether or not the rail was on screen. Projector mode
+and Up Next both hide it with `display: none`, and a hidden element
+measures 0 wide -- so the clone came back at 0, 0 is narrower than any
+threshold, and it concluded the full rail fits and took `furled` off.
+Measured while Up Next was on: `display: none`, `offsetWidth: 0`,
+`offsetParent: null`, and the class already gone. The rail then came
+back unfurled and refolded a frame later, in view.
+
+Taking the class off was never right. Whether the rail furls is a fact
+about the window, and a window does not stop having a width because
+something is covering the rail. `if (rail.offsetParent === null)
+return;` -- decide nothing, change nothing.
+
+That is the second time this function has been wrong about a
+measurement in the same way. The first was measuring the real element
+and committing an intermediate style; this one is measuring an element
+that has no geometry to give. **Both come from treating a layout read
+as a free question.** It is not: it has a precondition -- that the
+thing is laid out at all -- and it has a side effect.
+
+### A breakpoint is not a gesture
+
+Even with the class applied at the right moment, the rows animated
+from their unfurled 52px to 0. So narrowing the window briefly showed
+*more* rail than before, which is the opposite of what the fold is
+for.
+
+`setFurled` puts a `nomotion` class on, toggles `furled`, forces one
+flush, and takes `nomotion` off. The flush is the point: it commits
+the new geometry while motion is off, so removing the class afterwards
+has nothing left to animate. Opening and closing the list is a gesture
+and stays watchable; changing which rail you have is a layout change
+and should already have happened.
+
+Verified by shrinking 1000 to 620 and reading the rail height on five
+consecutive frames: 51, 51, 51, 51, 51. Before, those frames walked
+down from about 260.
+
+### A transform is a property, not a slot
+
+Highlighting a group moved its label. The highlight writes
+`node.style.transform` to grow each piece about the group's centre,
+and `.pill` was already using `transform` for something: it centres
+itself on its point with `translate(-50%, -50%)` rather than by
+subtracting half its width from `left`, because its width depends on
+how long the name is.
+
+Writing over it dropped the label half its own size down and to the
+right. It looked like the highlight moving the label; it was the
+highlight deleting the thing that had put the label where it was.
+
+Fixed by re-applying the centring at the end of the list -- so it
+happens first -- with `transform-origin: 0 0` on the lifted pill, so
+the chain is plain multiplication and the scale happens about the
+point rather than about a corner that has already moved.
+
+Verified by measuring every pill's centre against its own `left`/`top`
+in room units, before and after the lift: 0, 0 for all seven both
+times, including the lifted one.
+
+The general form is worth keeping beside the `border-width` note from
+yesterday. That one was *a property a rule changes that the transition
+list does not mention*; this one is *a property a rule changes that
+another rule was already using*. `style.transform = ...` is not
+"apply a transform", it is "replace whatever transform this element
+had", and the element usually had one for a reason.
