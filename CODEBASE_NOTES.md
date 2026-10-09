@@ -9385,3 +9385,126 @@ list does not mention*; this one is *a property a rule changes that
 another rule was already using*. `style.transform = ...` is not
 "apply a transform", it is "replace whatever transform this element
 had", and the element usually had one for a reason.
+
+## Printing, and one letter that was doing two jobs (2026-10-08)
+
+### The submode problem, and why it was not one
+
+Printing needed Order and Versions, and Order needed by-group and
+by-seat. A two-level tree, and the instructor said outright that it
+did not fit the rail-island-strip vocabulary.
+
+It fits once you notice that **by-group and by-seat are not a
+submode**. A mode decides what a click on the canvas means. By-group
+and by-seat decide what comes out of the printer, they outlive the
+visit, and they are true of the room whether or not anybody is looking
+at Printing. That is a document setting, and the tree collapses:
+
+    Printing --  [ Order | Versions ]  .  [ By group | By seat ]
+                                           only while Order is on
+
+Two submodes is a segmented pair. The setting sits beside the submode
+it belongs to and goes away with it, because offering "by group" while
+you are editing versions is offering a setting that has nothing to do
+with what is in front of you.
+
+It lives in a **sub-rail**: a second island directly above the mode
+rail, present only in Printing. Reading upward you get the mode and
+then the thing inside it, which is what nesting looks like without
+drawing a nest. Smaller type than the rail on purpose -- a child that
+matched its parent for weight would read as a second rail.
+
+That made the bottom edge a stack of up to three, so `stackBottom`
+measures them and writes each one's `bottom` from the one below.
+Fixed offsets would have been wrong twice over: the rail is 63 tall
+unfurled and 51 furled, and the sub-rail is only there sometimes.
+
+### A seat letter is not a print version
+
+`seat.version` was doing two jobs: which paper lands here, and which
+chair this is at the table. Up Next's representative walk leans on the
+second meaning. The moment anybody wants six distinct chairs and three
+versions the two disagree, and the instructor asked for them split
+before that happened.
+
+**The split costs nothing in the model**, because the seat letter does
+not need storing. It is a function of where the seats are:
+
+> Clockwise from the top left, A onward, within the group.
+
+`seat.version` keeps its name and its meaning -- the print version,
+exactly what `seats_of`, `assign_versions` and `seating.toml` already
+mean by it -- and `slotsOf` derives the letter at draw time. The
+instruction "recalculate the letters whenever a seat has finished
+moving" then needs no event and no bookkeeping: every redraw is a
+recalculation, and there is no second copy to go stale.
+
+Three shapes need three answers and a single rule gets them wrong:
+
+* A row of three sorted by angle round its own centre is nonsense --
+  the middle seat *is* the centre and has no angle.
+* A 2x2 sorted left-to-right is reading order, not clockwise.
+
+So: within one card of a single line, order along it; otherwise sweep.
+
+The sweep's starting point was the one real bug. Starting at a fixed
+-135 degrees is the obvious choice and it is wrong -- the top left
+corner of a 2x2 sits at about -145, ten degrees *before* the line, so
+it wrapped the whole way round and lettered last. A 2x2 came out
+D A C B. Anchoring the sweep to the top left *seat* rather than to a
+bearing cannot be just past the line, because the line is drawn
+through it. Verified across the fixture: every 2x2 reads A B C D
+clockwise, the 1x3 row reads A B C left to right, the one-seat table
+reads A.
+
+Up Next's representative walk now keys on seat letters. "All the Cs"
+means the third chair at every table, which is something you can point
+at from the front of a room; the third *paper* is not, and once the
+versions are reshuffled for printing the two have nothing to do with
+each other.
+
+### One button, two letters
+
+The island switch is "Seat letters" outside Printing and "Version
+labels" inside it, with the glyph changing from a letter on a card to
+a letter in a circle -- the same letter, two different things about a
+seat, so the same glyph in two different containers rather than two
+unrelated pictures. On the canvas the version wears the circle too, in
+the group's solid colour, bottom right where the seat letter is top
+right, so a card can carry both without either being the other.
+
+Arriving in Printing turns seat letters off and versions on; leaving
+puts seat letters back the way the instructor had them. A switch the
+app flipped is a switch the app owes back, and that meant routing
+every way into a mode through one `enterMode` -- `setProjecting` was
+assigning `seatingMode` by hand, so coming out of the projector into
+Printing would have shown both letters at once.
+
+### The strip has two states
+
+A seat and a group are different selections, and the strip describes
+the selection. One strip carrying both would be twice as long or would
+rearrange itself, and rearranging is the thing this strip was built
+not to do.
+
+The seat strip carries the group's dot and name as a *fact* -- same
+dot, same name, hover shade and cursor removed. That is the
+distinction the strip already draws between `scount` and
+`scount.typable`, so it is one the window has taught once and does not
+have to teach again.
+
+### Still to build
+
+The sub-rail chooses between jobs that are not yet done: order numbers
+on groups and seats, typing a position on the canvas, clicking groups
+into order, the version count and its reshuffle, the graph-colouring
+button, and dragging a version from one seat to another.
+
+On that last one -- the instructor asked how long a press should be
+held before the letter starts following the pointer. **It should not
+be a time at all.** A hold delay makes every drag feel broken for as
+long as it lasts, and it is only needed on touch, where it
+disambiguates a drag from a scroll. Here the ambiguity is drag versus
+click, and distance settles that with no wait: the same four pixels
+the name cards already use. Click-then-click is supported anyway, so
+nothing is lost.
