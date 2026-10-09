@@ -9508,3 +9508,116 @@ disambiguates a drag from a scroll. Here the ambiguity is drag versus
 click, and distance settles that with no wait: the same four pixels
 the name cards already use. Click-then-click is supported anyway, so
 nothing is lost.
+
+## No second bar, and no submodes either (2026-10-09)
+
+The sub-rail from yesterday was wrong and the instructor said so
+immediately -- "that's what I was afraid you would do". Worth keeping
+the reasoning, because the fix was two steps and only the first one
+is obvious.
+
+### What every canvas application actually does
+
+Looked it up rather than guessed. Illustrator and Photoshop have an
+**options bar**: one row, one fixed place, contents change with the
+active tool. Figma changes the contents of the right-hand properties
+panel and leaves the toolbar alone. Excalidraw changes the contents of
+its left island. tldraw changes its style panel. Miro hangs a small
+flyout off the tool button.
+
+A second bar is the one thing nobody does. The pattern is always *one
+contextual surface whose contents change*, never *a new surface that
+appears*, and the reason is visible the moment you build the second
+bar: two rows of the same weight in the same place read as two rails,
+and smaller type is not enough to stop it.
+
+This app has a contextual surface already -- the strip.
+
+### And then the submodes went too
+
+Putting the submodes in the strip would have been the small fix. The
+larger one: **Order and Versions should not be submodes at all.**
+
+Every other mode here decides what a click means by *what you click*.
+Groups mode has no move/resize/rotate selector -- the grips are the
+selector, the label is the rename target, the silhouette is the drag
+handle. A submode picker in Printing would have been the first place
+in the app where you tell it what you are about to do before doing it.
+
+So Printing draws the order numbers and the version circles at once,
+and a click on a number edits a number while a click on a version
+picks up a version. The numbers stop their own events, so a click
+anywhere else on the card still selects the seat.
+
+What is left over -- by group or by seat, how many versions, shuffle,
+space them out -- is the **print plan**: facts about the job rather
+than about the moment. The strip shows them when nothing is selected,
+which is a state it previously used to hide in. "What am I looking at
+when I am not looking at any one thing" turns out to be a real
+question with a real answer, and that is an options bar in the sense
+Illustrator has meant since 1997.
+
+Net effect on screen: two bands at the bottom instead of three.
+
+### Two badges, two corners, and the one that was pale
+
+A seat in Printing carries two facts: where it comes in the run, and
+which paper lands on it. Top left and top right, which is as much as a
+card already holding a name can be asked to say. The version moved to
+the top right -- the seat letter's own corner -- which was the point
+of the circle all along: the same letter asked two ways, and only one
+of them ever on, so sharing a corner is what makes the circle mean
+something. In the opposite corner it just looked like a second badge.
+
+The group's number started in the group's top left corner and landed
+exactly on the first seat's own number. Centred above the group
+instead, bigger, so the one number about the table does not read as a
+fifth number about a chair.
+
+It also came out pale. `.ordertag` is a direct child of the canvas, and
+`--solid` is declared on `.deskwrap, .shape, .seatcard, .pill` -- a
+custom property reaches children, and a sibling is not a child. This
+is the third time that exact sentence has been the bug: the first was
+grips invisible because `--solid` was on the silhouette rather than
+the wrap.
+
+### A chair that reads at 15px
+
+The instructor asked for a chair before the seat letter and a printer
+before the version, because a bold D beside a bold C says nothing
+about which is which.
+
+The printer was fine first time. The chair went through five drafts,
+rendered side by side at 52px and at 15px and looked at, rather than
+reasoned about. Front view with the seat drawn as a *line* merges with
+the backrest into a box with a stroke through it -- at 15px it read as
+an H. Drawing the seat as its own rounded bar separates the two
+shapes and it reads as a chair immediately. Side views read as "h" at
+any size.
+
+Worth the four extra renders: there is no way to know which of five
+nearly identical glyphs works except to put them next to each other.
+
+### Ordering, by group
+
+`seatRun` gives a group's seats in print order: by `spot` where one is
+set, and by seat letter otherwise -- so a group nobody has touched
+prints clockwise from its top left, which is the order somebody
+handing them out would walk anyway. The default is derived, so a room
+that has never been reordered stores nothing and has nothing to go
+stale.
+
+`reorderSeat` is `reorderGroup`'s rule again: take it out of the run,
+put it back where asked, number what is left 1..N. Verified: a 2x2
+reading ABCD, move A to 3, reads BCAD with spots B:1 C:2 A:3 D:4.
+
+`seat.spot` is new in the model, optional, an integer of at least 1,
+and mutation-checked -- with the range replaced by `if False` the test
+fails.
+
+### Still to build
+
+By-seat numbering (the running number across the room, and editing
+it), and the whole of versions: the count, the reshuffle, the
+graph-colouring button, and dragging a version from one seat to
+another.
