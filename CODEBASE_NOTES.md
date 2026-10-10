@@ -9703,3 +9703,75 @@ plan and not yet the code:
 The through-line: **when the edges are full, the answer is not another
 edge.** It is depth on the surfaces already there, and the canvas
 itself.
+
+## A flyout cannot fly out of a flyout (2026-10-09)
+
+### The plan from last round was wrong
+
+I proposed hanging Printing's tools off the mode rail as an
+Illustrator-style flyout. The instructor asked the obvious question I
+had not: the rail *is already* a flyout when the window is narrow, so
+that is a flyout from a flyout.
+
+It is worse than awkward -- it is a category error, and noticing why
+is what produced the better answer. **"Click them in order" and "draw
+a walking path" are not tools.** A tool is a persistent state: you
+pick the pen and everything you do is penning until you pick
+something else. These two are a single transaction with a beginning
+and an end. You ask for them, you click some groups, it is over.
+
+That is Raskin's **quasimode**: a temporary state, visibly different
+while it lasts, that ends by itself. The right shape is a *command
+that arms an interaction*, which is how Illustrator's Blend works --
+choose the command, then click two objects, then it is done.
+
+Commands do not need a seat on a rail. They need a menu, and the
+canvas has one free: nobody has right-clicked it yet.
+
+### One way to handle a badge
+
+Three small things on the canvas can now be picked up and retyped:
+the group's print number, the seat's print number, and the seat's
+version letter. They had grown three different behaviours -- one
+opened an editor on a single click, one could not be edited at all,
+and the group label (a fourth) had its own.
+
+`holdBadge` is the label's behaviour generalised: hover shows a hand,
+press and move drags, press twice retypes. The label keeps its own
+copy because what it drags onto is anchors rather than other labels,
+which is a different question.
+
+Two details worth keeping:
+
+**The badge becomes its own editor rather than being replaced by
+one.** The first draft swapped in an absolutely positioned input of a
+different size, and the number jumped across the card the moment you
+started typing. Turning the existing element into the editor -- clear
+its text, append an input, add a class -- keeps the box, the corner
+and the card, so nothing moves. Measured: the editor opens at an
+offset of 0, 0 from where the badge was.
+
+**It is white with a ring in the group's colour.** It had been dark
+with a green ring, which is the islands' palette worn by something
+that is not an island; the group label had the right answer already.
+
+**A dragged badge is moved to the canvas first.** Inside its card it
+cannot be carried past the card's own edge.
+
+### One glyph per idea
+
+`order` and `printer` were two drawings of printing; `seats` and
+`chair` two drawings of a seat. Two names for one idea is two places
+to change it and one of them always gets missed -- which is precisely
+how the rail kept the numbered list after Order became Printing, and
+then kept it in the strip after the rail was fixed.
+
+Both deleted. There is one printer and one chair, and nothing left
+that can drift.
+
+### The two numbers now weigh the same
+
+The print number was 17px at font 11 and the version circle 20px at
+font 12, sitting in opposite corners of the same card. They are the
+two things a seat says in Printing and one of them looked like a
+footnote. Both 20 at 12.
