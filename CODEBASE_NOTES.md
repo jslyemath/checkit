@@ -10091,3 +10091,62 @@ on the right, a swap glyph after it, and a rule below separating it
 from the actions it governs. That is how every menu in every
 application draws the difference, and without it you have to click a
 row to find out whether it does something or merely says something.
+
+## A rebuild is not a transition (2026-10-10)
+
+### Why the rail popped the moment hover became click
+
+Taking hover off the rail broke its animation, and the reason is one
+I had already written down twice this month in other words.
+
+Pressing the pill called `renderSeating`, which rebuilds the rail's
+rows. **A brand new element has no previous value to transition
+from**, so it is simply born at its open height. Hovering had worked
+only because hovering does not re-render -- the elements were already
+there, and a class change on an element that exists is the only thing
+a transition can act on.
+
+`showOpen` now puts the three open-states onto the live elements
+without redrawing anything. Opening a menu is not a change to the
+room: it changes which of two states an element is in, and the
+element is already there to be told.
+
+Measured after: 41, 95, 115, 125, 132, 137, 141, 144, 146, 148, 152
+-- a decelerating curve, where before it was 41 then 152.
+
+This is the third member of a family worth naming. A style read that
+commits an intermediate value starts transitions nobody wanted; a
+style read on an element with no geometry returns nothing; and a
+rebuild throws away the "before" that a transition needs. **All three
+are the same mistake: treating the DOM as a picture to be redrawn
+rather than as objects with state.**
+
+### A ceiling you guessed is a stall you will see
+
+`max-height: 320px` on a drawer that is 143 tall means the curve
+finishes in the first third and the box then sits still for the rest
+of the duration, while the padding and the opacity finish on their
+own schedule. That is the jitter: not a stutter, a *stall* followed
+by two late arrivals.
+
+`showOpen` measures `scrollHeight` and writes it to `--full`, so
+every property lands together. Verified: drawer settles at 143 with
+the ceiling at 143px, save menu at 85 with the ceiling at 85px.
+
+Both drawers and the rail now share `--in-time` / `--in-curve` and
+`--out-time` / `--out-curve`, which is what 12.13 asked for and what
+the first attempt at it did not actually deliver -- it unified where
+the code was duplicated and left the two mechanisms that were merely
+*similar* alone.
+
+### Three marks for one fact
+
+The ordering row had "Ordering" in grey, "by seat" in white, and the
+same double-arrow glyph at both ends. One fact, four pieces of ink,
+two of them saying the same thing.
+
+The label *is* the value now -- "By seat" -- which is exactly what
+the display switch does with "Seat letters" and "Version labels".
+One glyph, one colour, bold, above a rule. The rule is what separates
+a state from the commands under it; the weight is what makes it read
+as the heading of the list rather than the first item in it.
