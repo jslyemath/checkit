@@ -1763,6 +1763,55 @@ Written as a self-contained `seating/` module with its own stylesheet
 from the start. That is the difference between the spin-off being a
 move and being a rewrite.
 
+### 12.13 One disclosure, one behaviour
+
+Written down because the inconsistency keeps coming back. By the time
+anybody counted, this window had **four** ways of opening a thing that
+holds other things, and no two of them agreed:
+
+| | opened by | closed by | motion |
+|---|---|---|---|
+| mode rail | hover | leaving | 0.28s in, 0.2s out |
+| furniture drawer | click | click, or outside | 0.28s / 0.2s |
+| save menu | click | outside **only** | none |
+| colour swatches | click | outside | none |
+
+Three of those are defensible on their own. Together they are a window
+that has to be learned four times, and the save menu's missing
+press-again-to-close was a bug nobody would have written if it had
+been the same code as the drawer.
+
+**The rule.** Anything that opens to reveal more:
+
+* **opens on a press, never on hover.** There is no hover on a touch
+  screen, which is the same argument that ruled out a right-click
+  menu for the Printing commands. Hover-open also fires when somebody
+  is on their way somewhere else, and the usual patch for that -- an
+  intent delay -- is a timer that makes the interface feel slow in
+  exactly the case it was added for.
+* **closes on a second press of the same control**, on a press
+  outside it, and on Escape. All three, always.
+* **uses `--in-time` / `--in-curve` arriving and `--out-time` /
+  `--out-curve` leaving.** Those exist so that nothing has to choose
+  a duration, and anything that chooses its own is wrong twice: once
+  for being different, and again the next time the pair is tuned.
+* **is built once and shown by a class**, not created on demand. A
+  popup made at the moment it is needed has nothing to animate from,
+  and -- the save menu's actual bug -- a second press builds a second
+  one on top of the first instead of closing it.
+* **is one at a time.** Opening any of them shuts the others.
+
+**And the enforcement, which matters more than the rule:** these
+should share an implementation, not a convention. Four places
+independently deciding to behave the same way is four places that can
+independently stop. The CSS is now one `.drop` / `.palette` pair of
+rules over shared tokens; the open state is a boolean per surface
+cleared in one place.
+
+Where this bites next: the colour swatches (`openHues`) are still the
+fourth way -- created on demand, no motion, outside-press only. They
+should become a `.drop` like the rest.
+
 ### 12.8 Decisions taken
 
 | | |

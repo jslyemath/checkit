@@ -10014,3 +10014,80 @@ what the rest of the list means -- the two numbering actions below it
 read "groups" or "seats" according to it. The top-left island was the
 right *category* for it, a property of the document, and the wrong
 size.
+
+## Four ways to open a thing (2026-10-10)
+
+### Counted, because the instructor noticed before I did
+
+The report was that the rail, the corner buttons and the save menu
+all behaved differently. Counting them found four:
+
+| | opened by | closed by | motion |
+|---|---|---|---|
+| mode rail | hover | leaving | .28s / .2s |
+| furniture drawer | click | click, or outside | .28s / .2s |
+| save menu | click | outside **only** | none |
+| colour swatches | click | outside | none |
+
+Each was defensible when it was written. Together they are a window
+that has to be learned four times, and the save menu's missing
+press-again-to-close was not a bug anybody would have typed -- it was
+the absence of code that the drawer already had thirty lines away.
+
+Hover is gone from the rail. There is no hover on a touch screen,
+which is the same argument that ruled out a right-click menu for
+these very commands; and hover-open fires when somebody is on their
+way somewhere else, with the usual patch -- an intent delay -- being
+a timer that makes the thing feel slow in exactly the case it was
+added for. The two `--open-wait` / `--shut-wait` delays went with it.
+
+The save menu is a standing element shown by a class now, like the
+drawer. **Created on demand it could not animate** -- there is
+nothing to transition from -- and pressing the floppy again built a
+second menu on top of the first, which is why the only way to close
+it was to click elsewhere.
+
+Escape closes whatever is open, before it does anything else;
+opening any one of them shuts the others.
+
+The rule is written down as PRINT_TOOL_DESIGN.md 12.13, with the part
+that matters most at the end: **these should share an implementation,
+not a convention.** Four places independently deciding to behave the
+same way is four places that can independently stop. The colour
+swatches are still the fourth way and are named there as the next one
+to convert.
+
+### A bin is not a revert
+
+"Discard 820" had a trash can on it. Looked it up rather than
+trusting the habit: KDE's design team, a Wikimedia revert-icon
+discussion and a Neo4j bug report have all had the same ambiguity
+raised against bins used this way -- a bin says the thing is being
+thrown away, and what is being thrown away here is an *edit*, not the
+room. The safer convention is an undo-style arrow, with the caveat
+that a *closed circular* arrow reads as "refresh", so it is drawn
+open.
+
+"Save" and "Save all" were the same floppy twice. Eclipse and Visual
+Studio both ship a separate graphic for Save All; the search could
+not confirm the exact drawing, so the second sheet behind the glyph
+is this window's own mark for "more than one document" -- used
+identically on `saveall` and `revertall`, so the two pairs read as
+pairs.
+
+### A dot that claimed too much
+
+The save button's dot was accent-coloured and hollow when the unsaved
+changes were in the *other* room. Accent in this window means "the
+state you are in", so a room with nothing to save wore a bright mark
+that read as though it had something. Grey: it still says "something,
+somewhere", which is the whole of what it knows.
+
+### A setting is not a verb
+
+"Ordered by group" sat in the drawer among four commands looking like
+a fifth. It reads as a settings row now -- label on the left, value
+on the right, a swap glyph after it, and a rule below separating it
+from the actions it governs. That is how every menu in every
+application draws the difference, and without it you have to click a
+row to find out whether it does something or merely says something.
