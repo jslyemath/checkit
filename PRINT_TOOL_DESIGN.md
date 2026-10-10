@@ -1753,7 +1753,36 @@ the hue and the chroma of whatever comes back.
 | **J** | the rail furls; hover to open; one motion vocabulary | **done** 2026-10-07 |
 | **K** | nine hues and a custom one; `group.chroma` | **done** 2026-10-07 |
 | **L** | Up Next out of the rail: one, a group, or one per group | **done** 2026-10-07 |
+| **M** | Printing: the mode, seat letters split from print versions | **done** 2026-10-08 |
+| **N** | the strip's two states: a group, or a seat | **done** 2026-10-08 |
+| **O** | order numbers on the canvas, dragged or typed | **done** 2026-10-09 |
+| **P** | versions: swap, shuffle, set the count | **done** 2026-10-09 |
+| **Q** | click in order, and draw the route | **done** 2026-10-09 |
+| **R** | per-section save and per-section print plan | **done** 2026-10-10 |
+| **S** | band-select, move and delete; pan onto space and two fingers | **done** 2026-10-10 |
 | then | 12.11's stages 4-6 land into the shell rather than beside it | |
+
+#### What is actually left, 2026-10-10
+
+In the order they would matter:
+
+1. **By-seat ordering does not reach the paper.** `section.print_by` is
+   read by the canvas and ignored by `seating.to_toml`. The chart's unit
+   is `[[group]]` and a seat's place is its index inside one, so a stack
+   that interleaves groups has nowhere to live. Flattening the room into
+   a single `[[group]]` would encode the order and destroy the meaning,
+   because that field is what `Chart.collisions` uses to decide who can
+   see whom. **This needs a format decision**: either an explicit order
+   key in the chart, or accepting that by-seat only reorders within
+   groups. Everything else in Printing does reach the paper -- verified
+   against the written text, not the helper.
+2. **The colour swatches are the last unconverted disclosure.** See
+   12.13: created on demand, no motion, dismissed only by a press
+   outside. They should be a `.drop` like the drawer and the save menu.
+3. **The paper colour choice** (12.12's stage C) was specified and never
+   wired up.
+4. **12.11's stages 4-6** -- randomise, swap two -- have still not landed
+   in the shell.
 
 A first because everything after it needs somewhere to live, C before D
 because the colours have to be designed against the paper they sit on,
@@ -1811,6 +1840,14 @@ cleared in one place.
 Where this bites next: the colour swatches (`openHues`) are still the
 fourth way -- created on demand, no motion, outside-press only. They
 should become a `.drop` like the rest.
+
+**A second rule, learned the hard way on 2026-10-10.** Sharing the CSS
+was not enough: the rail still snapped open where the others eased,
+because pressing it called `renderSeating`, which *rebuilds the rows* --
+and a brand new element has no previous value to transition from.
+Opening something is not a change to the document. `showOpen` sets the
+three open-states on the live elements and redraws nothing. Anything
+that animates must be told, not rebuilt.
 
 ### 12.8 Decisions taken
 
