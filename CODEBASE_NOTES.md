@@ -10363,3 +10363,70 @@ meaning for every gesture, and a canvas has to take each one away
 deliberately.** Worth checking the rest -- a middle-click drag can
 still start autoscroll on some platforms, and a two-finger swipe can
 still be a back-navigation.
+
+## A number the canvas drew and nothing read (2026-10-10)
+
+### Most of Printing was decorative
+
+Went looking for what still needed finishing and found the obvious
+thing I had not checked: whether any of it reaches the paper.
+
+`to_toml` writes each group's seats by iterating `group["seats"]` --
+whatever order the ids happen to sit in that list. It never asks for
+`seat.spot`. So the within-group print order, which has a draggable
+badge, a typed editor, a click-in-order quasimode and a drawn route
+behind it, changed nothing at all about what came out of the printer.
+
+This is the "verify the artifact, not the dry run" rule in a new
+costume. Everything I verified was true -- the badges moved, the
+model updated, `room.check` passed, the room round-tripped -- and
+none of it was the thing that matters, which is the text of the
+chart.
+
+`ordered_groups` sorts each group's seats by `spot` now, stably, on a
+copy. Verified against the written text and not only the helper: the
+same four seats came out `Ann Ben Cal Dot` before and `Dot Cal Ben
+Ann` after, each carrying its own version.
+
+A half-spotted group follows the rule a half-placed *section* already
+follows: the ones with a position go first in that order, the rest
+after in the order they were listed. Only reachable by hand-editing
+the file, because the canvas always renumbers a whole group.
+
+**And one thing that is not expressible.** "By seat" means a stack
+that ignores group boundaries -- a seat from table 1, then one from
+table 3. The chart's unit is `[[group]]`, and a seat's place is its
+index inside one, so an interleaved order has nowhere to live.
+Flattening every seat into one `[[group]]` would encode the order and
+destroy the meaning: `group` is what `collisions()` uses to decide
+who can see whom, and one group of twenty-five would call every
+neighbour a clash. `section.print_by` is therefore still read by the
+canvas and ignored by the writer, which is a real gap and needs a
+format decision rather than a patch.
+
+### A selection you can only delete is half a selection
+
+Dragging one of a banded set now moves all of them. The set is
+clamped as one -- the others take the leader's already-clamped delta
+-- because clamping each against the canvas separately would squash
+them together at the edge and silently change the shape of the thing
+being moved. A desk can end up slightly outside, which is visible and
+draggable back; a set that quietly deformed would not be.
+
+Verified with a real pointer: seven tables, all seven moved by
+exactly 100,100.
+
+A synthetic pointer could not test it. `dragShape` calls
+`setPointerCapture` *before* wiring its handlers, and a made-up
+pointer id makes that throw, so nothing is ever wired. Not a bug --
+real pointers have real ids -- but worth knowing before concluding
+from a dispatched event that a drag does nothing.
+
+### The last two gestures
+
+Both already claimed, as it turns out. `touch-action: none` on the
+paper takes the two-finger swipe before the browser can read it as a
+back-navigation, and the middle button now reaches `panPaper`, which
+refuses the default and so suppresses autoscroll. Named here because
+"I checked" is worth recording even when the answer is that there was
+nothing to do.
