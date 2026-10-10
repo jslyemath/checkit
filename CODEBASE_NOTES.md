@@ -10285,3 +10285,50 @@ itself is one function.
 
 The forced read between the two writes is load-bearing: without it
 the browser coalesces them into no change at all and nothing moves.
+
+## A scale is about a centre unless you say otherwise (2026-10-10)
+
+### The band was nowhere near the drag
+
+`transform: scale()` is about the element's own centre by default,
+and it does not touch `left` or `top`. The band had both: a non-zero
+`left`/`top` in room units *and* a scale. So its size was scaled, its
+position was not, and the scaling itself pushed it off its own
+corner. Three errors compounding, which is why it was not merely a
+little out.
+
+The walk layer had been right by accident -- it sits at `0, 0` with
+`transform-origin: top left`, where all three of those mistakes are
+zero. The band has a layer of the same kind now and is plain room
+units inside it. Verified: dragged 120,90 by 280x210 and the band
+drew at 120,90 by 280x210, off by nothing.
+
+### Grey, because the accent is a colour a group can wear
+
+The band was drawn in the accent, which is also a hue a table can be.
+A selection rectangle in the one colour the thing underneath might
+already be is a rectangle you cannot see. Grey is the only hue
+nothing in the room competes with.
+
+### The overlay is not the mode
+
+`bandKind` asked `seatingMode`, and Up Next does not change the mode
+-- it is a switch across it, so Up Next over Groups is still Groups.
+Dragging while showing the room therefore drew a selection band
+instead of panning, which is what "you cannot pan in Up Next" was.
+
+It asks about the overlays now as well. The same distinction the
+cursor needed: a crosshair in Groups and Seats, a hand everywhere
+else, because a crosshair promises a selection that four of the six
+states do not offer.
+
+### A leftover is not a decision
+
+`layoutRail` returns early when the rail is off screen, which was
+right -- it must not decide the furl state from a zero width. But it
+also returned before clearing the horizontal nudge it had written
+earlier, so Up Next, which hides the rail, left the strip sitting
+wherever the last furled rail had been pushed to.
+
+Nothing is decided while it is hidden; the leftover is cleared.
+Measured: the Up Next strip is now 0px off the paper's centre.
