@@ -9949,3 +9949,68 @@ documents for the unlabelled hamburger. Every other label in this
 window is a domain word -- Groups, Seats, Printing, Up Next -- and
 the honest label for this island is the room's own name, which is
 what Figma does with the file name in the same corner.
+
+## Two rooms are two documents (2026-10-10)
+
+### The anchor was the wrong child
+
+The bottom stack held the rail and the strip in a flex column, and
+`layoutRail` nudged the stack sideways using the **rail's** width --
+but the column was sized by its widest child, which is the strip. So
+the box being moved was 279px wide while the number moving it was
+104, and selecting anything threw the rail 88px off centre.
+
+The rail is the anchor, so the stack is sized by the rail alone and
+the strip hangs off it: `position: absolute; bottom: calc(100% + 8px)`
+inside a box that *is* the rail. The gap still tracks the rail's
+height through furling, unfurling and its list opening, with nothing
+measured -- `100%` of the stack is the rail, by construction.
+
+Measured after: stack 104, rail 104, rail 1px off the paper's centre,
+strip centred on the rail, gap 8.
+
+### A quasimode that outlived its mode
+
+`enterMode` cleared `numbering` and not `walking`, so leaving Printing
+mid-route left the pen armed: every press on the paper in People mode
+went on drawing a line for a job nobody was doing. Both are cleared
+now, and `walkPointer` refuses outside Printing as well -- two
+guards, because the one that depends on a cleanup running is the one
+that fails when a new way out of the mode is added.
+
+An open drawer also outranks the pen now. A menu is in front of the
+canvas and has to behave like it: the first press outside it puts it
+away and does nothing else.
+
+### Two rooms are two documents
+
+`print_by` moved onto the section. One class may want a pile handed
+to each table while the next is handed out one at a time on a walk
+round -- that is a fact about how a lesson runs, and the two lessons
+are different rooms. A single setting across the window could not say
+it. Checked, tested, and mutation-checked.
+
+Saving went the same way. `sectionDirty(i)` compares one section
+against the copy on disk; the floppy's dot is filled when the room
+you are looking at has changed and hollow when the change is in the
+other one. "Save 820" builds a room from the saved copy with that one
+section swapped in, so the other rooms keep whatever is on disk --
+and anything still unsaved stays edited in the window rather than
+being thrown away by a save that was not about it.
+
+Verified end to end: edited both rooms, saved 820 only, and found
+830's edit still in the window with the original still on disk.
+
+### A floppy, and a menu
+
+"Save" and "Discard" as words were 111px of an island already running
+63px under its neighbour. One floppy with a dot, and the choices in a
+short list: Save this room, Save all, Discard this room, Discard all
+when there is more than one to discard. Two rooms is two of
+everything in a row; six would be twelve.
+
+The ordering choice went into the drawer, first, because it decides
+what the rest of the list means -- the two numbering actions below it
+read "groups" or "seats" according to it. The top-left island was the
+right *category* for it, a property of the document, and the wrong
+size.
