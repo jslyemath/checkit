@@ -9621,3 +9621,85 @@ By-seat numbering (the running number across the room, and editing
 it), and the whole of versions: the count, the reshuffle, the
 graph-colouring button, and dragging a version from one seat to
 another.
+
+## Spreading the versions, and running out of edges (2026-10-09)
+
+### The colouring runs on the server, on purpose
+
+"Spread out" posts to `/api/seating/versions`, which calls
+`room.assign_versions` -- the same function the CLI uses, with the
+same graph colouring and the same heuristics about who can see whom.
+
+Reimplementing it in JavaScript would have been less code than the
+endpoint. It would also have been exactly the drift the GUI rule
+exists to stop: the browser's answer and the printed answer agree
+until one of them is improved, and then they disagree silently for a
+term. A button calls the function the command does.
+
+Nothing is written. The room comes back changed and the canvas holds
+it as an unsaved edit, so an instructor who dislikes the shuffle
+presses Discard and nothing happened. Verified: scrambled every table
+to AAAA, pressed it, every table came back with four distinct letters,
+and Discard restored the original letters exactly.
+
+**Two servers were bound to the same port.** The new endpoint came
+back "no such endpoint" from a server that predated it. Windows will
+let a second process bind 127.0.0.1:8765 without complaint, so
+`taskkill` on the one in the way and starting another left two
+listeners and a coin toss over which answered. The lesson written down
+three times already -- Python does not reload a live module -- has a
+corollary: check that the old one actually died, because the symptom
+of not checking is identical to the symptom of not restarting.
+
+### Two scales of print position
+
+`spot` is a seat's place inside its own group; `order` is its place
+across the whole room. Which is in force depends on how the
+instructor chose to order the printing, and a room may carry both.
+
+`roomRun` seeds the by-seat sequence from the by-group plan -- group
+by group, and within each group by its own run -- so switching
+between the two plans starts from the answer you already had rather
+than from nothing. Both default to derived order and store nothing
+until a seat is actually moved.
+
+### Still unsolved: where the rest of Printing lives
+
+The instructor is right that the plan strip is wrong. The strip is an
+infobox about what was clicked, and "by group or by seat" is a
+setting, and "click them in order" is a tool, and "draw your walking
+path" is another tool. Three kinds of thing, none of which is an
+infobox, and no surface left to put them on.
+
+What the literature actually says, in the order it recommends:
+
+1. **Put the control on the object.** Direct manipulation beats
+   chrome. Already done for the numbers -- the number is the control.
+2. **Progressive disclosure** (Nielsen Norman Group): show the two or
+   three common controls, put the rest one level down behind a single
+   affordance.
+3. **Tool groups** (Illustrator's long-press flyouts): a tool that has
+   variants holds them, and the palette does not grow.
+4. **Context menus**: the oldest unused real estate in the interface,
+   contextual by definition, costing zero pixels.
+5. **A command palette** (VS Code, Figma, Linear): the documented
+   modern answer to "one-shot commands with nowhere to live".
+
+The mapping that falls out of those, written here because it is the
+plan and not yet the code:
+
+* **By group / by seat** is a property of the section's print plan.
+  Properties of the document belong with the document, which in this
+  window is the top-left island -- "which room am I in, and is it
+  saved". Not with the view, and not in an infobox.
+* **Click in order** and **draw a path** are tools: they change what a
+  click or a drag on the canvas means. They belong to Printing the way
+  a flyout belongs to a tool, and this codebase already has the
+  mechanism -- the furled rail expands a mode into a list on hover.
+* **Spread out**, **shuffle**, **set the count** are one-shot
+  commands. A canvas context menu is free and contextual; a command
+  palette is free and searchable. Neither takes a pixel of the edge.
+
+The through-line: **when the edges are full, the answer is not another
+edge.** It is depth on the surfaces already there, and the canvas
+itself.
