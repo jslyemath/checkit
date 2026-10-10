@@ -10209,3 +10209,79 @@ Typing a letter into a version circle took anything. A seat lettered
 build and the build has no paper by that name. Refused now, with the
 letters that are in play named in the message and a pointer at the
 command that would add more.
+
+## The band, the space bar, and people seen to move (2026-10-10)
+
+### Neither shift nor ctrl: it is the space bar
+
+The question was which of shift-drag or ctrl-drag is the commoner way
+to pan. Neither. Figma, Illustrator, Excalidraw and Miro all use
+**space held plus drag**, with the middle mouse button as the
+alternate, and they reserve shift for "add to the selection" and
+ctrl/cmd for "duplicate". Binding pan to either would have been
+saying something those applications already use that key to say --
+and shift in particular is wanted here for exactly its usual job,
+adding to a band.
+
+So: a plain drag draws a band, space or the middle button pans, and
+shift-drag adds to what is already caught. The cursor says which --
+crosshair normally, a grabbing hand while space is down.
+
+On touch, **two fingers pan and spreading them zooms**, which is the
+same division: one finger does the tool, two move the view. Both at
+once in one handler, because a pinch that did not also pan would
+zoom about the wrong point and feel like the picture running away.
+`touch-action: none` on the paper, or the browser takes the gesture
+first.
+
+### Touched, not enclosed
+
+A band catches anything it overlaps rather than anything it fully
+contains. Enclosure sounds tidier and is unusable at a zoom where one
+table is bigger than the window: there is no rectangle you can draw
+that contains it.
+
+**The mode decides what is caught** -- groups in Groups, seats in
+Seats, never a mix. A band across two tables has no honest answer to
+"did you mean six seats or two groups", and the mode has already
+answered it. People mode has no band at all: moving one person is the
+whole of that mode's vocabulary, and a rectangle round four of them
+would have nothing to offer afterwards.
+
+`removeBanded` does the removal itself rather than calling
+`removeShape` or `removeChair` in a loop. Those each render and each
+toast, so four groups would have redrawn the room eight times and
+said "2 people are back on the unseated list" four times over.
+
+### A reach of ninety was the whole card
+
+Dropping a name used `REACH = 90` room units measured from a seat's
+*centre* -- most of a card's own width, so a card nudged a few pixels
+was claimed by the chair at the next desk.
+
+Two things were wrong. The distance was far too large, and it was
+measured to a point when the thing being aimed at is a rectangle: a
+position just past a card's short edge is nearer that card's centre
+than a position well inside its long edge is to its own. Measured
+against the box now, with 14 units of slack all round.
+
+Verified: the centre of a card hits it, eight units past its edge
+still hits it, forty units past hits nothing at all.
+
+### FLIP, by person
+
+A swap used to be instantaneous -- two names in new places with
+nothing in between, which is a puzzle rather than a move. The cards
+slide now, by First, Last, Invert, Play: record where everybody is,
+make the change, put each card back where it was with a transform,
+then take the transform off and let the transition carry it.
+
+**Tracked by student, not by seat.** The render rebuilds the cards,
+and what the eye is following is a person changing chairs; tracking
+seats would animate the chairs, which do not move. One wrapper,
+`moveAndShow`, so a move made by a click and a move made by a drag
+are seen to happen the same way -- the same reason `movePerson`
+itself is one function.
+
+The forced read between the two writes is load-bearing: without it
+the browser coalesces them into no change at all and nothing moves.
