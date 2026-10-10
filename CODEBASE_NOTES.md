@@ -9775,3 +9775,77 @@ The print number was 17px at font 11 and the version circle 20px at
 font 12, sitting in opposite corners of the same card. They are the
 two things a seat says in Printing and one of them looked like a
 footnote. Both 20 at 12.
+
+## Not a menu either: the corner button holds the actions (2026-10-09)
+
+### Three objections, all of them right
+
+I proposed a canvas right-click menu for Printing's commands. The
+instructor's reply: it hides its options, it is less accessible, and
+it has no clear equivalent on a touch screen.
+
+All three stand, and the third is sharpest in *this* window. The
+touch stand-in for right-click is a long press, and `holdBadge` --
+written the same day -- makes press-and-move a drag. They would have
+fought each other on the same pixels.
+
+### What it should have been, and already was
+
+The answer was built two weeks ago for the furniture: **the
+bottom-right button that unrolls a column**. That is Material's
+*speed dial*, and it answers each objection in turn.
+
+* Not hidden: the button is always on screen and the items are
+  labelled words, not glyphs.
+* Accessible: real buttons in DOM order, reachable by Tab, with
+  `aria-expanded` on the trigger and Escape to close.
+* Touch: a floating action button is a touch pattern to begin with,
+  and a tap is a tap.
+
+So Printing's corner button is a **wand** that unrolls *Number groups
+by clicking · Spread the versions · How many versions…*. The glyph
+changes by mode -- a plus where the action is adding something, a
+wand where it is asking the room to work something out -- and the
+position is the constant: the one thing this mode can do that is not
+about a selection.
+
+Labelled, not silhouettes. The furniture can be a picture because a
+rectangle is what you are asking for; "spread the versions out" has
+no picture, and a column of mystery glyphs is the hidden menu this
+was meant not to be.
+
+### Where the setting went
+
+"By group / By seat" moved to the **top-left island**, beside the
+section switcher. It decides what comes out of the printer and it is
+still true tomorrow when nobody is looking at Printing -- a property
+of the document, and that island is where the document's identity
+lives. It had been in the strip, which is an infobox about whatever
+was clicked, and a setting is not that.
+
+With the setting and the commands both gone, the strip in Printing is
+empty when nothing is selected, exactly like every other mode. The
+plan strip was a surface invented for things that had nowhere else to
+go, and once they had somewhere it stopped existing.
+
+### A quasimode that ends by itself
+
+"Number groups by clicking" arms `numbering`. While it is on:
+
+* every card on the canvas invites a click and nothing else responds;
+* the ones already taken step back to 45% and wear their new number;
+* the strip -- the one surface that is about what is happening --
+  counts "3 of 7";
+* Escape, or Cancel, leaves the order exactly as it was.
+
+**Nothing is written until the last one is clicked.** A half-finished
+order is not an order, and leaving the room half-renumbered because
+somebody changed their mind is worse than leaving it alone. Verified:
+armed, clicked two of seven, pressed Escape, order unchanged; armed
+again, clicked all seven in a chosen order, and the print order came
+out in exactly that order.
+
+Escape checks `numbering` before `picked` or `selected`, because the
+quasimode is the most temporary thing on screen and so the most
+likely thing the key was aimed at. `enterMode` clears it, because it
+belongs to Printing and to a moment.
