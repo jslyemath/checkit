@@ -9849,3 +9849,103 @@ Escape checks `numbering` before `picked` or `selected`, because the
 quasimode is the most temporary thing on screen and so the most
 likely thing the key was aimed at. `enterMode` clears it, because it
 belongs to Printing and to a moment.
+
+## Walking the room, and a stack that stacks itself (2026-10-10)
+
+### `hidden` is an HTMLElement property, and an `<svg>` is not one
+
+The drawn route worked first time -- right points, right smoothing,
+right coordinates, groups taken in the right order -- inside an
+element the browser was refusing to display.
+
+`svg.hidden = false` sets a plain JavaScript property on an
+`SVGElement`. `hidden` is reflected on `HTMLElement`; `SVGElement`
+gets `focus` and `tabIndex` from `HTMLOrSVGElement` but not this. So
+the attribute written in the markup stayed exactly where it was, and
+the computed `display` stayed `none`. Everything measured correctly
+because everything *was* correct.
+
+A class now, which an SVG does have.
+
+### The route
+
+`walkPast` takes whatever the line passes within half a card -- a
+route is sketched with a hand, and asking somebody to pass through a
+centre exactly would make drawing worse than clicking.
+
+**Several strokes, not one.** An instructor walking a room lifts the
+pen to skip an aisle, and a line drawn across that gap is a line
+through seats they did not mean. So releasing does not end the walk:
+`Done` in the strip does. That is also why `walking` keeps an `on`
+flag separate from existing at all.
+
+**Smoothed with one pass of quadratic curves** -- each segment's
+control point is the sample, its ends the midpoints between samples.
+Samples closer than 8 room units are dropped first, because a pointer
+reports far more than a curve needs and the extra ones are what put
+kinks in it. 27 curves for a route across seven tables. A pixel-exact
+polyline reads as a rendering artefact; a thick round stroke with
+some body reads as something somebody drew, which is what it is.
+
+### Clicking the same thing twice
+
+Taking a group back out of the order, rather than refusing. One click
+too far used to mean starting the run again, which is the kind of
+thing that makes a feature not worth using. And the desk counts as
+well as its chairs: aiming at a seat to choose a group was always
+odd, and in Printing the seats are carrying numbers and version
+letters that you may be trying to hit instead.
+
+### Let the layout do the layout
+
+The strip sat 8px above the rail when the rail was furled and
+overlapped it by 2px when it was not. `stackBottom` measured the rail
+and wrote the strip's offset -- and an offset computed from a height
+is a **copy** of that height, stale the moment the rail changes by
+any route that does not re-render. The rail changes height three
+ways: furling, unfurling, and opening its list on hover.
+
+The choice offered was "unify the heights or measure". Neither.
+Making the collapsed rail as tall as the expanded one throws away the
+space collapsing bought; measuring is a cache with no invalidation.
+Both the rail and the strip went into one bottom-anchored flex
+column with a gap, and the spacing became a consequence of the
+geometry rather than a copy of it. `stackBottom` is deleted.
+
+Verified at 8px in all four states, including the rail at 152px with
+its list open.
+
+Two things that had to be found by measuring rather than reading:
+`.isle` is `position: absolute`, which took the rail out of flow and
+left the column with nothing to stack; and a `.strip { bottom: 78px }`
+left in a media query became a *relative* offset once the strip
+stopped being absolute, holding it 78px above where the column put
+it.
+
+### A binary costs one button
+
+The top-left island reached 365px with Save and Discard up, running
+63px under the top-right island. "By group" and "By seat" as a
+mutually exclusive pair were 139 of that -- twice the width to say
+one thing.
+
+One button showing the state, which is the pattern this window
+already uses for the display switch ("Seat letters" outside Printing,
+"Version labels" inside it). 365 to 321, and the overlap from -63 to
+-19.
+
+Still overlapping, and the next lever is the section switcher: 83px
+for two sections and unbounded for more. That one wants collapsing to
+the current section with a chevron -- the instructor's own idea,
+applied to the part of the island that actually scales.
+
+**What it does not want is a generic label.** "Settings"
+conventionally means preferences -- app-wide, persistent, rarely
+touched -- and by-group/by-seat is a document property while the
+section switcher is not a setting at all; the word would send
+somebody looking in the wrong place. "Menu" names the widget rather
+than its contents, which is the specific failure Nielsen Norman
+documents for the unlabelled hamburger. Every other label in this
+window is a domain word -- Groups, Seats, Printing, Up Next -- and
+the honest label for this island is the room's own name, which is
+what Figma does with the file name in the same corner.
