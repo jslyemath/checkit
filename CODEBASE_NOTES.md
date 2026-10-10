@@ -10150,3 +10150,62 @@ the display switch does with "Seat letters" and "Version labels".
 One glyph, one colour, bold, above a rule. The rule is what separates
 a state from the commands under it; the weight is what makes it read
 as the heading of the list rather than the first item in it.
+
+## A menu placed before its button existed (2026-10-10)
+
+### Up and to the left is where zero is
+
+The save menu opened at the top left corner of the app. It is
+positioned from the floppy's rect -- and `drawSaveMenu` runs a few
+lines *before* `#seat-saving` is unhidden in the same render, so on
+the render where the room first became dirty the button was still
+`display: none` and its rect was all zeros. `0 - app.left` is
+negative, and negative is up and to the left.
+
+Placed in `showOpen` now, which runs at the end of the render when
+everything that is going to be visible is. Measured: 8px below the
+button, left edges flush.
+
+Third time a measurement has been taken of something that was not
+there yet or not there any more. The pattern is specific enough to
+state: **measure in the same pass that shows the thing, never in the
+pass that decides to.**
+
+### A menu is in front of what it covers
+
+The furniture drawer was being drawn *under* the selection strip.
+Both were `z-index: 5` -- the drawer from `.isle`, the strip from the
+bottom stack -- and the stack is later in the markup, so it won.
+Being in front is what makes a menu a menu; the drawer is 8 now.
+
+### Two glyphs that belonged to something else
+
+"Set version count" wore the card-with-an-A, which is the **seat
+letter** glyph from the other modes -- the one letter on a seat this
+menu has nothing to do with. "Number groups by clicking" wore the
+printer, which is Printing's own glyph in the rail: a mode's picture
+standing in for one action inside it says the two are the same thing.
+
+A pointer for the one you click and a row of three circles for how
+many versions there are. Both new, neither borrowed.
+
+### Verbs
+
+"Number groups by clicking", "Draw a path past the groups", "Spread
+the versions", "How many versions…" became "Click in order", "Draw
+the route", "Shuffle versions", "Set version count…". Four imperative
+verb phrases of two or three words, where there had been two
+sentences, a noun phrase and a verb nobody outside this repository
+would reach for. The *why* that the long names were carrying is in
+the tooltips, where a sentence is allowed to be a sentence.
+
+The ordering row above them says "By group" or "By seat", so the two
+numbering verbs no longer have to repeat it.
+
+### A version has to be one the room prints
+
+Typing a letter into a version circle took anything. A seat lettered
+"Q" in a room of A to D prints nothing -- `seats_of` hands "Q" to the
+build and the build has no paper by that name. Refused now, with the
+letters that are in play named in the message and a pointer at the
+command that would add more.
