@@ -10332,3 +10332,34 @@ wherever the last furled rail had been pushed to.
 
 Nothing is decided while it is hidden; the leftover is cleared.
 Measured: the Up Next strip is now 0px off the paper's centre.
+
+## A canvas is not a document (2026-10-10)
+
+Panning the room, or drawing a selection band across it, left half
+the class highlighted in blue.
+
+Every name on the canvas is text, and a drag across text is a drag
+across text as far as the browser is concerned. The gesture meant one
+thing to this window and another to the document underneath it, and
+**the document had the older claim** -- native text selection is
+older than every handler here and does not ask.
+
+`user-select: none` on `.seatapp`, switched back to `text` on inputs,
+textareas and anything contenteditable. That second rule is not
+optional tidiness: the property inherits, so setting it on an
+ancestor reaches into a field and stops you selecting what you are
+typing, which is the one place on a canvas where selecting text is
+exactly the point. Verified both ways -- a drag across the room
+selects nothing, and the label editor and the badge editor both
+compute `user-select: text` and can still select their own contents.
+
+`preventDefault` on the pan and band pointerdowns as well. The CSS
+stops the highlight; refusing the default stops the gesture starting
+at all, including the autoscroll some browsers run with it.
+
+This is the same shape as the walk layer's `touch-action: none` and
+as ruling out a long press for menus: **the browser has a default
+meaning for every gesture, and a canvas has to take each one away
+deliberately.** Worth checking the rest -- a middle-click drag can
+still start autoscroll on some platforms, and a two-finger swipe can
+still be a back-navigation.
