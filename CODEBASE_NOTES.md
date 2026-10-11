@@ -11298,3 +11298,65 @@ origin is (-512, -330).
 the origin and is no longer a fence. What makes a runaway drag
 recoverable is not a wall but Fit, which frames whatever is actually
 there.
+
+## A rule written on the wrong element (2026-10-11)
+
+### The shape picker took the drawer with it
+
+Making the furniture two columns wide meant writing `width: 104px`
+and a grid onto `.palette` -- which is not the furniture, it is the
+**drawer**, and the labelled action lists open in the same one. So
+People's menu became a 104px two-column grid as well and its rows
+were cut in half. `.named` already distinguished them; the grid is
+on `.palette:not(.named)` now.
+
+Worth naming the shape of it, because it is not a CSS mistake so
+much as a modelling one: a selector is a claim about which things
+share a behaviour. `.palette` claimed "every drawer", and the change
+was only ever true of one of them.
+
+### Two sets of handles, found at last
+
+Nine label anchors, drawn whenever a group was selected, sitting on
+exactly the nine points the eight resize handles occupy. Two sets of
+white dots on one desk, which is what that looked like because that
+is what it was.
+
+They are feedback for one gesture, so they belong to it: they appear
+while a label is actually being dragged, and the resize handles
+stand down for its duration. Neither is ever on the desk at the same
+time as the other now.
+
+### A chosen group gets the halo
+
+The same soft fade a chosen seat wears, in the group's own colour,
+tapering out across the gap between the desk and its ring.
+
+`filter: drop-shadow` rather than `box-shadow`: half the shapes are
+an SVG path inside a transparent box, and a box-shadow would draw a
+rectangle round a hexagon where a drop-shadow follows whatever was
+actually painted. Two passes, tight and wide, which is what makes it
+taper rather than stop.
+
+### Zoom holds the point under the pointer
+
+The wheel zoomed about the middle of the window, which is right for
+the buttons and wrong for a wheel -- what you are pointing at is
+what you want to get closer to. The room point under the cursor is
+measured before the change and put back under it afterwards by
+solving for `pan`, which is the only unknown in where the box lands.
+
+### The desk cannot get narrower
+
+Asked twice to bring a one-seat desk in horizontally, and **112 is
+the floor**: a name card is 104 wide and sits *on* the desk rather
+than inside it, so anything narrower hangs the card over both edges.
+The squaring is done by growing the other way instead -- 112 by 96
+reads as 7:6 where the first draft's 124 by 78 read as 8:5.
+
+### And the "1" in the triangle
+
+Centred was too high, flush at 5 was too low, 12 was too high again.
+Eight. Recorded only because three rounds of a one-number change is
+a sign the number should have been bracketed from both ends the
+first time something was wrong with it.
