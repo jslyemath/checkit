@@ -11232,3 +11232,69 @@ order backwards against the order the groups are listed in -- the
 only arrangement where picking by list position and picking by print
 order give different answers, and the mutation that deleted the sort
 passed until it did.
+
+## One selection at a time (2026-10-11)
+
+### Which colour means what, settled
+
+I had the rule inside out. **One thing chosen wears its own colour**
+-- a group's ring is that group's, which is what tells you which
+group you have hold of. **Several things wear grey**, because a band
+crosses groups and there is no one colour that could be theirs. The
+accent belongs to the chrome and may not appear on the canvas at
+all, which is the part that had been said before.
+
+Grey everything, which is what the last round did, loses the one
+piece of information a single selection carries.
+
+### A desk was showing two selections of itself
+
+The band's ring had its own inset, radius, weight and colour, and
+the single ring had the ones settled a day earlier -- so a desk that
+was both caught by a band and still `selected` drew two rings of
+different sizes around itself, with handles, which is the "duplicate
+set of handles" and the "very different dimensions" in one.
+
+Both come off one set of custom properties now, and more to the
+point: **a band of more than one is the only selection there is.**
+`isSelected` answers no while a band is up, which takes out the
+ring, the handles and the single-selection styling at their four
+draw sites at once. Clearing `selected` at each place that makes a
+band would have been four chances to miss one, and had already
+missed two.
+
+### A button fires on keyup
+
+Click something in an island, hold space to pan, let go -- and the
+button fired. Space activates a focused button on the **keyup**, not
+the keydown, so the pan ended by pressing whatever had been clicked
+last. With the projector button that meant ending a pan in
+presentation mode.
+
+Preventing the default on keydown is meant to suppress it and is not
+dependable once the key has been held across other events, so the
+focus is simply taken off the control when the pan key is claimed --
+nothing on the canvas wants focus -- and the keyup is defaulted-
+prevented as well.
+
+(The original report of panning being dead in the built-in browser
+turned out to be the desktop app swallowing part of the input, not
+the page. The focus bug fixed the day before was real and separate.)
+
+### The canvas has no edges
+
+Growing the right and bottom edges fixed half of it. The other half
+was the origin: everything was floored at (0, 0), so a room could
+not be extended up or to the left.
+
+**Coordinates may be negative now.** Nothing in the model minds -- a
+position is two numbers and `room.check` has never asked for a sign
+-- and nothing in the view minds, because fitting and centring
+measure the content's own box and subtract its corner. Checked: a
+desk at (-360, -220) draws, and Fit frames a content box whose
+origin is (-512, -330).
+
+`section.canvas` stays as a record of how far the room reaches from
+the origin and is no longer a fence. What makes a runaway drag
+recoverable is not a wall but Fit, which frames whatever is actually
+there.
