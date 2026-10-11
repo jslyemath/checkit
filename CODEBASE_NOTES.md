@@ -10836,3 +10836,62 @@ computed value disagreeing with the rule you just wrote means
 something else is winning, and the way to find out is to ask the
 element which rules match it -- which took one call and would have
 saved three rounds of changing a number and re-measuring.
+
+## Four shapes to draw one push pin (2026-10-11)
+
+### Say it in two words
+
+Labels are a verb and its object now, and the rule is written down as
+12.16 because it had been asked for three times. "Seat all",
+"Shuffle room", "Unseat all", "Unpin all", "Add person", and
+"Unseat" on the drop target. Counts moved into the tooltip, which is
+a fragment rather than a sentence.
+
+Two things fell out of writing it down. A label that reads "Unpin
+the one pinned seat" at one and "Unpin all 3 seats" at three is two
+labels, and the row appears to change identity as the room does --
+so counts cannot be in a label even when the grammar is handled.
+And "Clear every chair" was a third way of saying what the rail and
+the drop target both call unseating; once there is a house word it
+wins.
+
+### The pin took four attempts, and each failure was a different one
+
+1. **A map pin.** Wrong object: a teardrop means "a place on a map".
+2. **A thin bar, a barrel and a stub.** Right object, wrong
+   proportions -- read as an arrow or a trowel, because the head was
+   the lightest part of the glyph instead of the heaviest.
+3. **A circle for the head.** A lollipop. A disc is as long as it is
+   wide and a tack's cap is not: it is a flat thing seen nearly edge
+   on. Tried twice, once with a bigger body, and it was a lollipop
+   both times.
+4. **Four quads on one axis** -- cap, waist, body, needle -- with the
+   cap wider than the body is at its widest. The waist is what the
+   first attempts were missing: without it the cap and the body merge
+   into one diamond.
+
+Judged by rendering the glyph at 120, 44 and 17 pixels side by side
+in the page rather than squinting at it in a menu row. That is worth
+keeping as a habit: an icon has to survive the smallest size it is
+used at, and the only way to see all of them at once is to draw all
+of them at once.
+
+### Pips that were not there
+
+The five-pip die came out with one pip. Everything in this icon set
+is drawn with `stroke` and no `fill`, so a small `O` is a ring rather
+than a dot, and the first fix -- a zero-length path with a round cap,
+which is a dot of exactly the stroke width -- is 1.7 units in a 24
+box rendered into 17px, so 1.2 real pixels. Invisible. They are short
+strokes now, and the die face grew to fill more of the box.
+
+A row can also ask for a solid glyph (`solid: true` -> `.solidicon`),
+because the pin is a solid object and an outline of one at 17px is a
+smudge.
+
+### The last of the rail
+
+The drawer stopped a finger's width above the corner button: the
+reserve was a flat 86px, and is now `--edge` plus the button plus
+air, which measures 14. Same family as the 130px bottom band fixed
+yesterday -- a number chosen by eye once and never asked again.
