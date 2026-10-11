@@ -11360,3 +11360,86 @@ Centred was too high, flush at 5 was too low, 12 was too high again.
 Eight. Recorded only because three rounds of a one-number change is
 a sign the number should have been bracketed from both ends the
 first time something was wrong with it.
+
+## Two ratchets in one measurement (2026-10-11)
+
+### The Printing menu grew ten pixels a press
+
+`showOpen` measures a drawer's natural height as `scrollHeight + 10`,
+the ten being its padding -- which `scrollHeight` reports when the
+drawer is **open** and not when it is shut. Every press of the
+by-group/by-seat switch re-measures an already-open menu, so ten
+pixels went on each time until it hit its ceiling.
+
+Adding the padding only when shut fixed that and uncovered a second
+one going the other way: `scrollHeight` is a whole number, so a
+drawer capped at its own rounded-down height measures a pixel
+shorter next time, and the menu shrank a pixel a press.
+
+Both are the same mistake -- measuring a thing while it is wearing
+the constraint derived from the last measurement. The cap comes off,
+the height is read, the cap goes back, all before the frame is
+painted. Steady across six presses now.
+
+### One grey for everything the canvas marks
+
+`--mark`. The accent is the chrome's -- it means "the state you are
+in" on an island, and on the paper it lands beside whatever colours
+the groups happen to be. Five things were using it on the canvas: the
+desk a dragged seat would move to (a green dotted rectangle with its
+own inset and radius, so a fourth kind of selection), the two hover
+marks in the click-in-order quasimode, the badge a version would
+trade with, and the paper itself while a shape is being dragged onto
+it. All grey, and the reparent ring now has the same geometry as
+every other ring so it reads as the same thing asking a question.
+
+### Zoom at the pointer, and what I could not account for
+
+Holding the point under the cursor by solving for `pan` from the same
+arithmetic `placeBox` uses left about an eighth of a pixel a click,
+always the same way. Measuring the result and correcting it is a
+fixed point and lands within a hundredth of a pixel in one pass,
+which is verified: a single click now holds the point to 0.008 room
+units where the closed form left 0.14.
+
+**Honest note.** A nine-click synthetic run still reports one to two
+and a half pixels of total offset, and reports *identical numbers*
+before and after the fix -- which means that harness is measuring
+something structural rather than accumulation, since the per-click
+residual is a hundredth of a pixel and the round trip returns to
+exactly zero. I did not find what. The clamp never fires, `roomPoint`
+is deterministic across renders, and the canvas scales from its top
+left as assumed.
+
+### The strip says what the plan makes true
+
+Ordering by seat, a group has no place in the stack -- the stack
+crosses tables and a group's position in it is not a number that
+exists -- so that control is gone from the group strip in that mode,
+and a seat gains one, because by seat a single seat is exactly what
+has a place.
+
+The letter and the version are regular weight now; two bold
+characters side by side shouted and said nothing about which was
+which, and the chair and printer beside them already do. The version
+is typable and validated against the room's own list, because a
+letter nothing prints is worse than no change.
+
+**The seat letter is not editable, and should not be.** It is
+derived clockwise from where the seat sits, which is the whole
+reason "re-letter when a seat moves" needs no bookkeeping. Making it
+typable would mean storing an override and giving the room two
+answers to the same question.
+
+### A presentation attribute loses to an inherited style
+
+The merge and split glyphs needed a filled arrowhead inside an
+otherwise stroked icon, so the little path DSL grew an `F` prefix.
+Setting `fill="currentColor"` as an attribute drew nothing: every
+rule that paints these icons sets `fill: none` on the `svg`, and an
+inherited *style* beats a presentation *attribute* on a child. An
+inline style on the child wins.
+
+And the path data after the prefix still has to start with a move:
+`F2.6 8.4 L...` is not a path, it is a syntax error that draws
+nothing and reports nothing.
