@@ -2110,3 +2110,36 @@ contextual surface with different contents, which is what 12.13
 asked for. The wand rather than a plus, because the rule is that a
 wand means "asking the room to work something out", and that is what
 a shuffle is.
+
+### 12.16 Say it in two words (2026-10-11)
+
+**A control is labelled with a verb and its object, and nothing
+else.** "Seat all". "Unseat all". "Shuffle room". "Unpin all". Not
+"Seat all 6 standing", not "Clear every chair", and never a sentence.
+
+Written down because it has now been asked for three times, each time
+after a round of new controls arrived carrying explanations in their
+labels. The pull is understandable -- a label is the only place the
+writer is sure the reader will look -- and it is wrong, because a
+menu of five rows is read as a shape before it is read as words, and
+five sentences have no shape.
+
+The rules that follow from it:
+
+* **No counts in a label.** "Seat all", not "Seat all 6 standing".
+  The count belongs in the tooltip, where it answers "all of how
+  many?" for somebody who wondered.
+* **No grammatical variation on a count.** A label that is "Unpin the
+  one pinned seat" at one and "Unpin all 3 seats" at three is two
+  labels, and the row appears to change identity as the room does.
+* **A tooltip is a fragment, not a sentence.** "3 pinned stay put".
+  It is a footnote to the label, so it says the thing the label left
+  out and stops.
+* **The house word wins over the plain one, once there is a house
+  word.** The rail "unseats"; so does the menu, and so does the drop
+  target. "Clear every chair" was a third way of saying it.
+* **A caption on a drop target is one word** -- "Unseat" -- because it
+  is read in the half second while something is held over it.
+
+The test: read the menu as a column with the icons covered. If any
+row takes longer than a glance, it is too long.
