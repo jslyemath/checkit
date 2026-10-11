@@ -10752,3 +10752,87 @@ island's `display: flex` and the drawer's `flex-direction: column`:
 four swatches in one tall column, each squashed to 21px. Specificity
 was equal and the cascade decided on position. Moved down beside the
 hue swatches, which had worked all along for exactly that reason.
+
+## The rail joins the design (2026-10-11)
+
+### Seat everyone, clear everyone
+
+Two more rows in People's menu, with the shuffle's exemption: a pin
+is the one arrangement in the room that is about a person rather than
+a layout, so neither command touches one. **A pin on an empty chair
+means "keep this one free"**, which is a real thing to want beside a
+door or a projector, so filling skips it too.
+
+Seating fills in **stack order** -- the order the papers print, and
+therefore the order somebody walking the room would meet people.
+Filling in the order the room was built would scatter an alphabetical
+list across the tables. Nobody is ever evicted to make room: anybody
+who does not fit stays standing and the note says how many.
+
+Both are server-side, like the shuffle and for the same reason, and
+share one endpoint because they are one request with the sign
+flipped. **The canvas says who is standing**: the rail is filtered by
+section when the roster's section names match the room's and shown
+whole when they do not, and a second copy of that judgement living in
+the handler would answer differently the first time a section was
+renamed. `standingIn` is now the one definition, asked by the rail
+and by the menu.
+
+### The dead band was a guessed constant
+
+`freeBand` reserved 62 at the top and **130 at the bottom** for "the
+rail, and the strip". In a mode with nothing selected there is no
+strip, so eighty pixels of the band were held for something that is
+not on screen: the room fitted into what was left, sat in the middle
+of it, and left a hand's width of empty canvas above the islands. It
+measures the chrome now -- one layout read per fit, and a drawer, a
+strip or a rail that comes and goes is already in the DOM when it is
+called. Measured: 80px of dead band became 12.
+
+### The rail was the last thing not wearing the design
+
+It was the first piece built and never rejoined: a transparent box
+whose only edge was the drop shadow under its cards, so a column of
+names appeared to float loose on the canvas beside the one piece of
+unstyled browser furniture left in the app, a default scrollbar. It
+is an island now -- the tool surface, the island's edge, a thin
+scrollbar in the island's own greys -- and its height is its
+contents, up to what the window allows, rather than pinned between
+two guessed numbers that left it ending in mid-air.
+
+The drop zone claimed fourteen pixels to the rail's left as well, on
+top of a rail of full-size cards, so the right-hand quarter of the
+canvas meant "stand them up" and a group near that edge could not be
+rearranged without somebody being evicted. The slack is gone and the
+rail is narrow, which leaves the sliver that was wanted.
+
+### Why a rail card was three times the size of a seated one
+
+Chased through four wrong explanations, which is worth writing down.
+
+`fillCard` sizes a name by measuring it, and `nameSize` measured
+against `CARD_W` -- a *chair*, 104 wide. The rail draws the same card
+narrower, so every name in it came out at the room's type size while
+the room itself was drawn at 31% zoom. It takes the width it is
+filling now, cached per width as well as per name.
+
+That alone was not enough: `nameSize` only answers "how wide", so a
+one-letter first name takes the largest size that fits across, which
+in a card 54 tall is right and in the rail's is a letter taller than
+the card. `fillCard` takes a cap.
+
+And none of it appeared to work, because **a media query had been
+overriding all of it**. `@media (max-width: 760px)` carried its own
+rail card -- 86 wide, 46 tall, and `font-size: 18px !important` on
+both lines -- and the preview pane is narrower than 760. So the
+default being edited was never the rule in force, and the numbers
+coming back were the override's. The `!important` existed to beat
+`fillCard`'s inline size, which is exactly what the cap now does
+honestly, so the whole block is gone except the one thing narrow
+genuinely needs.
+
+**The lesson is not "check for `!important`".** It is that a
+computed value disagreeing with the rule you just wrote means
+something else is winning, and the way to find out is to ask the
+element which rules match it -- which took one call and would have
+saved three rounds of changing a number and re-measuring.
