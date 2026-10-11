@@ -1779,8 +1779,13 @@ In the order they would matter:
    clicking one and then the other, which is the gesture it would have
    duplicated. Stages 4 and 5 were already built: the palette and seat
    dragging, and the print-order mode is Printing.
-4. **The paper color choice** (12.12's stage C) was specified and never
-   wired up. The last thing on this list.
+4. ~~The paper color choice.~~ **Done 2026-10-10**, as
+   `section.canvas.background` -- four named light values in the
+   top-right island. Not called paper: in this tool that word is the
+   sheet in the printer. See the notes of the same day.
+
+Nothing on this list is open. What is left is whatever the next round
+of use turns up.
 
 A first because everything after it needs somewhere to live, C before D
 because the colors have to be designed against the paper they sit on,

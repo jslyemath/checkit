@@ -10663,3 +10663,92 @@ section must not be dragged behind a numbered one" put the reordered
 section *first*, where the bug is invisible. Noted again here because
 it is the second time this session that a test was written in the one
 arrangement that cannot distinguish the fix.
+
+## Shown is not edited, and a plus is not a menu (2026-10-10)
+
+### Projector mode was never actually locked
+
+`setProjecting` says in its own comment that projecting means "show
+the room and nothing else, and do not let me move anything by
+accident". The second half was not implemented. The CSS hid the
+chrome -- islands, the rail, the corner button -- so it *looked*
+locked, and the canvas underneath was fully live: desks dragged,
+names moved, pins on show, all while the room was on the wall.
+
+The cause is the usual one. Each site asked `upnext`, one at a time,
+and projector mode was simply missing from four of them. `showing()`
+is now the one predicate for "being shown rather than worked on", and
+it covers both overlays. Checked by surveying the live DOM in each
+combination: editing People has 24 draggable cards, 25 pins, 7
+draggable desks and 7 draggable labels; projecting over People, and
+Up Next over People, and both over Groups, have zero of each.
+
+**Group labels were never gated at all**, in either overlay. A
+group's name could be pushed around the wall during Up Next. Found
+only because the survey counted them.
+
+### A rail you could not drop into
+
+`drawPen`'s comment claimed the unseated rail "comes back mid-drag as
+a drop target". Nothing did that. The rail hides when everybody is
+seated -- right, an empty rail is a box around nothing -- but
+`dropTarget` refuses a hidden one, so standing somebody up was
+impossible in exactly the room where it is most likely to be wanted:
+a full one. There was no other route; `movePerson(who, seat, null)`
+is reachable only from a drop on the rail.
+
+It now appears for the length of the drag, dashed and captioned.
+Verified with a real pointer against a room with all 25 seated.
+
+### The corner button: two controls, one corner
+
+The wand had been bothering the instructor and they were right.
+Material's guidance is plain: a floating action button carries the
+*one* primary action of a screen, and overflow -- the secondary, the
+occasional, the settings -- belongs in a menu, not in that button.
+
+Groups and Seats have a primary action, which is adding a thing. So
+there the corner stays a proper floating button: accent-filled, a
+plus, turning to a cross when open. People and Printing have no
+single primary action, only a short list, so there it is now an
+overflow control -- the three dots every toolbar uses, drawn quiet,
+island-coloured with the island's own edge, lighting rather than
+spinning when open.
+
+The wand was neither of those things. "Magic" is a mood, not a kind
+of control, and it gave a menu the prominence a plus gives a command.
+The icon is deleted rather than left lying about.
+
+There was already a tell: a rule reading `.plusbtn:has(svg).on` that
+turned the background down when the *wand* was open, because a wand
+does not read as a cross when it is turned. The stylesheet had half
+worked out that these were two different controls.
+
+### The background, which is not paper
+
+12.12 called it "paper", and in a print tool that word is taken: a
+`paper` field beside `seat.version` reads as the same question. It is
+`section.canvas.background`, one of four named values, and the chooser
+says Background.
+
+Named rather than a free color because the group colors are designed
+against this surface. All four are light and differ in lightness and
+warmth -- white for a dim projector, warm for one that runs blue, cool
+for one that runs yellow, grey as the default. A dark option would
+need a second set of card colors, which is a bigger decision; the test
+that pins the set to those four is there to fail and be thought about
+rather than edited.
+
+It lives in the top-right island with the display switches, next to
+the projector button, which is the reason anybody changes it. Grey
+writes no key at all, so a room nobody has re-tinted stores nothing
+and goes back to clean.
+
+**And a CSS ordering trap.** `.bgs`, `.isle` and `.drop` are each one
+class deep, so the last one declared wins. The chooser's rules were
+written up beside the `--paper` definitions near the top of the file,
+which put them *before* `.isle`, so `display: grid` lost to the
+island's `display: flex` and the drawer's `flex-direction: column`:
+four swatches in one tall column, each squashed to 21px. Specificity
+was equal and the cascade decided on position. Moved down beside the
+hue swatches, which had worked all along for exactly that reason.
