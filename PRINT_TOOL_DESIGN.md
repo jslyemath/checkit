@@ -1766,23 +1766,18 @@ the hue and the chroma of whatever comes back.
 
 In the order they would matter:
 
-1. **By-seat ordering does not reach the paper.** `section.print_by` is
-   read by the canvas and ignored by `seating.to_toml`. The chart's unit
-   is `[[group]]` and a seat's place is its index inside one, so a stack
-   that interleaves groups has nowhere to live. Flattening the room into
-   a single `[[group]]` would encode the order and destroy the meaning,
-   because that field is what `Chart.collisions` uses to decide who can
-   see whom. **This needs a format decision**: either an explicit order
-   key in the chart, or accepting that by-seat only reorders within
-   groups. Everything else in Printing does reach the paper -- verified
-   against the written text, not the helper.
+1. ~~By-seat ordering does not reach the paper.~~ **Done 2026-10-10**,
+   with a format decision rather than a patch -- see 12.14 below and the
+   notes of the same day. Everything in Printing now reaches the paper,
+   verified against the written text and against the real room.
 2. **The colour swatches are the last unconverted disclosure.** See
    12.13: created on demand, no motion, dismissed only by a press
    outside. They should be a `.drop` like the drawer and the save menu.
 3. **The paper colour choice** (12.12's stage C) was specified and never
    wired up.
-4. **12.11's stages 4-6** -- randomise, swap two -- have still not landed
-   in the shell.
+4. **12.11's stage 6** -- randomise the room, swap two students -- has
+   still not landed in the shell. Stages 4 and 5 have: the palette and
+   seat dragging are built, and the print-order mode is Printing.
 
 A first because everything after it needs somewhere to live, C before D
 because the colours have to be designed against the paper they sit on,
@@ -1997,3 +1992,58 @@ onto `roster.toml`, `seating.toml`, `availability.toml`, `record.db` and the
 job's `publication.toml` respectively -- which is what 12.1 through 12.4
 describe.
 
+### 12.14 What the chart says about order (2026-10-10)
+
+`seating.toml` is a flat sequence of `[[group]]` tables, each holding a
+list of seats, and that list was being asked to mean three things at
+once: the order the papers print, who is sitting next to whom, and
+which chair at the table a seat is. One list can only do one of those
+honestly.
+
+It did not matter until the print order could differ from the seating
+order. Then it contradicted itself in both directions at once: a table
+seated A B A B round its four sides is fine, but printed 1 3 2 4 the
+file reads A A B B, so the check reported two clashes nobody in that
+room can see -- and the real pairs, the ones along the sides, were no
+longer written down anywhere to check.
+
+**The decision.** A `[[group]]` is the *table*. Its seats are listed in
+the order they sit, which is the clockwise sweep from the top left, and
+that order is never touched for printing. The stack is a separate thing
+each seat carries:
+
+```toml
+[[group]]
+seats = [{name = "Ada Lovelace", version = "A", at = 1},
+         {name = "Alan Turing", version = "B", at = 3}]
+
+[[group]]
+seats = [{name = "Grace Hopper", version = "A", at = 2},
+         {name = "Katherine Johnson", version = "B", at = 4}]
+```
+
+Ada still sits with Alan; the stack still alternates tables.
+
+Three properties were wanted and all three hold:
+
+* **An untouched room writes the file it always did.** `at` appears only
+  where the stack is not the order the file already reads in. Handing
+  out table by table with nothing reordered, those are the same list.
+* **Every hand-written chart still loads unchanged.** The sort is
+  skipped entirely when no seat claims a place, so the key is not merely
+  handled but absent from the code path.
+* **`print_by = "seat"` reaches the paper.** It means one walk round the
+  room, which crosses tables, and no ordering of `[[group]]` blocks can
+  express that.
+
+Rejected: flattening every seat into one `[[group]]`. It would encode
+the order and destroy the meaning, since `group` is what `collisions`
+reads, and one group of twenty-five would call every neighbour a clash.
+
+Two rules fall out of it. **The numbering is one sequence for the whole
+file**, because a chart has no sections in it, only a comment saying
+where one begins -- and all-or-nothing, because a seat with no number
+prints last and a bare section ahead of a numbered one would be dragged
+behind it. And **a seat with no `at` among seats that have one prints
+last**, which is the rule an unplaced group and an unspotted seat
+already follow.
