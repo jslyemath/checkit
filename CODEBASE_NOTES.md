@@ -10430,3 +10430,120 @@ back-navigation, and the middle button now reaches `panPaper`, which
 refuses the default and so suppresses autoscroll. Named here because
 "I checked" is worth recording even when the answer is that there was
 nothing to do.
+
+## One list cannot be three lists (2026-10-10)
+
+### What the chart asked a single list to mean
+
+`seating.toml` is a flat sequence of `[[group]]` tables, each with a
+list of seats. That list was doing three jobs at once and could only
+ever do one of them honestly:
+
+1. **the print order** -- the papers come off the printer in the order
+   the file reads in;
+2. **who sits next to whom** -- `collisions()` walks consecutive
+   entries and complains when two in a row share a table and a
+   version;
+3. **which chair** -- nothing recorded this, so it was inferred from
+   (1), which is the same assumption as (2).
+
+Yesterday's within-group `spot` sort made (1) and (2) contradict each
+other for the first time, and the contradiction was silent and wrong
+in both directions, which is the worst of both. A table seated A B A B
+round its four sides satisfies the rule with two versions. Reorder the
+printing to 1 3 2 4 and the file reads A A B B, so the check reported
+two clashes that nobody in that room can see. Meanwhile the real
+adjacency -- the pairs along the sides -- was no longer anywhere in
+the file to check.
+
+**The fix is to stop overloading the list.** A `[[group]]` is now the
+table: its seats are written in the order they sit, and that order is
+never touched for printing. The stack is each seat's own `at`:
+
+```toml
+[[group]]
+seats = [{name = "...", version = "A", at = 1},
+         {name = "...", version = "B", at = 3}]
+```
+
+`at` is written **only when the stack is not the order the file
+already reads in**, so a room handed out table by table with nothing
+reordered produces exactly the file it always did, and every
+hand-written chart is untouched. A seat with no `at`, in a file where
+others have one, prints last -- the rule an unplaced group and an
+unspotted seat already follow.
+
+### By seat now reaches the paper
+
+Which was the gap: `section.print_by` was read by the canvas and
+ignored by the writer. "By seat" means one walk round the room, which
+crosses tables, and no ordering of `[[group]]` blocks can say that.
+With `at` it needs no new block and no flattening -- the thing
+flattening would have destroyed, group membership, is exactly what
+`collisions` needs kept.
+
+`room.stack_order` is the Python twin of `roomRun` on the canvas: the
+by-group stack, then moved by `seat.order` when the plan is by seat,
+so switching plans starts from the order you already had.
+
+### Two things the unit tests could not see
+
+**The numbering restarted in each section.** A chart has no sections
+in it -- only a comment saying where one begins -- so a counter that
+started again at 1 put 830's first seat level with 820's and the two
+classes came off the printer shuffled together. Every test had one
+section. Found by writing the real two-section room.
+
+The rule is now all-or-nothing across the file: one section needing
+numbers means every section gets them, because a seat without one
+prints last and a bare section ahead of a numbered one would be
+dragged behind it. The first test written for that passed with the
+bug still in, because it put the *reordered* section first, where it
+cannot fail. The arrangement that can fail is the reordered section
+second.
+
+**The file disagreed with the canvas about every table.** The canvas
+letters a group clockwise from its top left seat, derived from
+geometry on every redraw. Python had no such thing and fell back on
+the order `group["seats"]` happened to hold -- which for a 2x2 is top
+left, top right, *bottom left*, bottom right, because that is how the
+palette builds it. Eleven of the twelve tables in the real room were
+listed in an order they are not sitting in. So the canvas showed one
+print order and the chart wrote another, and the "adjacent" pairs the
+collision check was reading were two diagonals and one side.
+
+`room.seat_sweep` is now the second copy of `slotsOf`, deliberately:
+the canvas needs the answer live while a seat is being dragged and
+the writer needs it with no canvas at all, so neither can ask the
+other. `TestTheSweepMatchesTheCanvas` pins them together by the
+letters each palette shape is known to draw, and both copies were
+read against the live app on the real room -- every table `ABDC` in
+both sections, from Python and from `drawn.slots`.
+
+Writing the group's list swept also puts the "no numbers for an
+untouched room" property back, since the order it reads in is now the
+order it prints in.
+
+### Three tests that passed while asserting nothing
+
+Found by breaking the code under each one, which is the only way they
+would have been found.
+
+**A perfectly flat row sweeps to the right answer by accident.** On a
+horizontal line every seat left of centre bears pi from it and every
+seat right of centre bears 0, so a stable sort keeps them in order and
+the straight-line branch looks unnecessary. Nudge one seat 20 units
+down -- well within a card, still plainly a row -- and the sweep puts
+it last. The test now nudges.
+
+**And so does a column, if the nudge leans the right way.** The first
+version offset the middle seat right and the bottom seat left, which
+the sweep also gets right. Leaning it the other way is what fails.
+
+**A measuring instrument can agree with itself.** The script that read
+the real room masked each student as `P01`, `P02` and so on *by first
+appearance*, and wrote the by-group chart first -- so that chart read
+`P01 P02 P03 P04` whatever order it was really in. Assigning the masks
+up front from the room's own list showed the real answer: the room
+lists `P01 P02 P03 P04` and the chart prints `P01 P02 P04 P03`, which
+is the clockwise swap.
