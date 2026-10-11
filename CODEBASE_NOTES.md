@@ -10985,3 +10985,88 @@ One further detail: rounding each edge to a whole pixel before
 subtracting put both gaps one out, because the pane runs at a device
 pixel ratio of 1.5. The placement is fractional, and the two gaps now
 agree to within one device pixel.
+
+## Pan from anywhere, and a tile that is the shape (2026-10-11)
+
+### Panning was not broken, and was unusable
+
+Two separate things, and only together do they explain it.
+
+**Space only panned from bare paper.** The paper's `pointerdown`
+tested `spaceDown` *after* the line that bails out when the press
+landed on a desk, a card or a label. In an empty room that is most of
+the canvas; in a full one it is almost none of it. Every element's
+cursor also won over the paper's, so holding space over a desk showed
+the desk's own grab cursor and dragging moved the desk -- which is
+exactly "none of them switched to a palm symbol and panned".
+
+**And the pan is clamped to the room.** At a fit zoom the whole room
+is on screen, so there is nowhere to pan and the clamp returns it to
+centre. Correct, and indistinguishable from broken: the first test of
+this produced no movement at all until the zoom went past the point
+where the room overflows.
+
+The key now wins over whatever is under the pointer -- the test moved
+above the bail-out, the three drag handlers return early while it is
+held, and the cursor follows onto everything on the paper.
+
+Ctrl, alt and shift do nothing, which is deliberate and was recorded
+on 2026-10-10: the pan modifier in this kind of application is the
+space bar.
+
+### A fat stroke is not a corner radius
+
+The polygons' corners were rounded with `stroke-linejoin: round`,
+which is cheap and wrong. A round join's radius is half the stroke
+width, so the 5-unit radius came with a 10-unit edge against the
+rectangles' 2.5 -- "super duper thick", and still a quarter of their
+14-unit corner. **Radius and thickness cannot come from the same
+number**, so the corner is cut in the path now.
+
+How far back to cut depends on the angle: `r / tan(theta/2)`, the
+tangent length of a circle of radius r tucked into that corner,
+clamped to half of each adjacent edge. A fixed cut rounds a blunt
+corner far more than a sharp one, which is what makes a triangle and
+a hexagon look like different design systems. A quadratic through the
+vertex rather than an arc -- at this size they are a fraction of a
+pixel apart, and a Bezier has no sweep flag to get backwards.
+
+### The palette draws the same shape the canvas does
+
+It had its own drawing: a solid grey blob with a `clip-path`. So the
+hexagon had square corners in the menu and round ones on the paper,
+and nothing in the menu had an outline while everything on the paper
+has one. `shapeSilhouette` is now one function at two sizes --
+outlined, lightly filled, corner radius scaled so a tile is a true
+miniature. The stroke is *not* scaled: a scaled 2.5 is invisible at
+34px, and the outline is most of what makes these read as furniture.
+
+Three goes at the size. One column of full-width tiles came to 389px
+and ran off the top of a short window; shrinking it to fit lost the
+point. Two columns of four fit in half the height at the mode rail's
+104px width -- and needed `minmax(0, 1fr)`, because a grid track's
+minimum is its content, so the tiles pushed the right column eleven
+pixels past the drawer and it was clipped.
+
+### Dragging a shape out
+
+Clicking still drops one in the middle of the view. Dragging one out
+puts it where you let go, and the ghost grows from the size of the
+tile to the size the shape will be in the room over the first moment
+of the drag. That part is worth having: without it a 34px tile
+becomes a 250-unit table the instant the pointer moves, which reads
+as the thing you grabbed being swapped for a different one.
+
+### Guides, and a line that was thicker one way
+
+Grey rather than the accent -- the accent means "the state you are
+in", and a guide is a passing remark. Groups align centre to centre,
+which is the middle ground: an edge guide on a desk that can be
+turned would point at an edge it no longer has, because its box is
+the unrotated one.
+
+The horizontal guide really was heavier than the vertical, and not by
+eye: the guides live inside the scaled canvas, so at 49% a 1px line
+is half a device pixel and rounds to one on one axis and nothing on
+the other. The canvas publishes its scale now and the guides divide
+it out, which makes both exactly 1px on screen at every zoom.
