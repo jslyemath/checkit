@@ -11070,3 +11070,86 @@ eye: the guides live inside the scaled canvas, so at 49% a 1px line
 is half a device pixel and rounds to one on one axis and nothing on
 the other. The canvas publishes its scale now and the guides divide
 it out, which makes both exactly 1px on screen at every zoom.
+
+## A canvas that was a pen (2026-10-11)
+
+### Panning, properly this time
+
+Yesterday's fix moved the pan test to the top of the paper's
+`pointerdown` handler. Not enough, and the reason is worth keeping: a
+dozen things on the canvas call `stopPropagation` on `pointerdown` --
+badges, grips, the spinner, the pin -- so whether the event ever
+reached the paper depended on what happened to be under the pointer.
+It worked in testing and failed in use, which is what that class of
+bug looks like.
+
+It is claimed in the **capture** phase now. The paper goes first by
+definition and nothing downstream gets a say, which removes the whole
+class rather than the instance.
+
+**And a held key must not be able to stick.** Testing left `spaceDown`
+true in the instructor's own session -- set from the console and never
+cleared -- and the canvas was stuck in pan with no visible cause and
+no way back. It now lets go on `visibilitychange`, on any other
+keydown, and on blur, because a missed keyup is a far cheaper failure
+than a canvas that cannot select anything.
+
+Worth saying plainly: the second half of "panning is broken" was that
+**the pan is clamped to the room**, so at a fit zoom there is nowhere
+to go and nothing happens. Correct, and indistinguishable from broken.
+
+### The canvas was 1200 by 800
+
+Which is about four tables across. Furniture was clamped to it, so a
+room could not be laid out from one side of the window to the other,
+and the pan had almost nothing to pan over -- the same wall, felt two
+ways.
+
+The right and bottom edges move now when something is dragged past
+them. Left and top cannot: the origin is fixed at (0, 0) and moving
+it would mean moving every shape, seat anchor and label to keep them
+still. Nothing needs it, because a room grows away from the corner it
+starts in.
+
+**This costs nothing downstream** -- the room's size was only ever
+this clamp. Fitting and centring both measure the content, so acres
+of empty room to the right do not change how the desks are framed.
+
+### The wheel zooms
+
+Up for in, continuous rather than in the buttons' steps: a wheel
+reports how far it was turned, and rounding that to a ratchet is what
+makes a trackpad feel wrong. `passive: false`, or the page scrolls
+underneath and the `preventDefault` is ignored.
+
+### Handles that looked like a mistake, and were
+
+Three things at once. The selection rectangle was drawn at 1.5px and
+the handles at 2px, which reads as two tools by two hands. The
+rectangle's corner radius was 7 against the desk's 14, so it turned a
+much tighter corner than the thing it surrounded. And the handles sat
+on the *desk's* edge while the rectangle ran 7px outside it -- which
+leaves 1.5px of gap along an edge and several pixels at a corner,
+because a corner of the rectangle is offset diagonally. That uneven
+gap is what looked wrong.
+
+One custom property for the offset and one for the line weight, both
+on `.deskwrap.chosen`, and the handles are placed from the same
+offset the rectangle uses. The radius is the desk's plus the offset,
+so the two are concentric.
+
+### Small things
+
+The palette put a scrollbar on screen for the length of its opening
+animation, because the content is taller than the box while the
+height is still growing. It may only scroll once it has stopped
+growing -- `.settled`, added on `transitionend`.
+
+A triangle's middle is not its centre of area; the "1" sits two
+thirds of the way down, where the apex is not squeezing it.
+
+Ctrl-click adds to the same selection a dragged rectangle makes, so
+the two ways of choosing several things produce one thing and share
+the strip. Whatever single item was already chosen comes along on the
+first ctrl-click, or picking a second desk would appear to lose the
+first.
