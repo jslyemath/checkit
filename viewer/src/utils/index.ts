@@ -260,16 +260,16 @@ const loadedSupportPackages = (bank:Bank):string =>
 /**
  * \setskilldesc for every skill on the assessment, from the bank manifest.
  *
- * The theme's \skillheader looks a slug up here for its title and colour;
+ * The theme's \skillheader looks a slug up here for its title and color;
  * without these lines every box prints the theme's default. printit generates
  * the same file from the same manifest -- see descriptions_tex in assemble.py.
  */
 const skillDescriptions = (outcomes:Outcome[]):string =>
     outcomes.map((o)=>{
         const description = (o.description ?? "").split(/\s+/).join(" ").trim()
-        // The optional argument is the box colour, resolved by the platform
+        // The optional argument is the box color, resolved by the platform
         // from <color_map>. Omitting it leaves every skill in the theme's
-        // default, which is not what a bank declaring a colour map is asking
+        // default, which is not what a bank declaring a color map is asking
         // for -- printit hit the same thing.
         const prefix = o.color ? `\\setskilldesc[${o.color}]` : "\\setskilldesc"
         return `${prefix}{${o.slug}}{${description}}`

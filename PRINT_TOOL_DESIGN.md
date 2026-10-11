@@ -593,7 +593,7 @@ Settled in review, recorded so they are not relitigated.
    `--image-seeds`, publish `.tikz`, or base64. Recommended: publish `.tikz`.
 3. ~~Whether the two banks' identical `skillcheckpoints.sty` copies are deleted
    in favour of the package default.~~ **Overtaken by events 2026-09-02.** They
-   are no longer identical: mat-106 and the printit package carry a colour fix
+   are no longer identical: mat-106 and the printit package carry a color fix
    that mat-206 does not, and mat-206 is to be rebuilt from scratch rather than
    kept in step. Revisit once that rebuild happens.
 4. What a hand-authored bank's `bank.xml` looks like, given the tool should keep
@@ -1296,7 +1296,7 @@ anybody is placed in it.
 * **Name cards** drop onto seats. First name on the top line, surname
   below, so the card is squarish rather than a long strip -- which is what
   sets the spacing of the whole room.
-* **Group designators** -- a table number, a colour, a letter -- sit in the
+* **Group designators** -- a table number, a color, a letter -- sit in the
   middle of a table, or float in the gap for a room of loose desks. A shape
   can carry a label and a standalone label can be dropped anywhere.
 * **Version letters toggle**, because this goes on the projector.
@@ -1326,7 +1326,7 @@ can be. There is **one bag of letters for the whole course**, across
 sections: a group of six with six available gets one of each, a pair gets
 two of the six.
 
-This is graph colouring -- see the notes of 2026-10-04 for the algorithm
+This is graph coloring -- see the notes of 2026-10-04 for the algorithm
 and the measurements behind each part of it.
 
 #### Print order is a mode
@@ -1363,7 +1363,7 @@ instructor preferred to a converter nobody would run twice.
 
 | | | |
 |---|---|---|
-| 1 | the model, the colouring, the chart writer | **done** 2026-10-04 |
+| 1 | the model, the coloring, the chart writer | **done** 2026-10-04 |
 | 2 | the canvas, read-only: shapes, cards, labels, section picker, toggles, zoom | **done** 2026-10-05 |
 | 3 | dragging -- cards between seats, shapes around the room | **done** 2026-10-05 |
 | 3b | the sizing pass: fit to content, a projector mode, click-to-place | **done** 2026-10-05 |
@@ -1445,7 +1445,7 @@ Two canvas editors were read closely, because they have solved this:
   placement, and that every panel is a small floating "island" over a
   full-bleed canvas rather than a region docked into a page.
 
-**Radix Colors** supplied the colour model, and the classroom tools
+**Radix Colors** supplied the color model, and the classroom tools
 surveyed in the notes of 2026-10-05 supplied click-to-place.
 
 #### The islands, and what each one is for
@@ -1483,7 +1483,7 @@ changes what the room is *showing*. It is a switch in the top right
 with the other two, and it works while projecting because that island
 is the one that survives.
 
-**The accent colour means one thing: the state you are in.** Not "look
+**The accent color means one thing: the state you are in.** Not "look
 at me". A switch that is lit while unused has nothing left to say when
 it is used. The plus is the one exception, because it is the only
 control that makes something that was not there.
@@ -1547,7 +1547,7 @@ additive, so `room.VERSION` does not move.
 
 **Rotating rewrites the chairs' own offsets** rather than storing an
 angle for everything downstream to apply. `room.seats_of`, the
-neighbour distances, the colouring and `seating.toml` therefore need
+neighbour distances, the coloring and `seating.toml` therefore need
 to know nothing about rotation: a seat is always simply where it says
 it is. `angle` is kept only for the silhouette and for the next turn.
 
@@ -1597,8 +1597,8 @@ was not needed:
   reveals the anchor points on its shape. Dragging the label pill onto
   one is the control; a nine-cell grid that does the same thing is a
   second way to say it.
-* **Six colour swatches in a row are deleted.** One filled dot showing
-  the group's colour, which opens the swatches when clicked.
+* **Six color swatches in a row are deleted.** One filled dot showing
+  the group's color, which opens the swatches when clicked.
 * **The label does not need a text field and a heading.** The heading
   *is* the label; click it to edit it.
 * **The print position does not need the words "Prints 2nd of 7".**
@@ -1611,7 +1611,7 @@ expanded state:
   ●  Table 2            4 seats    2/7
   ^  ^                  ^          ^
   |  click to rename    read-only  print position
-  colour
+  color
 ```
 
 Nothing in it needs opening, so there is no sheet to pull up and no
@@ -1642,7 +1642,7 @@ exactly when somewhere to put a person is needed.
 
 Everything that is neither a mode nor frequent:
 
-* **Paper** -- the canvas colour
+* **Paper** -- the canvas color
 * **Show** -- version letters, group labels
 * **Deal the version letters again** -- the shuffle
 * **Write the chart now** -- `seating.toml`, for when Save left it alone
@@ -1654,11 +1654,11 @@ The rule for the menu is the inverse of the rule for the rail: if it
 changes what the canvas *is* rather than what a click *does*, and it is
 not done every few minutes, it belongs here.
 
-#### Colour: one hue, three jobs
+#### Color: one hue, three jobs
 
 A group owns a hue. Three shades are derived from it, and they are
 derived rather than chosen so that every group is the same design in a
-different colour. Radix Colors' twelve-step scale gives each shade a
+different color. Radix Colors' twelve-step scale gives each shade a
 job; the three the room needs are:
 
 | drawn thing | job | step |
@@ -1673,7 +1673,7 @@ about ten lines of custom properties and holds up on a light or a dark
 canvas. An ungrouped seat uses the same three roles at **zero chroma**,
 which is what makes the unseated rail consistent for free.
 
-Colour is never the only carrier: the pill still says "Table 2".
+Color is never the only carrier: the pill still says "Table 2".
 
 #### The canvas is a document; the chrome is a tool
 
@@ -1715,7 +1715,7 @@ it cannot.
 #### What has to exist first
 
 **There is no selection model.** Nothing in the app can currently say
-"this group is selected", and the selection strip, the colour dot, the
+"this group is selected", and the selection strip, the color dot, the
 label anchors and the print position all hang off it. It is the
 backbone and it comes before any of the features that need it.
 
@@ -1726,13 +1726,13 @@ Old rooms load with sensible defaults, so `room.VERSION` does not move
 -- a version bump is for a change that would make an old file read
 wrongly, not for one that makes it read incompletely.
 
-**A colour is two numbers and never three.** `hue` says which colour,
+**A color is two numbers and never three.** `hue` says which color,
 `chroma` says how vivid, and lightness is not stored at all. The three
 shades a group draws are built at fixed lightnesses chosen so a name
 is readable on the card and the card is visible against the paper, on
 a screen and on a projector and in print. Let the instructor set
-lightness and the first dark colour anybody picks makes a table whose
-names cannot be read from the back of the room. The custom-colour slot
+lightness and the first dark color anybody picks makes a table whose
+names cannot be read from the back of the room. The custom-color slot
 therefore opens the platform's own `input type="color"` -- a visual
 field, hex, RGB and an eyedropper, none of it to maintain -- and keeps
 the hue and the chroma of whatever comes back.
@@ -1770,17 +1770,17 @@ In the order they would matter:
    with a format decision rather than a patch -- see 12.14 below and the
    notes of the same day. Everything in Printing now reaches the paper,
    verified against the written text and against the real room.
-2. **The colour swatches are the last unconverted disclosure.** See
+2. **The color swatches are the last unconverted disclosure.** See
    12.13: created on demand, no motion, dismissed only by a press
    outside. They should be a `.drop` like the drawer and the save menu.
-3. **The paper colour choice** (12.12's stage C) was specified and never
+3. **The paper color choice** (12.12's stage C) was specified and never
    wired up.
 4. **12.11's stage 6** -- randomise the room, swap two students -- has
    still not landed in the shell. Stages 4 and 5 have: the palette and
    seat dragging are built, and the print-order mode is Printing.
 
 A first because everything after it needs somewhere to live, C before D
-because the colours have to be designed against the paper they sit on,
+because the colors have to be designed against the paper they sit on,
 and G last because it is the only one that removes a tab.
 
 Written as a self-contained `seating/` module with its own stylesheet
@@ -1798,7 +1798,7 @@ holds other things, and no two of them agreed:
 | mode rail | hover | leaving | 0.28s in, 0.2s out |
 | furniture drawer | click | click, or outside | 0.28s / 0.2s |
 | save menu | click | outside **only** | none |
-| colour swatches | click | outside | none |
+| color swatches | click | outside | none |
 
 Three of those are defensible on their own. Together they are a window
 that has to be learned four times, and the save menu's missing
@@ -1832,7 +1832,7 @@ independently stop. The CSS is now one `.drop` / `.palette` pair of
 rules over shared tokens; the open state is a boolean per surface
 cleared in one place.
 
-Where this bites next: the colour swatches (`openHues`) are still the
+Where this bites next: the color swatches (`openHues`) are still the
 fourth way -- created on demand, no motion, outside-press only. They
 should become a `.drop` like the rest.
 

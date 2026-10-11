@@ -35,7 +35,7 @@ class Bank():
         ]
         # An optional <color_map> of <category prefix="W" color="Violet"/>.
         # The platform does not draw anything with these; it resolves them so
-        # every consumer agrees on which colour a slug gets.
+        # every consumer agrees on which color a slug gets.
         self._color_map = {
             category.get("prefix"): category.get("color")
             for category in xml.iter(f"{CHECKIT_NS}category")
@@ -62,7 +62,7 @@ class Bank():
 
         Resolved here, once, rather than in each consumer: the rule is easy to
         get subtly wrong, and a print handout and a browser export disagreeing
-        about a colour is exactly the kind of mismatch nobody notices until the
+        about a color is exactly the kind of mismatch nobody notices until the
         pages are side by side.
         """
         matches = [p for p in self._color_map if slug.startswith(p)]
@@ -186,7 +186,7 @@ class Bank():
         for o in self.outcomes():
             d = o.to_dict(regenerate=regenerate,remote=remote,precompute=precompute)
             # Published resolved, so a browser building a themed document gets
-            # the same box colour the printed handout uses. Absent when the
+            # the same box color the printed handout uses. Absent when the
             # bank declares no <color_map>, which means "the theme's default".
             color = self.color(o.slug)
             if color:

@@ -4,7 +4,7 @@ pdflatex recovers from most errors and writes a PDF anyway. The rasterizer
 used to treat that PDF as success, so two wrong pictures reached a published
 site without anything failing:
 
-  - an undefined colour drew the answer dot black instead of the theme's blue
+  - an undefined color drew the answer dot black instead of the theme's blue
   - an undefined \dfrac dropped the fraction bar, so a number line labelled
     5/6 was published reading "56"
 
@@ -41,7 +41,7 @@ class LogErrorsTestCase(unittest.TestCase):
         self.assertEqual(_log_errors(path), ["! Undefined control sequence."])
 
     def test_an_unknown_key_is_reported(self):
-        """The scCOLOR case: pgfkeys does not recognise the colour name."""
+        """The scCOLOR case: pgfkeys does not recognise the color name."""
         path = self.write(
             "! Package pgfkeys Error: I do not know the key '/tikz/scCOLOR'.\n"
         )
