@@ -11443,3 +11443,47 @@ inline style on the child wins.
 And the path data after the prefix still has to start with a move:
 `F2.6 8.4 L...` is not a path, it is a syntax error that draws
 nothing and reports nothing.
+
+## Writing the map found the second copy (2026-10-11)
+
+A documentation pass, and it is in here because of what it turned up
+rather than because of what it wrote.
+
+### The pass itself
+
+`checkit-printit/CLAUDE.md` was a fortnight behind the canvas. Added:
+the corner button's two forms, ctrl-click, wheel zoom, that nothing
+drawn on the canvas is a control while projector or Up Next is on,
+group merge and split, the triangle, the now-edgeless canvas, and the
+`--mark` rule. `PRINT_TOOL_DESIGN.md` gained 12.17 for the round's
+decisions and a current list of what is open; 12.15's closing
+sentence, which said the wand was right, is corrected in place rather
+than quietly rewritten, because a plan doc that silently agrees with
+the present teaches nothing about why it changed.
+
+### And then: `twoFinger` never got the zoom fix
+
+Checking a claim before writing it down -- "pinch to zoom is only
+hoped for" -- found that pinch has been implemented for some time,
+and that it still holds the view with
+
+    pan.x *= next / was;
+
+which is the proportional scaling the wheel used before the 11th and
+which drifted. The wheel now measures where the anchor point actually
+landed and corrects by the gap; the pinch does not, so it is very
+likely walking the subject off the fingers in the same way, about the
+pinch midpoint.
+
+**It is not fixed, and it is not confirmed broken.** Confirming it
+needs a real touch device; nothing in Seating has ever been under a
+thumb. Written down as the first open item instead of guessed at.
+
+The reason this is worth a section: the root `CLAUDE.md` already
+lists "a fix applied to one path is not applied to the others" as a
+recurring failure, with three instances in one day. This is a fourth,
+and the thing that caught it was **writing a sentence about the
+feature and going to check whether the sentence was true** -- not a
+test, which passed, and not use, because nobody pinches a desktop
+browser. That is a cheap habit and it found something the whole suite
+did not.

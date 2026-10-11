@@ -2111,6 +2111,13 @@ asked for. The wand rather than a plus, because the rule is that a
 wand means "asking the room to work something out", and that is what
 a shuffle is.
 
+**That last sentence is wrong as of 2026-10-11, and the wand is
+gone.** See 12.17: the corner button is a `+` where the mode has one
+primary action and a `⋯` where it has a list, and People has a
+list. The wand was a symbol for a category -- "the room works
+something out" -- which is a thing a reader has to be taught, and the
+two apps anybody compares this to teach the opposite.
+
 ### 12.16 Say it in two words (2026-10-11)
 
 **A control is labelled with a verb and its object, and nothing
@@ -2143,3 +2150,174 @@ The rules that follow from it:
 
 The test: read the menu as a column with the icons covered. If any
 row takes longer than a glance, it is too long.
+
+### 12.17 The canvas obeys canvas conventions (2026-10-11)
+
+A fortnight of use found one kind of complaint over and over: the
+canvas was *nearly* like every other canvas, and the gap was where
+the friction lived. These are the decisions that closed it. The
+common thread is that a design canvas is a genre with conventions
+already, and inventing inside it is a cost paid by the reader.
+
+#### The canvas has no edges
+
+It used to be fenced to a box a little larger than the content, which
+could not be dragged out of. The reason was good and the effect was
+not: a room could not be laid out across the width of a screen,
+because the fence arrived first.
+
+**So: coordinates may be negative, and nothing clamps.** The model
+never minded. Fitting and centring measure the content's own box, so
+they work the same at any offset, and `section.canvas` is a record of
+how far the room reaches rather than a limit on it.
+
+What makes that safe is that **fit is the recovery, not a wall.** A
+drag that throws a table somewhere surprising is undone by the thing
+the user already knows -- press fit, see everything, drag it back.
+A fence prevents the surprise at the cost of making the surface feel
+small all of the time, which is the worse trade, and "I can't even
+place things fully from one side of the screen to the other" is what
+it sounds like from the outside.
+
+#### The wheel zooms, about the pointer
+
+Scroll up is in, scroll down is out, and the point under the cursor
+stays under the cursor. Ctrl-click (cmd on a Mac) adds to a selection.
+Neither of these is a feature so much as **the absence of a defect**:
+a canvas without them reads as a prototype, because every tool the
+user has ever zoomed in does it this way.
+
+Holding the point under the cursor is worth one note, because the
+obvious implementation is wrong in a way that only shows up after ten
+clicks. Solving for the new pan in closed form requires being right
+about every rectangle in the chain, and being an eighth of a pixel
+wrong each time walks the subject visibly off the cursor. **Measuring
+where the point actually landed and correcting by the gap is a fixed
+point**, converges in one or two passes, and does not care which of
+the measurements was the inaccurate one. See the notes of 2026-10-11.
+
+#### One grey for everything the canvas marks
+
+`--mark`. The accent color belongs to the chrome, where it means "the
+state you are in"; on the paper it is just another color, landing
+beside whatever the groups happen to be. Five things were wearing it
+there -- a band, the desk a dragged seat would move to, the two hover
+marks in the click-in-order quasimode, the badge a version would
+trade with -- and each had invented its own inset, radius and dash
+along the way, so there were four selection rectangles that looked
+like four different ideas.
+
+**One geometry as well as one color**, `--pick-out` and `--pick-line`
+on `.deskwrap`. A reparent target is now visibly the same gesture as
+a selection, asking a question.
+
+#### Selection color answers "which one", and only when there is one
+
+* **A single selected group wears its own color.** That is the
+  question a selection answers -- which of these have I got hold of --
+  and the group's color is the only thing on screen that already
+  means that group.
+* **A multiselection is grey**, and the members lose their handles and
+  their own selection styling entirely. With more than one there is no
+  "which one", so the question changes to "what is in the set", and a
+  set is one shape with one ring. `isSelected` returns false while
+  more than one thing is banded, which is what makes the handles
+  disappear in one place rather than eight.
+* **The ring is feathered**, tapering out the same distance a seat's
+  selection does, because the two now had to look like one idea.
+
+#### Glue and unglue
+
+A group is **a set of seats**, not a shape. That was already true and
+merging is the first feature that makes it obvious: `merge_groups`
+folds two seat lists together, `split_group` regroups by desk, and
+**nothing moves either way**. Two tables merged while apart stay
+apart; they are one group that happens to span two desks.
+
+What follows without any new code:
+
+* one label, one color, one strip, one set of grips
+* a drag moves the whole thing; a rotation turns it about the common
+  middle
+* **the seat letters need no special case.** A letter is swept
+  clockwise from its *group*, so a merged group sweeps its whole
+  arrangement as one ring and the lettering is already right
+
+The strip carries the merge icon when more than one group is selected
+and the split icon when the selection is a merged group. Drawn as the
+two inner edges of adjacent tables with a filled arrow pushing in or
+pulling out, after `]  [` and `}  {` -- because the first drawing was
+legible at full zoom and a smudge at arm's length, and a strip is
+read at arm's length.
+
+#### A control exists only where the thing it edits exists
+
+The by-seat print plan made this concrete. Ordering by seat, **a group
+has no place in the stack** -- the stack crosses tables, and a
+group's position in it is not a number that exists -- so that control
+is simply absent from the group strip in that mode. A seat gains one
+instead, because by seat a single seat is exactly the thing that has
+a place.
+
+The general rule, which is cheaper than it sounds: a control that
+would edit something nothing reads should not be drawn. Greying it out
+says "not now"; absence says "not a thing", which is the truth.
+
+#### A strip field is editable exactly when it is stored
+
+* `seat.version` is stored, so it is typable, and validated against
+  the room's own version list -- a letter nothing prints would put a
+  version in the chart that the build has never heard of.
+* The **seat letter is derived** and is therefore not editable, and
+  should not become so. It is swept from where the seat sits, which is
+  the whole reason "re-letter when a seat moves" needs no bookkeeping.
+  Making it typable would mean storing an override, and the room would
+  have two answers to the same question.
+
+Both are regular weight now rather than bold. Two bold characters
+side by side shout at each other and say nothing about which is
+which; the chair and the printer icons beside them already say that.
+
+#### The corner button is two controls in one place
+
+A `+`, accent filled, where the mode has one primary action, which is
+always adding a thing. A quiet `⋯` where it has a short list
+instead. This is Material's own rule -- a floating button carries one
+action, and overflow belongs in a menu -- and it resolves the thing
+that looked like a conflict: People wants an "add person" *and* a
+menu, so add person is the first row of the menu. In this app it
+redirects to the Roster tab, because adding a person is roster work.
+
+#### What is actually left, 2026-10-11
+
+The four items on the 2026-10-10 list are all struck through above;
+this replaces it.
+
+1. **Pinch zoom does not anchor the way the wheel now does.**
+   `twoFinger` still scales `pan` proportionally, which is the
+   approach the wheel used before 2026-10-11 and which drifted. It
+   should almost certainly use the same measure-and-correct loop about
+   the pinch midpoint. **Unverified either way** -- it needs a real
+   touch device, and this is exactly the "a fix applied to one path is
+   not applied to the others" pattern the root `CLAUDE.md` tracks, so
+   it is first on the list.
+2. **Nothing in Seating has been used on a phone.** Two-finger pan and
+   pinch are written and have never been under a thumb. The layout was
+   checked at 530px in a desktop browser, which is not the same test.
+3. **Record** is the one view still entirely unstarted, and **Setup**
+   still wants its boilerplate editor.
+4. **The TOMLs want a pass.** They were designed before the GUI, in
+   preparation for it; now that the GUI has settled there is almost
+   certainly shape in them that no longer earns its place. The
+   instructor's own words: more there needs reconsidering than the one
+   `at` key that 12.14 added.
+5. **One unexplained measurement.** A nine-click synthetic zoom
+   harness reports one to two and a half pixels of total offset and
+   reports *the same numbers before and after the anchoring fix*,
+   while a single click is verified to hold its point to 0.008 room
+   units and a round trip returns to exactly zero. That pattern says
+   the harness is measuring something structural rather than
+   accumulation. The pan clamp, `roomPoint` determinism and the
+   transform origin were each ruled out. It is written down because an
+   unexplained residual that nobody can see is still a thing somebody
+   should eventually explain.
