@@ -1770,14 +1770,17 @@ In the order they would matter:
    with a format decision rather than a patch -- see 12.14 below and the
    notes of the same day. Everything in Printing now reaches the paper,
    verified against the written text and against the real room.
-2. **The color swatches are the last unconverted disclosure.** See
-   12.13: created on demand, no motion, dismissed only by a press
-   outside. They should be a `.drop` like the drawer and the save menu.
-3. **The paper color choice** (12.12's stage C) was specified and never
-   wired up.
-4. **12.11's stage 6** -- randomise the room, swap two students -- has
-   still not landed in the shell. Stages 4 and 5 have: the palette and
-   seat dragging are built, and the print-order mode is Printing.
+2. ~~The color swatches are the last unconverted disclosure.~~
+   **Done 2026-10-10.** All four are now `.isle.drop`, built once and
+   opened by a class, and `closeDrawers()` is the one place that knows
+   what "everything is shut" means.
+3. ~~12.11's stage 6.~~ **Done 2026-10-10**, as a shuffle and a pin --
+   see 12.15. Swap-two was dropped: People mode already swaps two by
+   clicking one and then the other, which is the gesture it would have
+   duplicated. Stages 4 and 5 were already built: the palette and seat
+   dragging, and the print-order mode is Printing.
+4. **The paper color choice** (12.12's stage C) was specified and never
+   wired up. The last thing on this list.
 
 A first because everything after it needs somewhere to live, C before D
 because the colors have to be designed against the paper they sit on,
@@ -2047,3 +2050,58 @@ prints last and a bare section ahead of a numbered one would be dragged
 behind it. And **a seat with no `at` among seats that have one prints
 last**, which is the rule an unplaced group and an unspotted seat
 already follow.
+
+### 12.15 The pin, and the shuffle (2026-10-10)
+
+Two halves of one thing. A shuffle is only usable if some people can
+be exempt from it: students with accommodations sit where they sit,
+and a button that threw them across the room would be a button nobody
+dared press.
+
+**The pin is on the seat, not the student.** `seat.pinned`, optional
+and boolean. What it means is "whoever is in this chair stays in it",
+which is the thing an accommodation is actually about -- a place, not
+a person. It is not the same word as `seating.Seat.pinned` in the
+chart, which says a version letter was written down rather than
+worked out.
+
+**Where it lives on screen.** The bottom-right corner of the name
+card, opposite the version letter and in the same `--solid` color:
+both corners are the room having decided something about that card.
+Only People mode draws one, because no other mode moves people. It
+shows when set, on hover, and on the card currently in hand -- the
+last of those being the one a finger can reach, since a touch screen
+has no hover. Twenty-five permanently visible grey pins would be
+noise nobody is looking for.
+
+**One refusal, not four.** A person can be moved by dragging a card,
+dropping onto a card, clicking a name, or clicking a chair. All four
+reach `movePerson`, so that is where a pinned seat is refused; the
+affordances are also turned off at each gesture, so the move never
+looks available in the first place. A pinned card simply does not
+drag, rather than springing back -- springing back looks like a
+missed drop, and the point is that the drop was never on.
+
+**What a shuffle touches.** The people already sitting down, into the
+chairs nobody has pinned. Not the unseated rail, which is somewhere a
+person was put on purpose. Empty chairs shuffle like anybody, or
+every gap collects at one table. The version letters stay on the
+chairs, because the coloring is of the room -- so the arrangement is
+still legal afterwards and nothing needs re-coloring.
+
+It runs on the server for the same reason the coloring does: a button
+calls the function a command would, and these rules are worth a test.
+Nothing is written -- the room comes back changed and unsaved, so an
+instructor who dislikes the result presses Discard.
+
+**Randomising only a selection was considered and is not needed.** It
+is pinning everybody else, which already exists, inverted. Swap-two
+was dropped for the same kind of reason: People mode already swaps two
+people by clicking one and then the other.
+
+**Where they live.** Both are rows in the corner button's drawer,
+which People mode now has like Groups and Printing -- the same
+contextual surface with different contents, which is what 12.13
+asked for. The wand rather than a plus, because the rule is that a
+wand means "asking the room to work something out", and that is what
+a shuffle is.
