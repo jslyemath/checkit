@@ -11487,3 +11487,117 @@ feature and going to check whether the sentence was true** -- not a
 test, which passed, and not use, because nobody pinches a desktop
 browser. That is a cheap habit and it found something the whole suite
 did not.
+
+## The pinch was wrong three ways, and the ruler was wrong too (2026-10-11)
+
+Yesterday's note said `twoFinger` had probably never got the wheel's
+anchoring fix and that confirming it needed a real touch device. The
+first half was right. The second was not: synthetic `PointerEvent`s
+with `pointerType: "touch"` drive the handler perfectly well, and
+measuring first turned one suspected fault into three confirmed ones.
+
+Everything below was measured before it was changed.
+
+### What a pinch actually did
+
+With the two fingers spreading about a midpoint held exactly still --
+so a correct implementation moves nothing under the fingers at all --
+the room point under that midpoint moved **117 pixels across and 79
+down** over four moves.
+
+**One.** `panPaper`'s `pointermove` handler did not check
+`e.pointerId`. The first finger starts a pan on its way in, and after
+that *every* pointermove on the paper was read as that finger having
+travelled -- so the second finger's position was taken as the first
+finger's, and the room jumped by the distance between them. A hundred
+and ten pixels an event, in the log.
+
+Pointer capture does not prevent this, which is the part worth
+keeping: **capture redirects the captured pointer to the element, it
+does not stop any other pointer arriving there as well.** The guard
+has to be written.
+
+`bandPaper` had the identical hole, so in Groups or Seats a pinch
+stretched a selection band out to the far finger.
+
+**Two.** Nothing called off the one-finger gesture when the second
+finger landed. Both handlers listen on the paper, so the one-finger
+pan and the pinch ran together, fighting over `pan` -- the trace
+oscillated between -11 and +98 and back on alternate events. There is
+now one `endGesture`, set by whichever of the two started, and
+`twoFinger` calls it. A plain teardown and not the normal ending,
+because ending a pan that never travelled clears the selection, and a
+pinch is not a click on bare paper.
+
+**Three.** The anchoring, which is what yesterday predicted.
+`pan.x *= next / was` does hold a point still -- the middle of the
+*window*. `zoomTo`'s own comment says so, about the branch the buttons
+use, and that is correct for a button and wrong for fingers.
+
+### One anchoring function, which is the actual repair
+
+`holdPoint(section, room, at)` -- move `pan` until room point `room`
+draws at screen point `at`, by measuring the gap and correcting,
+repeatedly. It was already written; it was written *inside* `zoomTo`,
+which is why the pinch did not have it. Both callers use it now.
+
+It made `twoFinger` smaller rather than larger. Panning and zooming
+stopped being two effects added together and became one statement --
+*the room point under the midpoint stays under the midpoint* -- so the
+explicit translation by the midpoint delta is gone. Fingers that slide
+carry the room, fingers that spread zoom about themselves, and doing
+both does both, out of the same line.
+
+Measured after: **drift 0.00 by 0.03 pixels**, and it does not
+accumulate -- the per-move error stays in the thousandths of a room
+unit rather than growing. In Groups mode a pinch now zooms, bands
+nothing and never shows the band rectangle.
+
+### The unexplained residual was the ruler, not the room
+
+The open question inherited from yesterday: a nine-click synthetic
+wheel run reported one to two and a half pixels of drift, reported
+**the same numbers before and after** the anchoring fix, while a
+single click held its point to a hundredth of a pixel.
+
+It is the harness. `MouseEvent.clientX` is a `long`, so **the browser
+truncates wheel coordinates to whole pixels**. The harness measured
+`roomPoint` at its own fractional point -- 383.39, 206.69 -- while the
+zoom anchored on the 383, 206 the event actually delivered. A point
+two thirds of a pixel from the anchor is *supposed* to move when the
+picture scales, and it moves by exactly its offset times
+`1 - 1/ratio`:
+
+    predicted   x  -0.39 * (1 - 1/3.1645) = -0.267
+                y  -0.69 * (1 - 1/3.1645) = -0.472
+    measured    x  -0.2535      y  -0.4752
+
+Round the measuring point to whole pixels and the same run drifts
+**0.02 by 0.03 pixels over fifteen clicks**, which is the zoom cap
+rather than any accumulation -- nine clicks and fifteen report the
+identical figure.
+
+**The tell was there and was read as noise.** A measurement that does
+not change when you change the thing it measures is not a stubborn
+bug; it is a measurement of something else. Yesterday's note recorded
+"identical numbers before and after" as the puzzling part. It was the
+answer: the fractional-offset artefact cannot depend on how the
+anchoring is implemented, because it would be there with perfect
+anchoring. Chasing it through the pan clamp, `roomPoint` determinism
+and the transform origin was chasing the room when the ruler was bent.
+
+### What was verified rather than assumed
+
+Each by measurement in the running app, on `Scratch 48`:
+
+* one-finger pan still moves by exactly the drag (60, 35 asked, 60, 35 got)
+* a second pointer no longer moves someone else's pan, or grows
+  someone else's band
+* band-select still catches what it is dragged over, and a press that
+  does not travel still clears
+* the wheel still anchors at the pointer, by real wheel events and not
+  only synthetic ones: 48% to 77% with the table under the cursor
+  staying under it
+* `endGesture` is null after every one of those, so nothing leaks
+* 715 printit tests, 152 checkit tests, 0 audit problems
+* the fixture hashes to what it did before
