@@ -80,7 +80,7 @@ Optional elements are genuinely optional: a `bank.xml` written before one
 existed still loads.
 
 > **Anything else in your `bank.xml` is yours, not the platform's.** Some banks
-> carry extra elements — colour maps, `<associate>` entries — read by their own
+> carry extra elements — color maps, `<associate>` entries — read by their own
 > tooling. CheckIt ignores them, and will keep ignoring them; do not expect the
 > viewer or the exports to honour them.
 

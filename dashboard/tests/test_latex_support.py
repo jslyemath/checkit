@@ -62,7 +62,7 @@ BANK_XML = """<?xml version='1.0' encoding='UTF-8'?>
             <title>Checkpoint</title>
             <slug>FCP</slug>
             <path>outcomes/FCP</path>
-            <description>Claims a colour of its own, against the F prefix.</description>
+            <description>Claims a color of its own, against the F prefix.</description>
         </outcome>
         <outcome>
             <title>Family</title>
@@ -241,11 +241,11 @@ class LatexSupportTestCase(unittest.TestCase):
 
         self.assertEqual(self.bank_json()["latex_support"], [])
 
-    def test_the_longest_matching_colour_prefix_wins(self):
+    def test_the_longest_matching_color_prefix_wins(self):
         """FCP must take its own entry, not the one for F.
 
         The rule matters because a themed export in the browser and a printed
-        handout both colour a skill box from this map. If they resolved it
+        handout both color a skill box from this map. If they resolved it
         differently, the mismatch would only show up with the two side by side.
         """
         self.build()
@@ -254,7 +254,7 @@ class LatexSupportTestCase(unittest.TestCase):
         self.assertEqual(colors["FCP"], "Sepia")
         self.assertEqual(colors["F2-E"], "Teal")
 
-    def test_an_outcome_matching_no_prefix_has_no_colour(self):
+    def test_an_outcome_matching_no_prefix_has_no_color(self):
         """Absent, not empty -- absent means "the theme's default"."""
         self.build()
 

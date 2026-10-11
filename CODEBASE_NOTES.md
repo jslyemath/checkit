@@ -3089,7 +3089,7 @@ Four properties worth keeping if this is ever touched:
 | mat-206 | **not started, and not a port** — see below |
 | Print tool as its own package | done — [checkit-printit](https://github.com/jslyemath/checkit-printit), stages 1-5 and 9; see `PRINT_TOOL_DESIGN.md` |
 | A real quiz printed from mat-106 | done — 2026-09-01, 98 pages; all 28 outcomes build. See "The first real quiz" |
-| `skillcheckpoints.sty` drift between banks | **drifted 2026-09-02.** mat-106 and the printit package match; mat-206 is one colour fix behind and is being rebuilt from scratch, so it is deliberately not chasing |
+| `skillcheckpoints.sty` drift between banks | **drifted 2026-09-02.** mat-106 and the printit package match; mat-206 is one color fix behind and is being rebuilt from scratch, so it is deliberately not chasing |
 | Upstream merge | current — 0 behind, 97 ahead as of 2026-09-02 |
 | mat-106 typography pass | done — commas, spacing, entities; regenerated and republished |
 
@@ -3407,7 +3407,7 @@ bytes. `outcomes/slye_math.py` is a copy of mat-106's, not a sibling: 27 of its
 `checkit-dashboard == 0.2.7`, all inherited by copy rather than written.
 
 What *is* real is `bank.xml`: **31 outcomes** with genuine titles, slugs,
-descriptions and a colour map (prefixes `G`, `M`, `A`, `S` -- geometry,
+descriptions and a color map (prefixes `G`, `M`, `A`, `S` -- geometry,
 measurement, algebra, statistics). That is the specification, and it is a
 larger one than mat-106's 28. The work is authoring generators against it, not
 migrating anything.
@@ -3497,7 +3497,7 @@ does not fail the call, it empties the result.
 
 - **Babylonian answers print black on the key.** `\babo` and `\babt` in
   `skillcheckpoints.sty` draw with TikZ `fill=black`, which ignores the ambient
-  `\color{scCOLOR}` that `ansenv` sets. `fill=.` would take the current colour.
+  `\color{scCOLOR}` that `ansenv` sets. `fill=.` would take the current color.
   Not fixed because the `.sty` exists in three byte-identical copies (both banks
   and the print package) and they should change together.
 - **N1's `textemplate.tex` asks for six fields no generator sets** --
@@ -3559,7 +3559,7 @@ than assumed — one file, one theme, no reconciliation needed.
 has a print-specific template per outcome, and has had one all along.
 
 **`pdfgenerator.py` assembles.** It writes `Skill Descriptions.tex` from
-`bank.xml` (slug, colour, description → `\setskilldesc[colour]{slug}{desc}`),
+`bank.xml` (slug, color, description → `\setskilldesc[color]{slug}{desc}`),
 renders each outcome's `textemplate.tex` per seed, wraps student copies with
 `\setname{...}` and `\preparefornextstudent`, and then emits the whole thing a
 second time under `\setboolean{anstoggle}{true}` to produce the answer keys.
@@ -3572,8 +3572,8 @@ exercise has.
 
 | | definition | reveals by | used by |
 |---|---|---|---|
-| `\ans{...}` | `.sty:71` | printing the answer text inline, in the theme colour | F2, F2-E, R1 |
-| `ansenv` | `.sty:72` | un-commenting a whole block and colouring it | 21 outcomes |
+| `\ans{...}` | `.sty:71` | printing the answer text inline, in the theme color | F2, F2-E, R1 |
+| `ansenv` | `.sty:72` | un-commenting a whole block and coloring it | 21 outcomes |
 | `\tfleft[True]{stmt}` | `.sty:77-89` | **boxing one of two already-printed words** | N1 |
 | `\fillinblank[2.25in]{ans}` | `.sty:100-102` | filling a ruled space that is *always* there | D3, W4 |
 
@@ -3596,7 +3596,7 @@ exercise wants*, and that is a property of the exercise, not of the page.
 
 ### The other pieces worth naming
 
-- **`\skillheader{N1}`** (`.sty:476`) opens each skill with a coloured
+- **`\skillheader{N1}`** (`.sty:476`) opens each skill with a colored
   `tcolorbox` titled with the slug and containing the outcome description,
   looked up from the `pgfkeys` dictionary that `pdfgenerator.py` generated out
   of `bank.xml`. The bank is already the single source of truth for that
@@ -3629,7 +3629,7 @@ dropped by a rewrite that only looked at the LaTeX:
 | **Names on/off** | `Include Names:` | real name, or a ruled blank |
 | **Key count** | `Key Amount:` | whole key packet repeated N times |
 | **Per-run generator settings** | `course_progress`, `w7_allow_terminating`, `n3_n4_force_listing_method`, `d2_allow_repeating` | passed straight into `generate(**settings)` |
-| **Per-skill colour** | `bank.xml` `<color_map>`, or a per-outcome `<color>` | resolved by slug prefix, defaulting to `scCOLOR` |
+| **Per-skill color** | `bank.xml` `<color_map>`, or a per-outcome `<color>` | resolved by slug prefix, defaulting to `scCOLOR` |
 | **Associates** | `<associate>` entries | parsed, and deliberately not generated |
 | **Key deduplication** | `used_versions` set | only versions actually handed out get keys, sorted in bank order |
 | **Double-sided safety** | `\preparefornextstudent` | stops one student's packet backing onto another's |
@@ -3832,7 +3832,7 @@ Applying that to what the templates currently do:
 | "the blank sits to the right in a second column" | theme | pure appearance |
 | "leave `\vfill` of working space here" | theme | pure appearance |
 | "the skill header is a blue rounded box" | theme | pure appearance |
-| "this skill's colour is `scCOLOR`" | **bank** | already in `bank.xml`'s `<color_map>` |
+| "this skill's color is `scCOLOR`" | **bank** | already in `bank.xml`'s `<color_map>` |
 | "these characters are Egyptian" | **SpaTeXt** | `<glyphs>`, already done |
 | "don't break this equation" | **SpaTeXt** | `<nobreak>`, already done |
 
@@ -3885,8 +3885,8 @@ that none of the current behaviour is lost. Mapping each mechanism forward:
 | today | becomes | who decides what |
 |---|---|---|
 | `\setboolean{anstoggle}{true}` | `subset='answer'` / `'all'` passed to `latex.xsl` | the **publication** ("this run is a key") |
-| `ansenv` | `\stxOuttro`, already emitted | the **theme** (colour, `\vfill` around it) |
-| `\ans{x}` | `<outtro>` inline within a `<p>`, or `\stxAns` | the **theme** (colour) |
+| `ansenv` | `\stxOuttro`, already emitted | the **theme** (color, `\vfill` around it) |
+| `\ans{x}` | `<outtro>` inline within a `<p>`, or `\stxAns` | the **theme** (color) |
 | `\tfleft[True]{s}` | `<response type="truefalse"/>` → `\stxTrueFalse` | **SpaTeXt** says it is T/F; the theme draws the box |
 | `\fillinblank[w]{a}` | `<response type="short"/>` → `\stxBlank` | **SpaTeXt** says short answer; the theme sets the width |
 
@@ -3931,11 +3931,11 @@ theme being able to do anything:
 
 | | declares | lives in |
 |---|---|---|
-| **bank** | what the content says; response types; the macros it needs to compile (`\babo`, `hieroglf`); slug, description and colour | `template.xml`, `bank.xml`, and a new preamble declaration |
-| **theme** | how `\stxTasks`, `\stxTrueFalse`, `\stxBlank`, `\stxOuttro`, `\stxExercise` render — widths, colours, spacing, the skill box | `skillcheckpoints.sty` — **shipped as the package default, replaced by a copy in the bank root if one exists** (decided 2026-08-31) |
+| **bank** | what the content says; response types; the macros it needs to compile (`\babo`, `hieroglf`); slug, description and color | `template.xml`, `bank.xml`, and a new preamble declaration |
+| **theme** | how `\stxTasks`, `\stxTrueFalse`, `\stxBlank`, `\stxOuttro`, `\stxExercise` render — widths, colors, spacing, the skill box | `skillcheckpoints.sty` — **shipped as the package default, replaced by a copy in the bank root if one exists** (decided 2026-08-31) |
 | **publication** | what *this run* wants: handout or key, which outcomes, how many versions, roster, seating, course/semester/professor | a file in the course repo |
 
-`bank.xml` already holds slug, description and colour, and `pdfgenerator.py`
+`bank.xml` already holds slug, description and color, and `pdfgenerator.py`
 already turns them into `\setskilldesc`. That flow is correct as-is and should
 survive unchanged.
 
@@ -4157,7 +4157,7 @@ found `distractor`, the tests passed, `build_docs.py` succeeded. The gap is
 between "the files are right" and "the commit contains the files", and nothing
 in that list can see it.
 
-It surfaced weeks later, by accident, from a question about a box colour that
+It surfaced weeks later, by accident, from a question about a box color that
 happened to require reading a merged file.
 
 Worse than a lost merge, because upstream is an ancestor: `git merge
@@ -4460,17 +4460,17 @@ everyone printed afterwards.
   continued sheet then came out with a blank name line and no section. They now
   set `\scname` and `\scsection`, which every page style renders.
 
-### The colour map never reached print
+### The color map never reached print
 
 Separate from FCP but found by it. `bank.xml` declares
 `<category prefix="W" color="Violet"/>`, mat-106's own `pdfgenerator.py` has
 always honoured it, and **checkit-printit dropped it** -- `descriptions_tex`
-emitted `\setskilldesc{slug}{desc}` with no colour, so every printed box came
+emitted `\setskilldesc{slug}{desc}` with no color, so every printed box came
 out in the theme's default blue. Fixed, and matching is now on the **longest**
 prefix rather than the first letter, which is what lets one outcome claim a
-colour of its own.
+color of its own.
 
-FCP's is **Sepia**, picked by measurement: 65 units from every colour in use in
+FCP's is **Sepia**, picked by measurement: 65 units from every color in use in
 CIE Lab, where the closest existing pair (Orange and Red) is 40 apart, and
 11.3:1 contrast against white.
 
@@ -4489,7 +4489,7 @@ twice for keys), problem numbering restarting at 1 for each student.
   doing only if a second skill ever needs a different display name.
 - **`../FundCheck` is unchanged** and is not a git repository. It still holds
   ~120 generated `.tex` files carrying real student names.
-- **`pdfgenerator.py` still matches colours on the first letter**, so the two
+- **`pdfgenerator.py` still matches colors on the first letter**, so the two
   pipelines now disagree about FCP. Only matters if that script is still used.
 
 ## Where we paused (2026-09-02)
@@ -7640,9 +7640,9 @@ spelling-tolerance mechanism exists. A room holds the student's **id** and
 resolves it to a name only when writing the chart. A rename cannot break a
 room.
 
-### The version assignment is graph colouring
+### The version assignment is graph coloring
 
-Seats are vertices, "must differ" is an edge, letters are colours. Two
+Seats are vertices, "must differ" is an edge, letters are colors. Two
 kinds of edge, and they are different sorts of claim: **same group**, which
 is semantic and comes from the instructor and is always right; and
 **within `NEIGHBOUR_DISTANCE`**, a heuristic over the drawing, which is
@@ -7961,7 +7961,7 @@ person left.
 ### Two smaller rules worth stating
 
 **A swap exchanges people, not letters.** A version belongs to the chair,
-because the colouring is of the room; if letters travelled with people a
+because the coloring is of the room; if letters travelled with people a
 swap could seat the same paper next to itself.
 
 **A drop on nothing is a cancel, not an eviction.** Losing somebody out
@@ -8159,23 +8159,23 @@ are the viewer's, not the room's.
 
 ### Selection was the backbone, and it did not exist
 
-Nothing in the app could say "this group is selected", and the colour,
+Nothing in the app could say "this group is selected", and the color,
 the label, the anchors and the print position all hang off it. Built
 before any of them. A table selects its group; a desk in no group
 selects itself, which is the rule the print order already uses -- a
 seat in no group is a group of one.
 
-### Colour: one hue in, three shades out
+### Color: one hue in, three shades out
 
 `oklch(0.935 calc(0.048 * var(--c)) var(--h))` and five more like it.
 Lightness and chroma are fixed per role and only the hue varies, so
-every group is the same design in a different colour, and `--c` scales
+every group is the same design in a different color, and `--c` scales
 the chroma so an ungrouped student is the same three roles at **zero**:
 being grey is the status, which is what let the unseated rail stop
 captioning itself.
 
 A group with no hue takes one off an eight-hue palette by position, so
-rooms drawn before colour existed came up coloured with nothing
+rooms drawn before color existed came up colored with nothing
 migrated. `group.hue` and `group.label_at` are additive, so
 `room.VERSION` did not move -- a version bump is for a change that
 makes an old file read *wrongly*, not one that makes it read
@@ -8408,7 +8408,7 @@ so the silhouette stays turned.
 
 The alternative -- store the angle and apply it wherever seats are
 read -- would have reached `room.seats_of`, the neighbour distances,
-the version colouring and `seating.toml`, and every one of those would
+the version coloring and `seating.toml`, and every one of those would
 have had to agree about the same rotation. Baking it into the offsets
 means **a seat is always simply where it says it is**, and nothing
 downstream learns a new concept. A test pins it: `seats_of` must give
@@ -8498,9 +8498,9 @@ and nowhere else. `box-shadow: inset` follows the element's
 polygon and the rectangle coincide, which for a hexagon is exactly the
 top and bottom edges.
 
-Two clipped layers instead: the element in the edge colour, and a
+Two clipped layers instead: the element in the edge color, and a
 `::after` inset by three pixels with the same clip in the surface
-colour. The outline is the gap, and it follows every side because both
+color. The outline is the gap, and it follows every side because both
 layers are the same shape.
 
 ### And the part that was taste, which I got wrong by not reading
@@ -8518,12 +8518,12 @@ same feedback arriving twice is a cost worth not paying again.
 
 ### The island was two islands wearing the same box
 
-It showed a group's colour, name and print position in People, and a
+It showed a group's color, name and print position in People, and a
 desk's kind and chair-count in Groups and Seats. Changing mode
 rearranged it, and sometimes took away the control just used. Reported
 as "some sort of inconsistency", which it was.
 
-It is the same strip in every mode now -- **colour, label, seats,
+It is the same strip in every mode now -- **color, label, seats,
 print position** -- and what varies is one button at the right-hand
 end. That is the right axis to vary on: what changes between modes is
 what you are about to *do*, not what you are looking at.
@@ -8535,7 +8535,7 @@ about*.
 ### A new desk had no group, so half the strip had nothing to show
 
 The real cause of the inconsistency. `addShape` created a shape and no
-group, so a new desk had no colour, no label and no place in the print
+group, so a new desk had no color, no label and no place in the print
 order -- the strip fell back to "table, 2 by 2, 4 chairs" because that
 was all there was. An old desk, which came from a file that did have
 groups, showed the full set.
@@ -8840,11 +8840,11 @@ do with them.
 
 **The letters come along.** They are most of the reason to duplicate: a
 second table arranged like the first wants the same pattern of papers
-around it, not a fresh colouring that happens to be legal.
+around it, not a fresh coloring that happens to be legal.
 
 **The hue is copied only if the original chose one.** A group with no
-`hue` takes its colour from its position in the list; writing that
-colour down on the copy would freeze it to a shade the original would
+`hue` takes its color from its position in the list; writing that
+color down on the copy would freeze it to a shade the original would
 abandon the moment a group before it was deleted.
 
 Seats are filtered to the group's own: one desk can hold seats
@@ -9073,7 +9073,7 @@ side of a number that was already centred in it, and with the island's
 own 4px gap that put sixteen pixels between the minus sign and the
 first digit. `width: 44px; padding: 0`. Island 186 to 177.
 
-### A tenth swatch, and what a colour picker is allowed to choose
+### A tenth swatch, and what a color picker is allowed to choose
 
 Nine built-in hues now, and a tenth slot that opens
 `input type="color"`.
@@ -9084,20 +9084,20 @@ whatever machine the instructor is sitting at, with nothing to
 maintain. "Is there an off-the-shelf solution" -- there is, and it
 ships with the browser.
 
-What it returns is a full colour and what is kept is the **hue and the
+What it returns is a full color and what is kept is the **hue and the
 chroma**. `oklchOf` does sRGB to Oklab with Ottosson's matrices, which
 is the same conversion the browser does for the `oklch()` already in
-the stylesheet, so a colour picked here and a colour written there
+the stylesheet, so a color picked here and a color written there
 mean the same thing. Chroma is divided by 0.155 -- the chroma of the
-solid shade -- so a colour as vivid as the built-ins comes back as 1.
+solid shade -- so a color as vivid as the built-ins comes back as 1.
 
 The lightness is thrown away, on purpose, and this is the part worth
 defending. The three shades a group draws are built at fixed
 lightnesses chosen so a name is readable on the card and the card is
 visible against the paper, on a screen and on a projector and in
-print. Let the instructor set lightness and the first dark colour
+print. Let the instructor set lightness and the first dark color
 anybody picks makes a table whose names cannot be read from the back
-of the room. So the picker chooses *which* colour and *how vivid*, and
+of the room. So the picker chooses *which* color and *how vivid*, and
 the design system keeps deciding how light. `group.chroma` is new in
 the model, optional, 0 to 1.4, and absent means the standard strength
 -- so every group drawn before the picker existed is byte-for-byte
@@ -9279,8 +9279,8 @@ proved nothing. Sampling a row that is not `.on` gave it immediately
 had moved.
 
 The fix is not to animate the border. It is to not have one: nothing
-in the rail ever gives it a colour, because `.ibtn` sets
-`1px solid transparent` and `.ibtn.on` colours the background rather
+in the rail ever gives it a color, because `.ibtn` sets
+`1px solid transparent` and `.ibtn.on` colors the background rather
 than the edge. It was drawing nothing and costing a jump.
 `.rail.furled .ibtn { border-width: 0 }`, and the two toggles go.
 Afterwards, two frames in: height 19.6, gap 1.47, border 0 -- all
@@ -9470,7 +9470,7 @@ labels" inside it, with the glyph changing from a letter on a card to
 a letter in a circle -- the same letter, two different things about a
 seat, so the same glyph in two different containers rather than two
 unrelated pictures. On the canvas the version wears the circle too, in
-the group's solid colour, bottom right where the seat letter is top
+the group's solid color, bottom right where the seat letter is top
 right, so a card can carry both without either being the other.
 
 Arriving in Printing turns seat letters off and versions on; leaving
@@ -9497,7 +9497,7 @@ have to teach again.
 
 The sub-rail chooses between jobs that are not yet done: order numbers
 on groups and seats, typing a position on the canvas, clicking groups
-into order, the version count and its reshuffle, the graph-colouring
+into order, the version count and its reshuffle, the graph-coloring
 button, and dragging a version from one seat to another.
 
 On that last one -- the instructor asked how long a press should be
@@ -9619,16 +9619,16 @@ fails.
 
 By-seat numbering (the running number across the room, and editing
 it), and the whole of versions: the count, the reshuffle, the
-graph-colouring button, and dragging a version from one seat to
+graph-coloring button, and dragging a version from one seat to
 another.
 
 ## Spreading the versions, and running out of edges (2026-10-09)
 
-### The colouring runs on the server, on purpose
+### The coloring runs on the server, on purpose
 
 "Spread out" posts to `/api/seating/versions`, which calls
 `room.assign_versions` -- the same function the CLI uses, with the
-same graph colouring and the same heuristics about who can see whom.
+same graph coloring and the same heuristics about who can see whom.
 
 Reimplementing it in JavaScript would have been less code than the
 endpoint. It would also have been exactly the drift the GUI rule
@@ -9751,7 +9751,7 @@ its text, append an input, add a class -- keeps the box, the corner
 and the card, so nothing moves. Measured: the editor opens at an
 offset of 0, 0 from where the badge was.
 
-**It is white with a ring in the group's colour.** It had been dark
+**It is white with a ring in the group's color.** It had been dark
 with a green ring, which is the islands' palette worn by something
 that is not an island; the group label had the right answer already.
 
@@ -10027,7 +10027,7 @@ all behaved differently. Counting them found four:
 | mode rail | hover | leaving | .28s / .2s |
 | furniture drawer | click | click, or outside | .28s / .2s |
 | save menu | click | outside **only** | none |
-| colour swatches | click | outside | none |
+| color swatches | click | outside | none |
 
 Each was defensible when it was written. Together they are a window
 that has to be learned four times, and the save menu's missing
@@ -10053,7 +10053,7 @@ opening any one of them shuts the others.
 The rule is written down as PRINT_TOOL_DESIGN.md 12.13, with the part
 that matters most at the end: **these should share an implementation,
 not a convention.** Four places independently deciding to behave the
-same way is four places that can independently stop. The colour
+same way is four places that can independently stop. The color
 swatches are still the fourth way and are named there as the next one
 to convert.
 
@@ -10077,7 +10077,7 @@ pairs.
 
 ### A dot that claimed too much
 
-The save button's dot was accent-coloured and hollow when the unsaved
+The save button's dot was accent-colored and hollow when the unsaved
 changes were in the *other* room. Accent in this window means "the
 state you are in", so a room with nothing to save wore a bright mark
 that read as though it had something. Grey: it still says "something,
@@ -10147,7 +10147,7 @@ two of them saying the same thing.
 
 The label *is* the value now -- "By seat" -- which is exactly what
 the display switch does with "Seat letters" and "Version labels".
-One glyph, one colour, bold, above a rule. The rule is what separates
+One glyph, one color, bold, above a rule. The rule is what separates
 a state from the commands under it; the weight is what makes it read
 as the heading of the list rather than the first item in it.
 
@@ -10303,10 +10303,10 @@ zero. The band has a layer of the same kind now and is plain room
 units inside it. Verified: dragged 120,90 by 280x210 and the band
 drew at 120,90 by 280x210, off by nothing.
 
-### Grey, because the accent is a colour a group can wear
+### Grey, because the accent is a color a group can wear
 
 The band was drawn in the accent, which is also a hue a table can be.
-A selection rectangle in the one colour the thing underneath might
+A selection rectangle in the one color the thing underneath might
 already be is a rectangle you cannot see. Grey is the only hue
 nothing in the room competes with.
 

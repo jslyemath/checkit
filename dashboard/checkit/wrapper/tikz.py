@@ -180,7 +180,7 @@ def _log_errors(log_path, limit=8):
     LaTeX writes errors as a line beginning "! ", and carries on afterwards
     whenever it can. That recovery is why checking for a PDF is not enough:
     the file exists and the picture is wrong. Two silent cases reached
-    published images before this was checked -- an undefined colour drew black,
+    published images before this was checked -- an undefined color drew black,
     and an undefined \\dfrac dropped the fraction bar and printed "56".
 
     Warnings are left alone. Overfull boxes and font substitutions are normal
@@ -248,7 +248,7 @@ def _compile_one(tikz_path, png_path, name, preamble, bank_root=None):
                 f"pdflatex reported errors while compiling {name} "
                 f"(from {tikz_path}). A PDF was still produced, but a figure "
                 f"drawn through an error is not the figure that was asked for "
-                f"-- an undefined colour silently draws black, an undefined "
+                f"-- an undefined color silently draws black, an undefined "
                 f"\\dfrac silently drops the fraction bar.\n"
                 + "\n".join(f"  {line}" for line in errors)
                 + f"\n\nThe figure's preamble comes from tikz_preamble.tex in "
