@@ -2293,14 +2293,16 @@ redirects to the Roster tab, because adding a person is roster work.
 The four items on the 2026-10-10 list are all struck through above;
 this replaces it.
 
-1. **Pinch zoom does not anchor the way the wheel now does.**
-   `twoFinger` still scales `pan` proportionally, which is the
-   approach the wheel used before 2026-10-11 and which drifted. It
-   should almost certainly use the same measure-and-correct loop about
-   the pinch midpoint. **Unverified either way** -- it needs a real
-   touch device, and this is exactly the "a fix applied to one path is
-   not applied to the others" pattern the root `CLAUDE.md` tracks, so
-   it is first on the list.
+1. ~~Pinch zoom does not anchor the way the wheel now does.~~
+   **Done 2026-10-11**, and it was three faults rather than one. The
+   guess that it needed real hardware to confirm was wrong: synthetic
+   touch pointers drive the handler, and measuring first found that
+   neither `panPaper` nor `bandPaper` filtered `pointermove` by
+   `pointerId`, and that nothing called off the one-finger gesture
+   when a second finger landed. The anchoring is now one named
+   function, `holdPoint`, which both the wheel and the pinch call.
+   117 pixels of drift before, 0.03 after. See the notes of the same
+   day.
 2. **Nothing in Seating has been used on a phone.** Two-finger pan and
    pinch are written and have never been under a thumb. The layout was
    checked at 530px in a desktop browser, which is not the same test.
@@ -2311,13 +2313,12 @@ this replaces it.
    certainly shape in them that no longer earns its place. The
    instructor's own words: more there needs reconsidering than the one
    `at` key that 12.14 added.
-5. **One unexplained measurement.** A nine-click synthetic zoom
-   harness reports one to two and a half pixels of total offset and
-   reports *the same numbers before and after the anchoring fix*,
-   while a single click is verified to hold its point to 0.008 room
-   units and a round trip returns to exactly zero. That pattern says
-   the harness is measuring something structural rather than
-   accumulation. The pan clamp, `roomPoint` determinism and the
-   transform origin were each ruled out. It is written down because an
-   unexplained residual that nobody can see is still a thing somebody
-   should eventually explain.
+5. ~~One unexplained measurement.~~ **Explained 2026-10-11, and
+   there was nothing wrong with the room.** `MouseEvent.clientX` is a
+   `long`, so the browser truncates wheel coordinates to whole pixels;
+   the harness was measuring a point up to a pixel away from the one
+   the zoom anchored on, and such a point is *supposed* to move when
+   the picture scales. Rounding the measuring point gives 0.03 pixels
+   over fifteen clicks. The clue was the thing recorded as the puzzle:
+   **a number that does not change when you change what it measures is
+   measuring something else.**
