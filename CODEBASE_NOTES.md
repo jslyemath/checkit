@@ -10895,3 +10895,93 @@ The drawer stopped a finger's width above the corner button: the
 reserve was a flat 86px, and is now `--edge` plus the button plus
 air, which measures 14. Same family as the 130px bottom band fixed
 yesterday -- a number chosen by eye once and never asked again.
+
+## A shortcut that had never once worked (2026-10-11)
+
+### The arrow keys
+
+Groups mode has advertised "arrows nudge the one you click by 20,
+shift+arrows by 1" in its own description since it was written, and
+the keys have never worked. Three things in a row, each individually
+reasonable:
+
+* `dragShape` calls `event.preventDefault()` on `pointerdown`, which
+  is right -- it stops the browser selecting text during the drag --
+  and which also cancels the browser's own focus-on-click.
+* It then calls `focus()` itself, on `drawn.shapes[id]`. That is the
+  *wrap*, the element that gets positioned; its own comment even says
+  so. The wrap carries no `tabindex`, so the call does nothing.
+* The `keydown` handler and the `tabindex` are both on the
+  silhouette *inside* the wrap, which therefore never had focus.
+
+Confirmed before fixing rather than assumed: the wrap has no
+tabindex and is not focusable, the inner element has both the
+tabindex and the handler. So this was never user error. Both
+`dragShape` and `nudgeShape` now focus the element that carries the
+handler -- `nudgeShape` too, because the render that follows a nudge
+replaces the element and the second press would otherwise go
+nowhere.
+
+Seats never had nudging at all. They do now, and the mode's
+description says so.
+
+### Seats line up with each other
+
+The grid was the only thing a seat snapped to, which lines a room up
+with an abstract lattice rather than with itself. A dragged seat now
+takes the x of the nearest seat above or below it and the y of the
+nearest left or right, per axis and independently, with a guide line
+drawn on the one it took.
+
+**Alignment is tried before the grid, not after.** The grid is always
+within half a cell, so a grid-first order means the alignment snap
+can never fire.
+
+**Shapes were left out on purpose.** A desk can be turned, and its
+box is the unrotated one, so an edge guide would point at an edge the
+desk no longer has. Lining up seats is the case that comes up; lining
+up angled furniture is not worth a geometry engine.
+
+### Polygons could not have rounded corners, or a border
+
+The hexagon and the trapezoid were `clip-path: polygon(...)`, which
+cannot carry a border -- so each was two clipped layers, the lower
+one the edge colour showing through as an outline -- and cannot round
+a corner at all.
+
+They are SVG polygons now: one layer, a real stroke, and
+`stroke-linejoin: round`, which rounds every corner for nothing. The
+stroke scales with the room because the canvas is scaled by a
+transform, exactly as the rectangles' borders do. A triangle with one
+seat cost three numbers once that was in place.
+
+### Two words, and the one that lied
+
+"Discard 820" names the section and then says to discard it. The
+object named is the thing discarded, so the row reads as deleting the
+class. **"Revert 820"** says the same thing in the same two words
+without the misreading, because reverting a thing is returning it to
+an earlier state rather than throwing it away -- and the icon has
+been a back-arrow called `revert` all along.
+
+The menu also carried `min-width: 190px` against a widest row of 61,
+so it stood off to one side of its own text. It hugs now, at 116.
+
+### Measured, again
+
+The unseated rail's top gap was 7 where every other gap in the window
+is 8, and its bottom landed 3px above the strip when the mode rail
+was furled -- and 108px below it when the rail was open. Both ends
+were constants. They are measured now, from the island above and the
+strip below.
+
+**The bottom follows the strip only while the mode rail is furled.**
+Unfurling lifts the strip by about 110px, and a persistent list that
+lost a third of its height whenever a transient flyout opened --
+scrolling whatever was in view out of it -- would be a worse bug than
+the misalignment. The resting state is the one that lines up.
+
+One further detail: rounding each edge to a whole pixel before
+subtracting put both gaps one out, because the pane runs at a device
+pixel ratio of 1.5. The placement is fractional, and the two gaps now
+agree to within one device pixel.
