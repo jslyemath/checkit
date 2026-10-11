@@ -11153,3 +11153,82 @@ the two ways of choosing several things produce one thing and share
 the strip. Whatever single item was already chosen comes along on the
 first ctrl-click, or picking a second desk would appear to lose the
 first.
+
+## The pan key was a question about focus (2026-10-11)
+
+### Why it only worked some of the time
+
+Two fixes had already gone in and the symptom survived both, which
+should have been the clue that neither had found the cause. It was
+this, and it had been there from the first version:
+
+```js
+if (e.target.closest("input, textarea, button")) return;
+```
+
+A keydown's target is whatever has keyboard **focus**. Clicking a
+button focuses it. The canvas is ringed with buttons -- the mode
+rail, the corner, the palette, the strip, both islands -- so after
+touching any control at all, focus was parked on it and space did
+nothing: no flag, no palm, no pan. It came back only when focus
+happened to land somewhere else, which is exactly "it works a bit of
+the time". And because the early return skipped the
+`preventDefault` too, the space went on to *activate* that focused
+button, so the mode rail would flap open as a bonus.
+
+**The question is about the pointer, not about focus.** Space means
+pan when the pointer is over the paper; everywhere else it keeps its
+ordinary job of pressing the focused button, which is the one thing
+a keyboard user needs it for. The only guard left is for text entry,
+which is the single case the original was really written for.
+
+Worth recording the shape of the mistake rather than just the line:
+the first two attempts were both about *delivery* -- the event
+reaching the paper, the handler running before a descendant could
+stop it -- and both were real improvements that fixed nothing,
+because the flag was never set in the first place. A symptom that
+survives a correct fix means the model of the failure is wrong, not
+that the fix needs another layer.
+
+### One selection, in grey
+
+Three faults in the chrome, reported as "two sets of handles".
+
+The ring was drawn in the group's own colour a few pixels outside
+the desk's own coloured border, so the two read as one doubled
+outline -- which is also the thing already decided against twice:
+**the accent and the group colours are the document's, and nothing
+that means "chosen" may use them.** It is grey now, the one colour
+on this canvas that cannot belong to a group.
+
+It was also 1.5px against the desk's 2.5, so the selection was
+lighter than the thing it surrounded. One weight, the room's.
+
+And the handles sat at the rectangle's *corner point*, which is not
+on a rectangle with a 21px radius: a rounded corner bulges inward by
+`R - R/sqrt(2)`, so the four corner handles floated past the arc
+while the four edge handles sat exactly on the line. They come back
+by that amount now and every handle meets the line the same way.
+
+### Glue and unglue
+
+A merged group needed almost no new model: a group already spans
+whatever desks its seats are on, so merging is a fold of the seat
+lists and splitting is a regroup by desk. **Seat letters needed no
+case at all** -- a letter is derived clockwise from the top left of
+its *group*, so a merged group sweeps the whole arrangement as one
+ring the moment it exists.
+
+What did need writing is that it behaves as one body: every desk of
+the group travels on a drag, and a turn swings the arrangement about
+its common middle rather than spinning each desk on its own axis in
+formation. One desk is the same code with a party of one and a pivot
+at its own centre.
+
+The survivor of a merge is whichever part printed first, so the
+merged group lands where the earliest of its parts was and the stack
+shifts as little as it can. The test for that had to put the print
+order backwards against the order the groups are listed in -- the
+only arrangement where picking by list position and picking by print
+order give different answers, and the mutation that deleted the sort
+passed until it did.
