@@ -10547,3 +10547,119 @@ appearance*, and wrote the by-group chart first -- so that chart read
 up front from the room's own list showed the real answer: the room
 lists `P01 P02 P03 P04` and the chart prints `P01 P02 P04 P03`, which
 is the clockwise swap.
+
+## A view that answers a question it cannot answer (2026-10-10)
+
+### Spelling
+
+`colour` is now `color` everywhere we write it: 194 occurrences across
+25 files, a plain respelling of `olour` with the case kept. Prose,
+comments and one test class name; there were no identifiers in it
+beyond that, and the LaTeX style files turned out to use the word only
+in comments, so no public command name moved. Generated, built and
+deployed copies were left alone -- editing an artifact is undone by
+the next build.
+
+### The color swatches, finally a drawer
+
+The last of the four disclosures that was created on demand. It
+appeared with no motion, and could only be dismissed by pressing
+elsewhere -- pressing its own dot again built a *second* copy on top
+of the first. It is now an `.isle.drop` built once in the markup, and
+it closes four ways: the dot again, Escape, another drawer opening, a
+press on bare paper. All four were checked in the browser.
+
+Its contents are rebuilt only when a different group is selected, and
+here 12.13's "told, not rebuilt" is load-bearing rather than
+cosmetic. The tenth slot holds a live `input type="color"` whose
+preview calls `renderSeating` on every movement of the picker, so
+rebuilding during that render would replace the element the
+platform's picker is anchored to and the picker would shut on first
+use. Verified by rendering twice with the drawer open and checking
+the input is the same node.
+
+`closeDrawers()` replaced three hand-written lists of the open flags.
+Three sites had to name all of them, which is exactly how the fourth
+gets forgotten at two of the three.
+
+### A pin, and a shuffle that steps round it
+
+`seat.pinned` is optional and boolean: whoever is in this chair stays
+in it, which is what an accommodation needs. Not the same word as
+`seating.Seat.pinned`, which is about a version letter being written
+down rather than worked out; different file, different question, and
+both are commented to say so.
+
+The pin sits in the bottom-right corner of a name card, opposite the
+version letter, and in the same `--solid` color -- both corners say
+"the room has decided something about this card". It shows when set,
+on hover, and on the card currently in hand. That last one is what
+makes it reachable under a finger, which has no hover: tap a person,
+then tap their pin. Showing all twenty-five always would be a row of
+grey dots nobody is looking for.
+
+**Four gestures can move somebody** -- drag a card, drop onto a card,
+click a name, click a chair -- and all four end at `movePerson`. The
+refusal lives there, so "pinned means pinned" is true once rather
+than four times; the affordances are turned off at each gesture as
+well, so the move never looks available.
+
+The shuffle is server-side, like the coloring, because the rule here
+is that a button calls the function a command would -- and because
+its rules are worth testing, which a shuffle living in the canvas
+could not be. It deals the *seated* into the *unpinned* chairs: the
+rail is somewhere a person was put on purpose, and emptying it would
+be undoing a decision rather than making one. Empty chairs shuffle
+like anybody, or every gap collects at one table. Letters stay on the
+chairs, because the coloring is of the room, so the arrangement is
+still legal afterwards and nobody needs re-coloring.
+
+Nothing is written: the room comes back changed and unsaved, so an
+instructor who dislikes where everyone landed presses Discard.
+
+**Randomising a subset needs no feature.** It is pinning the rest,
+which is already there, inverted.
+
+### `seats_of` is a view, and it bit twice in one hour
+
+`room.seats_of` looks like the way to reach every seat and is not. It
+builds a *fresh dict per seat* carrying id, shape, student, version
+and absolute position -- so it silently drops `pinned`, `spot` and
+`order`, and anything written to what it hands back is thrown away
+with it.
+
+First it ate the shuffle. `shuffle_seats` filtered on `pinned` through
+the view, so every seat looked unpinned; it then permuted six
+throwaway dicts and reported that it had moved five people. Which it
+had. The tests caught that one immediately.
+
+Then, half an hour later, it ate the same function's *report*. The
+endpoint counted pinned chairs through the view as well, so the count
+was always zero and the note quietly stopped mentioning them. Nothing
+caught that: there was no test on the wording, and the number it got
+wrong was not the number anything asserted. It was found by reading
+the toast in the browser rather than the return value -- "23 moved."
+where it should have said "and 1 pinned chair stayed put".
+
+That is the "a fix applied to one path is not applied to the others"
+rule, with the second path written by the same hand twenty minutes
+after the first. `room.live_seats` now exists for code that changes a
+seat or reads a field the view does not carry, and says in its
+docstring which question belongs to which. Every other caller of
+`seats_of` was checked: the remaining four read only fields the view
+does carry.
+
+### Two more tests that asserted nothing
+
+**A guard that changes no answer.** `shuffle_seats` returns early when
+there is nothing to permute. Deleting the guard changed no result:
+the re-roll loop simply spins twenty times over a list of one and
+returns zero anyway. What the guard actually promises is that it does
+not try, so the test now counts calls into a stubbed `Random` instead
+of only reading the answer.
+
+**The arrangement that cannot fail.** The first test for "a bare
+section must not be dragged behind a numbered one" put the reordered
+section *first*, where the bug is invisible. Noted again here because
+it is the second time this session that a test was written in the one
+arrangement that cannot distinguish the fix.
