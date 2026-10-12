@@ -12061,3 +12061,80 @@ not. 746 printit tests, 152 checkit, 0 audit problems.
 honest fix is not to make it cleverer but to make alternation rare,
 which the warnings now do. `assemble.printed_collisions` already
 measures the real thing on a real run.
+
+## The pull promised a default it did not apply (2026-10-12)
+
+First real print run through the new course: the 10-12
+Extravaganza, 45 students, order and versions from the Seating tab,
+selections pulled from the instructor's own Google Form.
+
+### What the run said, and what it did
+
+`form pull` reported, accurately, that 28 students answered for today
+and that
+
+    17 did not answer; they will get [selection] default_when_missing
+
+They did not. The write path is
+
+    if key in out.pulled.chosen:
+        updated.append(dataclasses.replace(student, skills=[...]))
+    else:
+        updated.append(student)        # untouched
+
+so a non-responder keeps whatever `skills` they already had. This
+course was created with `course init --adopt` from the 2026-10-05 job,
+whose roster carried that day's `['W5', 'W6', 'W7']` for everyone. All
+17 still had it.
+
+So they were handed six papers each -- last week's three plus the
+three appends -- where the instructor had asked for three. **51 papers
+nobody requested**, in a stack that otherwise verified perfectly.
+
+### Why nothing caught it
+
+The build is not wrong: it faithfully printed what the roster said.
+The roster was not obviously wrong either -- `skills` is a real field
+with real values in it. The only thing that knew was the pull, and it
+announced the opposite of what it did.
+
+Checking "every student's papers == their choice plus the appends"
+passes in both worlds, because it reads the same roster the build
+read. It took comparing the *silent* list against the adopted roster
+to see it. **A check that derives what it expects from the same file
+the thing under test used cannot find a wrong file.**
+
+### Fixed for the run, not yet in the tool
+
+The 17 were cleared, the already-recorded run was taken back out of
+`record.db` (built eight minutes earlier, never printed), and the
+rebuild produced 258 papers -- exactly 309 minus 51.
+
+**The tool is still wrong.** Either the pull should clear a
+non-responder's stale choices, or it should stop saying they will get
+the default. The first is almost certainly right: `skills` means
+"what this student chose for the assessment being prepared", and a
+value left over from a previous one is not an answer to that
+question. Left for the next session because it was found mid-print
+with a class waiting.
+
+### What did verify, on the artifact
+
+* order: the record's student order equals the chart's, all 45
+* versions: every paper on its seat's letter
+* appends: all 45 have R1, N1 and N1-E; the 17 silent have exactly those
+* R1: pinned to whole-number seeds per letter -- A add, B subtract,
+  C multiply, D divide -- and the rendered `.tex` of all four contain
+  no fraction, decimal or PEMDAS words
+* 360 pages, 0 LaTeX errors, one benign `rerunfilecheck` notice
+
+### R1 could not be asked for, only pinned
+
+Worth keeping. R1 declares no variant, so `[variants]` cannot reach
+it, and the print tier was generated with `pool='assessment'`, which
+draws from every version list the generator holds. 207 of its 600
+printable seeds are fractions, decimals or PEMDAS -- about one letter
+in three would have been off topic. `course_progress`, which exists
+precisely to restrict it, is read only by the legacy pdfgenerator
+path. `[seeds.R1]` per letter is the way to get a topic out of this
+bank without regenerating a live skill mid-term.
