@@ -11884,3 +11884,74 @@ checked.**
 Four mutations, all noticed: never refusing, ignoring the date,
 ignoring the skills, and letting the button through. 739 printit
 tests, 152 checkit, 0 audit problems.
+
+## A button nobody could press, verified with .click() (2026-10-12)
+
+Reported by the instructor within minutes of being handed it: "your
+'start the room' button doesn't do anything".
+
+### Why it did nothing
+
+`.startroom` is drawn inside `#seating-empty`, which is inside
+`.paper`. The paper's bubble `pointerdown` handler claims anything
+its filter does not name -- the filter lists
+`.shape, .seatcard, .pill, .grip, .spinner` -- so pressing the button
+ran `panPaper`, which takes pointer capture. Capture sends the
+`pointerup` to the paper, and the browser dispatches the synthesised
+`click` to the common ancestor of the two targets. **The button never
+sees it.**
+
+`.plusbtn` escapes this only because it lives outside `.paper`, in
+`#view-seating`. That is luck, not design: nothing stopped the next
+control being drawn on the paper, and the next control was.
+
+The filter now also skips `button, input, select, textarea, a` --
+named by role, because the control after this one will not be in any
+class list this file keeps.
+
+### How it was shipped broken
+
+This is the one worth writing down. The verification was
+
+    const b = document.querySelector(".startroom");
+    b.click();
+
+which runs the handler and proves nothing about whether a pointer can
+reach it. `element.click()` does not go through hit testing, pointer
+capture, or the paper's handler at all.
+
+Worse: **two real clicks at the right coordinates had already been
+tried and done nothing**, and that was explained away as a
+coordinate-frame problem between the screenshot and the viewport.
+The evidence was there and was argued with. The root `CLAUDE.md`
+already says "operate the control; do not call what you think it
+calls", from a case where an endpoint was POSTed instead of a button
+being pressed; this is the same rule one layer down -- a DOM `click()`
+is not a click either.
+
+Re-verified the right way: a real `left_click` at the mapped
+coordinates, with a listener counting. One click received, sections
+created.
+
+### And the button should not have been the way in
+
+The instructor's second point, which is the better design: a course
+whose roster names 820 and 830 should not have to be *asked* to make
+820 and 830.
+
+`loadSeating` now starts them when a room has no sections, quietly
+and unsaved -- the same shape as a shuffle, so Discard still works
+and looking commits nothing. The empty state survives only as the
+retry when that call fails.
+
+**And a new room opens in Groups**, because the plus that opens the
+shape palette exists only there. Landing in People would be a rail
+full of students, a bare canvas and nowhere to put anybody. The rail
+stays People's; nothing is hidden, there is simply nothing to seat
+them on yet.
+
+Verified on the real course, from a plain page load and no press:
+mode `groups`, sections 820 and 830 in order, the switcher drawn,
+22 standing in one and 23 in the other, unsaved. Panning still pans
+(an 84 by 56 drag moves `pan` by exactly 84 by 56) and a Groups-mode
+drag still bands rather than panning.
