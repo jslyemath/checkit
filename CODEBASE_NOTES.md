@@ -11601,3 +11601,79 @@ Each by measurement in the running app, on `Scratch 48`:
 * `endGesture` is null after every one of those, so nothing leaks
 * 715 printit tests, 152 checkit tests, 0 audit problems
 * the fixture hashes to what it did before
+
+## Pointing it at a real class, and what that found (2026-10-11)
+
+Setting MAT 106 up for actual use -- 45 students, sections 820 and
+830, local only. Two bugs inside the first ten minutes, neither of a
+kind any fixture could have produced.
+
+### `course init --adopt` hands you a chart the tab will not touch
+
+The newest job carried a real roster and a real `seating.toml`, and
+`init` adopts both. But that chart is not a room: it is a flat
+print-order list from a Control Center spreadsheet export, two
+`[[group]]`s standing in for the two sections, 22 and 23 names in row
+order with the version letters pinned.
+
+And `api_seating_save` refuses to overwrite a chart it did not write
+-- rightly, that guard is the 10-02 mistake wearing a seatbelt. So
+adopting it would have meant building a room, pressing Save, reading
+"Room saved", and having the build go on printing from the old flat
+list. **The room would have been decorative and nothing would have
+said so.** Confirmed before it bit: `was_generated` on the real file
+answers False.
+
+Adopted the roster, deleted the chart. The original is still in the
+job folder; nothing was overwritten.
+
+### A real course could not start a room at all
+
+`room.new_section` existed. Nothing but `tests/` had ever called it.
+Not the CLI, not the app -- and every control that adds furniture adds
+it *to a section*, so a course with none has no palette, no rail and
+no canvas. The empty state said "the canvas is where you lay the desks
+out" and offered nowhere to lay them. Scratch 48, the fixture
+everything was developed against, had its sections written by hand,
+which is exactly why a fortnight of work never met this.
+
+An empty state has to be a door, not a sign.
+
+**The first room is made by the server**, `/api/seating/start`,
+because the canvas could have built the dict in four lines and then
+there would be two answers to what a section is. The rule in this
+project is that a button calls the function a command would.
+
+**And it makes one room per section the roster names**, with the
+names taken from the roster rather than typed. That is not
+convenience: `standing` filters the unseated rail by comparing the
+room's section name to the roster's `section` field, and a name that
+matches no student **turns the filter off** rather than failing, so
+both sections would be offered every chair. A typed name is a silent
+wrong answer. Verified against the real class: 22 cards in 820, 23 in
+830.
+
+Nothing is written, like the shuffle -- the room comes back as an
+unsaved edit, so looking does not commit and Discard still works.
+
+Eight tests, each watched failing: ignoring the roster, dropping the
+no-sections fallback, dropping the already-has-a-room guard, and
+writing to disk are all noticed.
+
+### A tool giving confident wrong instructions
+
+`course init` ended with "an adopted roster has display names and no
+student ids -- import a class list next". Unconditional. The real
+roster had a Banner id **and** an email for all 45, so the advice was
+to go and fix something that was not broken -- and every class list on
+disk was older than the roster, so taking the advice would have
+resurrected two students who had left. Wrong instructions in a tool's
+own output are worse than none.
+
+It now counts and says nothing when there is nothing to say. The test
+that covered it only ever checked the warning appears when ids are
+missing; it could not have caught this, because nothing checked the
+other half. Both halves now, and the new one asserts **that a complete
+roster earns no advice at all** rather than looking for a phrase --
+the old phrase does not contain the new one, so a phrase check would
+have passed against the unfixed code and proved nothing.
