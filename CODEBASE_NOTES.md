@@ -11955,3 +11955,43 @@ mode `groups`, sections 820 and 830 in order, the switcher drawn,
 22 standing in one and 23 in the other, unsaved. Panning still pans
 (an 84 by 56 drag moves `pan` by exactly 84 by 56) and a Groups-mode
 drag still bands rather than panning.
+
+### Then the room it started opened at 19%
+
+Found by looking at the screenshot of the fix rather than at the
+numbers, which is worth noting on its own: every assertion passed and
+the picture was still wrong.
+
+`contentBox` falls back to the **declared canvas** when nothing is
+drawn, and `new_section` declares 2400 by 1600 -- generous, from when
+that number bounded where furniture could go. Since the canvas lost
+its edges it bounds nothing; it is a record of reach. So a new room
+fitted to a rectangle that describes nothing and opened at 19%, where
+the first desk dropped into it is a 21-pixel speck.
+
+Fitting a placeholder instead gave 44%, which is no better in kind:
+still a number this file made up. **There is nothing to fit in an
+empty room**, so `fitZoom` now returns 1. 100% means something.
+
+The box carries an `empty` flag because `fitZoom` is handed a
+rectangle, not a section, and "there is nothing here" is the one
+thing it cannot read off a rectangle.
+
+**Left alone, and reported instead:** dropping the first desk still
+jumps the view to 208%, because `seatingZoom` is null while fitting
+and fit recomputes live as content changes. That is fit doing what
+fit does, it predates all of this, and changing what fit means is not
+a call to make while the instructor is mid-build.
+
+### A commit message is shell text too
+
+`git commit -m "... carries an \`empty\` flag ..."` in bash runs
+`empty` as a command and substitutes nothing, so the word vanished
+from the message. Double quotes do command substitution; the project
+already knows heredocs eat backslashes and `sed` eats `\u`, and this
+is the same family. Single-quote the message, or keep backticks out
+of it.
+
+Not amended: it was already pushed, and a force-push over one word is
+a worse trade than a slightly thin commit message when the real
+record is here.
