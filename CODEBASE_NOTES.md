@@ -11677,3 +11677,83 @@ other half. Both halves now, and the new one asserts **that a complete
 roster earns no advice at all** rather than looking for a phrase --
 the old phrase does not contain the new one, so a phrase check would
 have passed against the unfixed code and proved nothing.
+
+## `.gs` and `.js` are one file, and the guard could not see it (2026-10-11)
+
+`form attach` had never been run against a form somebody else made.
+The first time it was, it failed -- and the check written to make it
+safe had already said it was safe, wrongly.
+
+### What `Conflicting files found` meant
+
+`clasp push --force` refused. The staging directory held both
+`Code.gs` and `Code.js`.
+
+**Those are not two files.** `.gs` and `.js` are one file type to
+Apps Script; clasp writes `.js` when it clones and printit stages
+`.gs`, so the clone brings our own file back down under a name we do
+not use, and clasp sees one remote file claimed twice. Re-staging
+cannot fix it, which is the part worth keeping: **an overwrite cannot
+reach a name it does not share.** The twin has to be deleted.
+
+`attach_form` now drops any cloned file Apps Script would file under
+one of ours -- matched by the name without its extension, because the
+extension is not part of the identity -- and then stages ours.
+
+### The guard was blind to the only case that happens
+
+`what_the_clone_would_replace` exists for one reason: to say, before
+attaching, which of the instructor's files would be destroyed. It
+scanned for `.gs`, `.json` and `.html`.
+
+Not `.js`. **The extension every real clone produces.**
+
+So it reported `files: [.clasp.json, appsscript.json]` over a project
+that contained `Code.js`, and on that basis this session said out
+loud that the script was empty and attaching was safe. It happened to
+be true -- the remote `Code.js` was Google's 29-byte
+`function myFunction() {}` stub -- but the reasoning was worthless,
+and had there been real code in it the instructor would have lost it
+to a check reporting nothing at risk.
+
+**Why the test suite did not have this.** There was a test. Its fake
+clone writes `Code.gs`, `ControlCenter.gs`, `appsscript.json`,
+`Sidebar.html` -- a fixture built out of *printit's* vocabulary
+rather than clasp's. A fake that models your own side of the boundary
+cannot fail the way the boundary does.
+
+It also reported `.clasp.json`, which clasp writes during the clone:
+a file the instructor never had, listed among the ones they might
+lose.
+
+### Asking the safe question broke the thing it protected
+
+It cloned into `_inspect/` **inside `clasp_dir`** -- which is the
+directory `clasp push` runs in, and clasp pushes recursively. So
+running the check left a second complete copy of the project exactly
+where the next push would trip over it. It now clones into a
+temporary directory and removes it.
+
+### The mutation that was not noticed
+
+Five mutations, four caught. The one that was not: putting `_inspect`
+back inside the push root. The test asserted "nothing is left
+behind", and the cleanup added alongside the move ran either way --
+so it passed with the bug restored.
+
+That is the familiar shape in a new place: **the test proved the half
+of the fix that was easy to assert and silently stopped proving the
+half that mattered.** Location is the half that matters precisely
+when cleanup cannot run -- a clone that dies partway, a file Windows
+still has open. Both halves are asserted separately now, and both
+mutations fail.
+
+### State afterwards
+
+The retry pushed and deployed. It stopped where it is supposed to
+stop: Google has not authorized the web app, which only the form's
+owner can do in a browser. `form.toml` has the script id; `form_id`
+is still empty because the script has to be reached to learn it.
+Nothing on the form itself was changed.
+
+730 printit tests, 152 checkit, 0 audit problems.
