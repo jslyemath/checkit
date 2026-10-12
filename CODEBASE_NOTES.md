@@ -11995,3 +11995,69 @@ of it.
 Not amended: it was already pushed, and a force-push over one word is
 a worse trade than a slightly thin commit message when the real
 record is here.
+
+## Plausible letters nobody chose (2026-10-12)
+
+The instructor laid out both sections, saved them, and asked whether
+the print view was really reading the versions off the seating. It
+was not, and the reason is worth the section.
+
+### What was actually true
+
+45 students seated across 820 and 830. **Not one seat carried a
+version letter** -- the coloring in Printing mode had never been run.
+So:
+
+* `to_toml` wrote 45 seat entries and **no `version` key on any of
+  them**, while printing a header saying "Every seat names its
+  version because the room chose it";
+* `seating.load` filled the gap with `alternate`, cycling A B C D by
+  position within each table;
+* the Print view's "Who gets what" showed those letters in a column
+  headed **Version**, beside a reset button offering to "put every
+  student back on their seat's version";
+* and `Chart.collisions` reported no clashes -- which it always will,
+  because alternation never repeats within a run. **The check is
+  vacuous against the chart that needs it most.**
+
+Nothing anywhere was wrong enough to fail. Every layer passed on a
+plausible answer.
+
+### Whether it would actually have printed badly
+
+Checked rather than assumed, against the saved geometry: 43 adjacent
+pairs in 820 -- 30 at the same table and **13 across tables**, which
+is the kind alternation knows nothing about -- and no pair would have
+received the same letter. So this particular room would have printed
+correctly.
+
+That is luck. It is one dragged table away from not being true, and
+nothing in the pipeline was ever going to say so.
+
+### Three places now say it
+
+* **the chart**: when no seat carries a letter the header says `NO
+  VERSIONS ARE SET` and what will happen instead, rather than
+  asserting the room chose them;
+* **the save**: the toast adds "No seat has a version yet, so the
+  build will alternate them", at the moment the file is written;
+* **the refusal in `responses.for_assessment`**, which is a different
+  bug found the same morning: "Set one with `skills set --date`" was
+  the whole advice, and it is reached from the Pull button on a tab
+  that has a date field. It names both now.
+
+All three are the same fault in different clothes: **the tool knew
+something the person needed and did not say it.** Yesterday's
+`course init` note was the inverse -- saying something confidently
+that was not so.
+
+Five mutations, all noticed, including the two that matter most:
+warning when the letters *are* set, and not warning when they are
+not. 746 printit tests, 152 checkit, 0 audit problems.
+
+### Not changed
+
+`Chart.collisions` is still vacuous against an alternated chart. The
+honest fix is not to make it cleverer but to make alternation rare,
+which the warnings now do. `assemble.printed_collisions` already
+measures the real thing on a real run.
