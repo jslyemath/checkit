@@ -12138,3 +12138,84 @@ in three would have been off topic. `course_progress`, which exists
 precisely to restrict it, is read only by the legacy pdfgenerator
 path. `[seeds.R1]` per letter is the way to get a topic out of this
 bank without regenerating a live skill mid-term.
+
+## Both fixed properly (2026-10-12)
+
+### A non-responder chose nothing
+
+`form pull` now clears a silent student's `skills` instead of leaving
+last assessment's answer in place. `skills` means "what this student
+chose for the assessment being prepared", and somebody who did not
+answer chose nothing -- which is what the pull had been *claiming*
+all along while doing the opposite.
+
+Two things came with it, both because clearing is destructive in a
+way that keeping was not:
+
+* `Pull.stale` counts the silent who were actually carrying something,
+  and the CLI says how many choices it threw away. A clearing nobody
+  is told about is worse than the bug.
+* **A pull that matches nobody is refused.** With clearing in place, a
+  wrong date would empty every choice on the roster at once, and the
+  likeliest moment to type a wrong date is the morning of. `--force`
+  gets through, because a cancelled assessment is a real reason to
+  want exactly that. The dry run is never refused: seeing what a
+  wrong date would do is how somebody discovers it is wrong.
+
+**The test that should have caught the original was vacuous**, and
+in the now-familiar way. `test_it_leaves_the_silent_alone` asserted
+that a silent student's skills were `[]` afterwards -- and the
+fixture had set them to `[]` before the pull ran. Keeping and
+clearing are indistinguishable from an empty start. It is renamed,
+and the case it could not see is tested beside it.
+
+Five mutations. The one that was **not** caught first time: clearing
+*everybody* rather than only the silent. Nothing noticed, because
+every student in the fixture was active, so "did not answer" and
+"silent" were the same set. The difference is the dropped, whose rows
+are a record of a term that happened and which the print record still
+refers to. That is a test now.
+
+### R1 declares the level it has reached
+
+`variants = ["whole_numbers", "integers", "fractions", "decimals"]`,
+cumulative, mapped onto the six lists the generator already had.
+
+The structure was always there -- `get_available_versions(n)` returns
+`versions_lists[:n+1]` -- and nothing could ask for it. The only
+caller that passed `course_progress` was the legacy pdfgenerator
+path; the pool CheckIt generates with drew from the whole dictionary.
+So 207 of 600 printable versions were fractions, decimals or PEMDAS
+regardless of where the course was, and the only way to get a topic
+onto paper was to name individual seeds.
+
+`pool='assessment'` now takes an optional `course_progress` and
+restricts to it; passing none behaves exactly as before, so nothing
+else that calls it changes.
+
+**The variant does not reach the viewer**, and that is deliberate
+rather than an oversight. `self_study` draws from `html_versions`, a
+separate and larger pool with its own names and no level structure to
+restrict to. A browsing student still sees everything. The wrapper
+writes the label into those seeds too and it is never read for them:
+only printable seeds are filtered.
+
+Verified after regenerating: 150 printable seeds per variant, each
+holding versions from its own level and none from beyond it, and
+`seeds_with_variant` answering for all four.
+
+### What regenerating cost
+
+`-r` re-rolls every version, which the bank's own notes warn against
+mid-term, and the instructor asked for it knowingly.
+
+Three of the four seeds the Extravaganza pinned happen to still hold
+the same exercise; **seed 415 does not** -- it held `div-scaffold-1p`
+and now holds `pemdas-1p`. The printed PDF is unaffected, being
+already rendered, but a `--replay` of that run would no longer
+reproduce it. The job file says so, and now asks for
+`[variants] R1 = "whole_numbers"` instead of four pins.
+
+**`docs/` has not been rebuilt**, so the published site still serves
+the old R1. That is a deploy affecting students mid-term, so it is
+the instructor's to make: `checkit viewer`, then push.
