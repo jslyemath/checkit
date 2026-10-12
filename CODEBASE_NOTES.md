@@ -11821,3 +11821,66 @@ The resume reported "connected to 'Skill Selection Form'", recorded
 the form id, and said "no items mapped yet -- run `form map`". The
 form still has five items, the number it had before printit touched
 it. 732 printit tests, 152 checkit, 0 audit problems.
+
+## A push with nothing to say, and the form map (2026-10-12)
+
+### The map went on without incident
+
+`form map` bound printit's four slots to the four questions the
+instructor had already built by hand. Verified by resolving each
+recorded id back to its title rather than by reading "wrote
+form.toml": the id is the thing that matters and a written file says
+only that something was written. Five items before, five after; the
+instructor's own "How do I decide what to choose?" is unmapped and
+will never be written to.
+
+### The next foot-gun along
+
+`form push` checked that the items were mapped. It did not check that
+there was anything to put in them.
+
+`availability.toml` is empty in every new course -- `course init`
+writes a template with `name`, `date` and `due` blank and no skills.
+Pushing in that state sends
+
+    You are selecting any skill(s) you would like to attempt on the  on .
+
+over a sentence the instructor wrote, and leaves the skill question
+with **no options at all**. A question nobody can answer is worse
+than the one it replaced.
+
+The CLI at least previews what it will send and has `--dry-run`. The
+GUI's Update form tab is a button, with no preview and no dry run, in
+a tab somebody setting a course up is going to click.
+
+`Availability.nothing_to_say()` now answers that in one place, and
+both front ends ask it -- the rule here being that a button calls the
+function a command would. The CLI keeps `--force`; the button does
+not, because a button cannot ask "are you sure" and be believed.
+
+**The date and the skills, not the name.** A missing name reads as
+one blank in one sentence; a missing date and an empty option list
+are what make the form unusable. Refusing on the name would block
+pushes people meant.
+
+### Both of my own tests were built on the wrong fixture
+
+Written, run, and they failed -- correctly, because the two fixtures
+they leaned on are fully populated. `test_availability.FILE` has a
+name, a date and two skills; `test_skills_view`'s course fixture
+writes a complete assessment. A guard for the empty case tested
+against a full one asserts the opposite of what it claims.
+
+Both now load the template `course init` actually writes, which is
+the state every real course begins in and the only state this guard
+is for.
+
+That is twice in two days that a fixture modelled the convenient case
+rather than the real one -- `Code.gs` where clasp writes `Code.js`,
+a filled assessment where a new course has a blank. **A fixture is a
+claim about the world, and it is the claim least likely to be
+checked.**
+
+Four mutations, all noticed: never refusing, ignoring the date,
+ignoring the skills, and letting the button through. 739 printit
+tests, 152 checkit, 0 audit problems.
