@@ -11757,3 +11757,67 @@ is still empty because the script has to be reached to learn it.
 Nothing on the form itself was changed.
 
 730 printit tests, 152 checkit, 0 audit problems.
+
+## It said it changed nothing, and added four questions (2026-10-12)
+
+The fourth fault in `form attach`, and the one that would have done
+real damage. Caught by reading `finish` before re-running the resume
+against the live form, not by anything that failed.
+
+### What it did
+
+`finish` is everything after Google authorizes the script, and it
+called `addItems` unconditionally:
+
+    made = form_mod.call(conn, "addItems", {"items": dict(conn.items)})
+
+`addItems` creates whatever it cannot find by id. An attached form's
+items are unknown until `form map` says which they are -- so "only
+what is missing" means **all four**, appended to a form the
+instructor built. And `attach_form` returns, literally:
+
+    "nothing on the form itself was changed"
+
+The MAT 106 form already has all four questions, written by hand:
+"What am I selecting skills for?", "Confirm Skill Checkpoint Date",
+"When is this form due?", "Choose ANY Skills" -- plus one of the
+instructor's own. Attaching would have left nine items, two of them
+spare required checkboxes, on a form students use, and reported that
+nothing happened.
+
+**A form worth attaching to is exactly a form that already has
+these.** The failure was therefore not an edge case; it was the
+central case.
+
+### The gate that existed and was not reached for
+
+`rename_to` already meant "printit made this form". `configure` was
+gated on it, `rename` was gated on it, and both were tested. Every
+write to the form now hangs off it, named once as `ours`.
+
+### Two tests, both shaped so they could not catch it
+
+* `test_it_adds_the_items_and_saves` called `finish(space)` with **no
+  `rename_to`** -- the attach path -- and asserted the four items
+  were created. It asserted the bug.
+* `test_a_rename_happens_only_when_asked` checked that `rename` and
+  `configure` do not run without one. Two of the three writes.
+  Nothing said *every* write is gated, only that those two were, so
+  the third was free to be added later without contradicting a test.
+
+The replacement asserts the property rather than the list: after an
+attach, **no operation but `ping` was asked of the script**. That
+cannot be outlived by a fourth write being added.
+
+This is the same lesson as the `.gs`/`.js` fixture the day before,
+from the other end. There, the fake was spelled in our vocabulary
+instead of the far side's. Here, the assertion enumerated the known
+ways to fail instead of stating what must be true. **Both are tests
+written from the inside of the thing they test.**
+
+### Verified on the real form
+
+The resume reported "connected to 'Skill Selection Form'", recorded
+the form id, and said "no items mapped yet -- run `form map`". The
+form still has five items, the number it had before printit touched
+it. 732 printit tests, 152 checkit, 0 audit problems.
