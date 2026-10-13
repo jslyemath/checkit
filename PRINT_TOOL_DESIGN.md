@@ -2322,3 +2322,172 @@ this replaces it.
    over fifteen clicks. The clue was the thing recorded as the puzzle:
    **a number that does not change when you change what it measures is
    measuring something else.**
+
+## 13. The look of the app (2026-10-13) — DRAFT
+
+**Status: a draft under discussion.** What is marked *settled* has been
+decided by the instructor and should not be relitigated. What is marked
+*open* is still a judgement call and belongs to him, not to whoever is
+editing this file.
+
+### 13.1 The problem this exists to fix
+
+The GUI was designed end to end by Claude, and it reads that way. The
+diagnosis is not that it breaks rules -- it mostly does not. It is that
+**uniform treatment was applied where a designer would have made
+judgements.**
+
+Every section is a card. Every card is the same weight. Every
+explanation is the same size as every other piece of text. Nothing is
+emphasised, because nothing was *chosen* to be emphasised. The giveaway
+on the old Overview tab was eight identical boxes in which the largest
+word on screen was "yes".
+
+Three secondary tells, all of the same kind: native OS form controls
+left unstyled in a custom dark theme; explanatory prose everywhere a
+human would have trusted the reader and cut; a three-column grid
+holding eight items.
+
+**The through-line of the instructor's own reactions to a dozen
+reference applications**: everything he liked was row-based with
+comfortable spacing (Linear, Things 3, TrueNAS). Everything he disliked
+was either boxes-with-gaps (Sonarr, Sublime Merge, Home Assistant, our
+Overview) or crushed rows (TablePlus). The target is **rows with air.**
+
+### 13.2 What we take from Material and Fluent, and what we refuse
+
+Both frameworks were consulted. They converge on five structural
+points, and those are worth having:
+
+1. Navigation placement follows destination count and window width.
+2. Layout should change *shape* at breakpoints, not merely reflow.
+3. Elevation is a ladder of surfaces, not a binary.
+4. One accent-filled action per view.
+5. Density is a named global setting, not improvised per screen.
+
+**We take their structure and refuse their surfaces.** Their visual
+defaults are precisely what makes software look like everyone else's --
+boxy and dated in Fluent's case, spartan in stock Material's. Adopting
+the reasoning without the skin is the whole point.
+
+### 13.3 Settled
+
+**The rail.** Navigation moves from a centred top bar to a left
+navigation rail, with icons, collapsible to icons only. This is not a
+preference: with seven destinations at desktop width it is what both
+frameworks specify, and Material 3 Expressive has since dropped the
+navigation drawer in favour of exactly this collapsible rail.
+
+**No top navigation at all.** What survives at the top of a page is the
+page's own title.
+
+**No dashboard.** The Overview tab is removed. Its contents are
+redistributed by *where you would act on them*: counts go in the
+relevant page's header, configuration facts go to Setup, and anything
+wrong becomes a warning -- a dot on the rail, and a strip at the top of
+the page that owns the problem.
+
+**Rows, not cards.** Cards are for a group that genuinely needs a
+boundary. Lists are bordered rows. Nothing gets a card merely for being
+a section.
+
+**Filled checkboxes**, not outlines. Outline checkboxes read as too
+much negative space at this density.
+
+**Save state is a bar that appears only when dirty** (option c of three
+tried). Absent when there is nothing to save.
+
+**The page title is the editable field.** The Print tab had the job's
+name and date rendered twice -- once as uneditable page furniture, once
+as form fields further down, with a button between them that depends on
+the date. One editable title carrying name and date removes the
+duplication and puts the date above the control that needs it. The
+section heading "This run" dies with it: every setting on that tab is
+about this run.
+
+**A second hue, with one meaning.** Amber means *something needs your
+attention* -- the rail dot, the page-top strip, the unsaved badge. It
+is not used decoratively. Green stays the accent.
+
+**No jet black in dark mode**, and more grey steps than the two the app
+has now.
+
+### 13.4 Writing, which is where the character is
+
+§12.16 already governs control labels: a verb and its object, nothing
+else. It extends to the whole GUI.
+
+**Explanations do not sit in the open.** The long paragraphs on the
+Print tab were an AI's instinct to over-explain. An explanation belongs
+behind a `?`. A short subtitle is permitted where the section genuinely
+needs one; a paragraph is not.
+
+**Say the consequence, not the event.** "17 will take the default" is
+worth more than "17 did not answer", because what the reader needs is
+what will print. Where two numbers are a pair, make the grammar
+parallel: *28 answered / 17 didn't*.
+
+**Empty states are the one place a utility may have a voice**, and the
+cheapest source of the warmth this app lacks. "Inviting" here means
+microcopy, empty states and the typeface -- not colour, not rounder
+corners, not illustration scattered about. Those read as decoration,
+which is the opposite of charm.
+
+### 13.5 Structure
+
+**Sections are annotated**: the section's name and its `?` sit in a
+left gutter, the controls to the right. This is Polaris's settings
+layout, and it works because the header is distinguished by *position*
+rather than by shouting. **At narrow widths the gutter collapses and
+the header moves above its controls.**
+
+**Counters never live inside a heading.** "Open for retake — 0 to 29"
+jammed three ideas into one line. The name goes in the heading, the
+count sits right-aligned on the same row, the range belongs to the
+control it governs.
+
+**A table's header row has its own surface**, so it reads as a header
+without extra spacing.
+
+**Columns collapse rather than disappear.** The variant column shows a
+real editable control at full width and folds to a single icon when the
+table is narrow.
+
+**Numerals are tabular** everywhere a number sits in a column.
+
+### 13.6 What Seats gives us, and what it does not
+
+Seats is a canvas sandbox. The rest of the app is text and tables.
+Importing its look wholesale would be a category error -- and the
+instructor's own reaction proves it: Seats's floating islands are cards
+with space around them, which is exactly what he disliked in Home
+Assistant. They work over a canvas because the room must stay visible
+underneath. In a text view there is nothing underneath.
+
+| from Seats | verdict |
+|---|---|
+| two-word labels; tooltip carries the rest | **take** |
+| a control exists only where the thing it edits exists | **take** |
+| editable exactly when stored; derived things are not | **take** |
+| an empty state is a door, not a sign | **take** |
+| one neutral for what the system marks; accent reserved | **take, translated** -- accent marks the primary action and current location, never decoration |
+| a ladder of surfaces | **take, translated** -- no canvas to float over, but one `--panel` is not enough |
+| floating islands | **refuse** -- nothing to see through to |
+| modes | **refuse** -- tabs are different data, not different verbs on one object |
+| the corner plus | **refuse** -- a form has a natural home for its primary action |
+| the geometric icon set | **refuse** -- those glyphs depict spatial operations; "Pull responses" has no picture |
+
+### 13.7 Still open
+
+* **Typeface.** The single largest lever on "this looks like nobody
+  chose it", because a system font stack is literally what that is.
+  Candidates shown: Inter (baseline), IBM Plex Sans with Plex Mono,
+  Source Sans 3, Figtree, Atkinson Hyperlegible.
+* **Which header treatment** -- letterspaced micro-label, a rule
+  running right, or the header in the gutter.
+* **Whether the annotated gutter survives contact with every tab**, as
+  against looking good in isolation.
+* **How much lighter the greys go**, and how many steps.
+* The exact density: row height and padding. The target is the
+  midground -- roughly 36-40px rows -- but it has not been tested
+  against a 45-student roster.
