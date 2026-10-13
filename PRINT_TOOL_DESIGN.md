@@ -2412,10 +2412,52 @@ is not used decoratively. Green stays the accent.
 **No jet black in dark mode**, and more grey steps than the two the app
 has now.
 
+**The greys are warm.** Measurably: the first drafts came out violet --
+`#a6a2ac` is R166 G162 B172, blue highest and green lowest, and the
+whole ladder carried that cast. The light theme has always been warm
+(`#fbfaf8`), so a warm dark ladder makes the two modes siblings rather
+than strangers. Neutral was the alternative and is still defensible;
+violet was nobody's choice, it was an accident.
+
+**Figtree**, over Inter, Source Sans 3, Atkinson Hyperlegible and IBM
+Plex Sans. It is the roundest of the candidates without being a
+consumer-app face, and it is the one that answers "inviting" -- the
+numerals in particular soften a dense grid at no cost to legibility.
+
+**The gutter is for settings-shaped sections only.** Not a layout for
+the whole app. See 13.5.
+
 ### 13.4 Writing, which is where the character is
 
 §12.16 already governs control labels: a verb and its object, nothing
 else. It extends to the whole GUI.
+
+**Never run facts together with separators.** `45 students · 22 in 820
+· 23 in 830` is the single most recognisable tic in this codebase, and
+it is the writer reaching for a separator because no layout was
+designed. Three facts in a row with dots between them is a sentence
+pretending to be an interface.
+
+What to reach for instead, roughly in order: **an icon with a number**,
+which costs no words at all; **small grouped pills** where the facts
+are peers; **colour or weight** where one of them is the one that
+matters and the others are context; and **putting the fact next to the
+thing it describes** rather than collecting facts into a strip at the
+top. A count that belongs to a section belongs in that section's
+header row, not in a run-on with two other counts.
+
+The run-on is occasionally right -- for genuinely equal, genuinely
+minor metadata, three items at most. It is not the default, and it
+must never be the first thing reached for.
+
+**Skill names come from the bank.** Each outcome in `bank.xml` carries
+*two* strings: a short `<title>` ("Divisibility Statements") and a long
+`<description>`, the "I can..." statement. **Titles belong in tables
+and headers; descriptions belong in tooltips.** Nothing in the GUI
+should invent, abbreviate or paraphrase either. `bank.description()` is
+currently the only accessor printit has, which is why the long form
+leaks into places that wanted the short one -- that is a gap to close,
+not a style to follow.
 
 **Explanations do not sit in the open.** The long paragraphs on the
 Print tab were an AI's instinct to over-explain. An explanation belongs
@@ -2435,11 +2477,22 @@ which is the opposite of charm.
 
 ### 13.5 Structure
 
-**Sections are annotated**: the section's name and its `?` sit in a
-left gutter, the controls to the right. This is Polaris's settings
-layout, and it works because the header is distinguished by *position*
-rather than by shouting. **At narrow widths the gutter collapses and
-the header moves above its controls.**
+**Settings-shaped sections are annotated**: the section's name and its
+`?` sit in a left gutter, the controls to the right. This is Polaris's
+settings layout, and it works because the header is distinguished by
+*position* rather than by shouting. **At narrow widths the gutter
+collapses and the header moves above its controls.**
+
+**Table-shaped tabs get no gutter.** Roster and Record are not settings
+and must not pretend to be. The gutter costs about 120px of width
+permanently, which a form does not miss and a table does: drawn both
+ways, the same Roster column went from carrying a real skill name to
+carrying a bare digit.
+
+So the consistency this app keeps is **consistency of rule, not of
+appearance**: a section whose content does not want horizontal space
+gets a gutter; a section whose content does, does not. Two structures,
+one reason, stated here so neither looks like an oversight later.
 
 **Counters never live inside a heading.** "Open for retake — 0 to 29"
 jammed three ideas into one line. The name goes in the heading, the
@@ -2479,15 +2532,16 @@ underneath. In a text view there is nothing underneath.
 
 ### 13.7 Still open
 
-* **Typeface.** The single largest lever on "this looks like nobody
-  chose it", because a system font stack is literally what that is.
-  Candidates shown: Inter (baseline), IBM Plex Sans with Plex Mono,
-  Source Sans 3, Figtree, Atkinson Hyperlegible.
-* **Which header treatment** -- letterspaced micro-label, a rule
-  running right, or the header in the gutter.
-* **Whether the annotated gutter survives contact with every tab**, as
-  against looking good in isolation.
-* **How much lighter the greys go**, and how many steps.
-* The exact density: row height and padding. The target is the
-  midground -- roughly 36-40px rows -- but it has not been tested
-  against a 45-student roster.
+* **How a page header carries its counts**, now that the run-on is
+  banned. The Roster needs to say 45, 22 and 23 somehow; icons, grouped
+  pills and putting each count beside its own thing are the candidates,
+  and none has been drawn yet.
+* **Section header treatment.** Three were tried -- a letterspaced
+  micro-label, a rule running right, the header in the gutter -- and
+  all three were rejected. Parked until a whole tab can be seen at
+  once; it may turn out to need nothing.
+* **Exact density**: row height and padding. The target is the
+  midground, roughly 36-40px rows, untested against 45 students.
+* **How many grey steps**, and how far apart.
+* **Record has not been drawn.** It is the one tab nobody has looked
+  at, and the only one that is purely a log.
