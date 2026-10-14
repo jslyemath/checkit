@@ -2530,18 +2530,46 @@ underneath. In a text view there is nothing underneath.
 | the corner plus | **refuse** -- a form has a natural home for its primary action |
 | the geometric icon set | **refuse** -- those glyphs depict spatial operations; "Pull responses" has no picture |
 
-### 13.7 Still open
+### 13.7 The stages, and where they stopped
+
+The work is staged so that payoff comes early and risk late. Direct
+on `main`: the instructor is the only user, and asks for the usual
+branch-and-merge procedure to be skipped.
+
+| stage | what | state |
+|---|---|---|
+| 1 | token layer: surfaces, spacing, radius, type, font, native controls | **done** |
+| 2 | the shell: left rail, no top nav, no Overview | **done** |
+| 3a | a skill shows its `<title>`, not its description | **done** |
+| 3b | Print tab: editable page title, `This run` dies, annotated sections, prose behind `?` | next |
+| 3c | Roster: the counts question, and the `colgroup` arithmetic | |
+| 3d | Form, Setup | |
+| 3e | Record -- never drawn, and the only tab that is purely a log | |
+| 4 | save bar, warning strips, empty states, a microcopy pass | |
+
+**Settled during the build, beyond 13.3:** Figtree is vendored, not
+linked. The greys are OKLCH 260, Seating's own hue, several steps
+lifted unchanged. The rail is `.navrail` and carries the course name
+at body size, matched to Seating's section toggle; its labels are
+body size and its glyphs 21px. The count has left the rail.
+
+### 13.8 Still open
 
 * **How a page header carries its counts**, now that the run-on is
-  banned. The Roster needs to say 45, 22 and 23 somehow; icons, grouped
-  pills and putting each count beside its own thing are the candidates,
-  and none has been drawn yet.
-* **Section header treatment.** Three were tried -- a letterspaced
-  micro-label, a rule running right, the header in the gutter -- and
-  all three were rejected. Parked until a whole tab can be seen at
-  once; it may turn out to need nothing.
-* **Exact density**: row height and padding. The target is the
-  midground, roughly 36-40px rows, untested against 45 students.
-* **How many grey steps**, and how far apart.
-* **Record has not been drawn.** It is the one tab nobody has looked
-  at, and the only one that is purely a log.
+  banned. The Roster needs to say 45, 22 and 23 somehow; icons,
+  grouped pills, and putting each count beside its own thing are the
+  candidates. None has been drawn. This blocks 3c.
+* **Section header treatment.** Six have now been tried across two
+  rounds and all six were rejected. Parked deliberately: the
+  instructor wants to judge it with a whole tab on screen, not in
+  isolation, and it may turn out to need nothing at all.
+* **Exact density**: row height and padding. `--t-base` is still 15px
+  because turning it reflows every view; the midground target is
+  roughly 36-40px rows, untested against 45 students.
+* **The rail's collapse threshold.** It folds to icons below 900px,
+  which on a narrow window means the labels are never seen. Right
+  number unknown until it is used at a real window size.
+* **A top strip, or none.** The top bar is gone and nothing replaced
+  it. Whether the app wants a thin one for global state is open;
+  three save-state placements were shown and (c), a bar that appears
+  only when dirty, was chosen, which may be all that is needed.
