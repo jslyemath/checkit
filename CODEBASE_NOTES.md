@@ -12219,3 +12219,139 @@ reproduce it. The job file says so, and now asks for
 **`docs/` has not been rebuilt**, so the published site still serves
 the old R1. That is a deploy affecting students mid-term, so it is
 the instructor's to make: `checkit viewer`, then push.
+
+## Making the GUI look like somebody chose it (2026-10-13 / 14)
+
+The instructor's framing, which is the right one and worth keeping
+verbatim: *you designed all of it, so that's why it is screaming "AI
+made this", and now we need to un-AI it.* He also pointed out that my
+first answer -- CSS tokens and adherence to Material -- was not a
+design philosophy. It was not. The work below is stages 1 to 3a of
+`PRINT_TOOL_DESIGN.md` section 13, which is where the philosophy now
+lives.
+
+### What was actually wrong, and it was not the CSS
+
+`style.css` had **ten tokens, all colour**. No spacing scale, no
+radius scale, no type scale, no elevation. `seating/seating.css` had
+colour *and* geometry. That is the whole reason one half of the app
+looked designed and the other did not -- not taste, not effort.
+
+But the deeper fault was uniform treatment where a designer would
+have judged. Every section a card, every card the same weight, every
+explanation the same size as every other text. Nothing emphasised
+because nothing was *chosen*. The giveaway was the Overview tab:
+eight identical boxes in which the largest word on screen was "yes".
+
+### Research, and the one thing it settled
+
+Ten reference applications were surveyed. The instructor's reactions
+to them were more useful than the survey: **everything he liked was
+row-based with air (Linear, Things 3, TrueNAS); everything he
+disliked was boxes-with-gaps (Sonarr, Home Assistant, our Overview)
+or crushed rows (TablePlus).** "Rows with air" is the target, and it
+came out of his reactions, not out of a framework.
+
+Material and Fluent were useful for exactly one thing: both specify a
+**navigation rail** at desktop width for this many destinations, and
+Material has since dropped the drawer in favour of a collapsible one.
+The instructor had already proposed it unprompted. We took their
+structure and refused their surfaces.
+
+### Stage 1, and the two lines that did most of the work
+
+Four surfaces instead of one, a 4px grid, a radius scale (all 20 raw
+radii migrated, none left), a type scale, one font family on `body`.
+`--panel` aliases `--surface-1` so nothing moved, and `--t-base`
+stayed at 15px deliberately because turning it reflows every view.
+
+`color-scheme: dark` and `accent-color` did more visible work than
+everything else combined: the OS-blue checkboxes and the white date
+picker were the only things on screen speaking a different language.
+
+### The font, and a thing I let him believe
+
+He asked how I had shown him Figtree if it was not installed. The
+answer is that **the mockup widgets fetched it from Google into their
+own iframe** -- it rendered in his browser, never from his machine --
+and I had not said so. Worth recording because the mockups looked
+like evidence and were partly a loan.
+
+It is vendored now: two subsets, 30kB, in `static/fonts`. Not a CDN
+link, and not only for tidiness -- that would be a network request on
+every page load from a tool that keeps names, ids and emails off the
+network on purpose, and it would look different in a classroom with
+no wifi.
+
+### The greys changed twice, both times from seeing them at size
+
+First draft came out **violet** and read as subtly wrong without
+being nameable. Measurable: `#a6a2ac` is R166 G162 B172, blue highest
+and green lowest, and the whole ladder carried it. Nobody chose that;
+it was an accident of picking hexes by eye.
+
+Second draft was warm, to match the light theme. Then, seeing it down
+the whole app, he changed his mind: make it the hue Seating already
+uses. That is **OKLCH 260**, and several steps are now lifted from
+`seating.css` unchanged. The chrome and the canvas are the same
+material rather than two palettes that coexist.
+
+### `.rail` was already taken
+
+The new navigation rail shipped as `.rail`. Seating has had a `.rail`
+since its own stage A -- the mode rail inside `.bottomstack`. So
+`height: 100vh` landed on both, stretched the stack to the full
+viewport, and `freeBand` measured **80px** of usable height and
+fitted the room at 20%.
+
+This is the "a selector that claims more elements than the change is
+true of" failure listed in the root `CLAUDE.md`, committed by the
+same hand that wrote it down. It was caught only because Seats gets
+checked after every change to the shell -- nothing failed, no test
+covered it, and the Print and Roster tabs were perfect.
+
+Renamed `.navrail`. **Before adding a class name to the shell, grep
+`seating.css` for it.**
+
+### Removing the top bar fixed a bug nobody had reported as one
+
+He reported the Roster as broken: scrolling moved the content but
+"collision is still in the old location". Measured: the scroller's
+whole range is 9px, scroll and layout agree, and
+`elementFromPoint` over the first row returned **the sticky header**,
+not the row. Content scrolled under a sticky bar that still caught
+the clicks.
+
+Stage 2 deletes that bar, so the hit-testing half is gone. The 9px
+is `sizeColumns` computing 884px of columns into an 875px scroller,
+pre-existing, and belongs to stage 3c.
+
+I also raised a false alarm here -- said the Roster showed every
+student as dropped, when `find` had merely read hidden text from the
+accessibility tree and 45 rows were rendering. Checking the file took
+one command and I should have done it before saying anything.
+
+### Stage 3a: a skill shows its name, not its definition
+
+`bank.xml` gives every outcome a short `<title>` and a long
+`<description>`. Nothing in printit could ask for the first, so every
+skill list was a column of truncated "I can..." sentences -- fifteen
+of them on the Print tab, visible in a screenshot the whole time.
+
+Two things the tests found that reading did not:
+
+* **`api_print` builds its own description map.** The first patch
+  added `title` to its payload and defined `titles` only in
+  `api_skills`. NameError on the second endpoint, first test run.
+* **A mutation pass found dead belt-and-braces**: the no-bank branch
+  populated a dict the payload's `.get(s, s)` already covered. Two
+  mechanisms for one rule, which is a thing this project's notes say
+  mutation testing finds, and it did. One removed; the survivor
+  re-checked by breaking it.
+
+### Where it stopped
+
+Stage 3b (the Print tab's structure), 3c (Roster, including the
+`colgroup` arithmetic and the counts question), 3d and 3e are not
+started. 760 printit tests, 152 checkit, 0 audit problems, both repos
+pushed.
