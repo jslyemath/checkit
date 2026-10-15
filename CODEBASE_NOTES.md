@@ -12355,3 +12355,103 @@ Stage 3b (the Print tab's structure), 3c (Roster, including the
 `colgroup` arithmetic and the counts question), 3d and 3e are not
 started. 760 printit tests, 152 checkit, 0 audit problems, both repos
 pushed.
+
+## The variant nobody chose (2026-10-15)
+
+The instructor noticed that one or two of the four W5 versions in the
+2026-10-12 Extravaganza were addition and subtraction only, when he had
+meant all four to include multiplication and division. He was right, and
+it was worse than he thought.
+
+### What the evidence actually said
+
+He had already chosen it. `courses/MAT 106/job.toml`, saved 07:19 and not
+touched since, carries:
+
+    [variants]
+    W5 = "multiplication"
+    W7 = "terminating"
+
+The build ran at 07:46 from a `publication.toml` with no `[variants]`
+table at all. That is provable without the file, because `manifest.toml`
+fingerprints its inputs: the publication it read hashes `81d2d60c`, the
+draft hashes `d69e7972`, and `publication_text()` run against that draft
+produces `810643cf`. Three different files, and the one the build read is
+none of them -- it was hand-written from what had been said in chat, and
+overwritten an hour later at 08:44 when R1 learned its variants.
+
+So the plumbing was never broken. `_build` loads the draft and hands it
+straight to `write_job` -> `publication_text`, which emits `[variants]`
+verbatim. **A build through the Print tab would have been correct.** The
+bug was a hand-built run that never read the state the instructor had
+set, and no part of the system minded.
+
+### Then silence drew from everything
+
+    wanted = publication.variants.get(slug)      # None
+    available = bank.seeds_with_variant(slug, wanted)
+
+and `seeds_with_variant(slug, None)` returns the whole printable tier.
+W5's is 300 `no_multiplication` and 300 `multiplication`, exactly even,
+so four letters dealt two of each: A=798 and B=928 below level, C=617 and
+D=709 above it.
+
+**It was four skills, not one.** W5 (10 students), W7 (9), W4 (4) and
+W4-E (10). W5 and W7 had been chosen and dropped; W4 and W4-E had never
+been named anywhere.
+
+### The record said so and nobody read it
+
+Every `[[paper]]` carries `variant = "no_multiplication"`, written at
+build time, sitting in the output folder in plain text. The verification
+pass after that run checked the four things that had been asked --
+requests honoured, order, R1 whole-numbers-only, appends applied -- and
+found all four correct. A check scoped to the question can only find what
+the question mentions. Nothing compared the run against the draft.
+
+### The guard
+
+`check_variants_chosen` refuses a run that prints a *dealt* paper from a
+variant-bearing skill nobody chose for. Three scoping decisions, each of
+which a test pins:
+
+* **Printed papers, not bank slugs.** Nine of the 29 outcomes declare
+  variants (R1, R2, W4, W4-E, W5, W7, N3, N4, D2) and a given run prints
+  a handful. Demanding a choice for a paper that will not exist is noise,
+  and noise is what gets a guard switched off.
+* **Dealt papers, not pinned ones.** A replay pins every seed from the
+  manifest, so the draw had no say and there is nothing for a variant to
+  decide. Without this, `--replay` of any older run would refuse.
+* **Before the dry-run return**, so a preview that passes and a build
+  that refuses cannot happen -- this project's own "verify the artifact,
+  not the dry run", backwards.
+
+The message hands over a fill-in-the-blank table rather than a
+suggestion, because alphabetically first is `multiplication` for W5 and
+`no_terminating` for W7: a pre-filled template would be right by luck
+half the time and pasted without reading the rest.
+
+### Four copies of one scan, and a blank that was not a choice
+
+Finding "which variants does this skill have" existed four times --
+`manifest.write`, `manifest.check`, `seeds_with_variant`'s error branch,
+and the GUI's deliberately-different 60-seed slice. The first three are
+now `Bank.variant_labels`; the slice stays, documented.
+
+The blank was found by a test, not by reading. `W5 = ""` is what you get
+when the instructor pastes the refusal's own template, and it is *not*
+None, so it reached `seeds_with_variant` and raised "the bank has no
+variant named `''`" -- true, and no help. `variant_for` normalises it for
+both the draw and the guard, one definition rather than two.
+
+### Fixture: every skill had variants, which no bank does
+
+Adding the guard failed 35 tests, because both fixture outcomes declared
+`["small", "large"]`, so every assembly test exercised the variant path
+whether it was about it or not. That is the "fixture modelling the
+convenient case" trap in reverse -- the convenient case here was
+*universal*, where the real bank is nine of 29. AD and SU now declare
+none and a third outcome, VR, declares both.
+
+Seven mutations, all noticed, each killing exactly the tests that should
+care. 768 printit, 152 checkit, 0 audit problems.
