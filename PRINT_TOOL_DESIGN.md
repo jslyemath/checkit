@@ -2541,11 +2541,20 @@ branch-and-merge procedure to be skipped.
 | 1 | token layer: surfaces, spacing, radius, type, font, native controls | **done** |
 | 2 | the shell: left rail, no top nav, no Overview | **done** |
 | 3a | a skill shows its `<title>`, not its description | **done** |
-| 3b | Print tab: editable page title, `This run` dies, annotated sections, prose behind `?` | next |
-| 3c | Roster: the counts question, and the `colgroup` arithmetic | |
+| 3b | Print tab: editable page title, `This run` dies, annotated sections, prose behind `?` | **done** |
+| 3c | Roster: the counts question, and the `colgroup` arithmetic | next -- blocked on the counts question |
 | 3d | Form, Setup | |
 | 3e | Record -- never drawn, and the only tab that is purely a log | |
 | 4 | save bar, warning strips, empty states, a microcopy pass | |
+
+**Settled in 3b:** an annotated section is a `.annot` grid -- a 200px
+gutter holding the name and its `?`, the controls to the right, a
+hairline between sections and no card. `annot-full` drops the gutter
+for content that wants the width, which on this tab is the table and
+nothing else; it buys the table 220px. The `?` toggles a `.hint-text`
+and is wired by one delegated listener, so a section added later gets
+the behaviour without being remembered. Below 860px the gutter
+collapses and the header goes back above its controls.
 
 **Settled during the build, beyond 13.3:** Figtree is vendored, not
 linked. The greys are OKLCH 260, Seating's own hue, several steps

@@ -12455,3 +12455,77 @@ none and a third outcome, VR, declares both.
 
 Seven mutations, all noticed, each killing exactly the tests that should
 care. 768 printit, 152 checkit, 0 audit problems.
+
+## Stage 3b: the Print tab stops being a stack of boxes (2026-10-19)
+
+Seven `.panel` cards became seven annotated sections: the name and its
+`?` in a 200px gutter, the controls to the right, a hairline between
+them and no card anywhere. This is 13.5's settled layout, and the
+reason it works is that the header is distinguished by *position*
+rather than by being made louder -- which is what the six rejected
+header treatments were all attempts at.
+
+### The title was the duplicate, not the heading
+
+`<h2>Print job</h2>` was generic, and the fields that actually name the
+run were buried in a panel called **This run** -- a name true of the
+entire tab. Earlier there had also been a read-only `Extravaganza - 12
+Oct` in the top bar, so the copy that looked authoritative was the one
+you could not edit; stage 2 deleted that bar and left the other half.
+
+Now the page title *is* the field. `field-sizing: content` makes the
+box hug its text so the date sits beside the title rather than beside
+the right edge of a mostly-empty input -- at a 26ch basis the two read
+as unrelated. Guarded by `@supports`, so a browser without it keeps
+the flex basis and loses only the nicety.
+
+### Which sections get the gutter, and why it is not taste
+
+13.5's rule: content that does not want horizontal space gets a
+gutter, content that does does not. On this tab that is one section --
+`Who gets what`, five columns and 45 rows -- and `annot-full` measured
+**220px** more body width for it. Stating the rule rather than the
+outcome is what stops the next section being argued about.
+
+### Two bugs, both found by operating the thing
+
+**The `?` slid 29px down the page the moment it was used.** `.annot-head`
+is a grid item, so it stretched to the row's height, and the button's
+`align-self: center` centred it in however tall the section had become.
+The first click opened the text, the section grew, and the second click
+missed the button. `align-self: start` on the head. Found by clicking
+twice, not by reading.
+
+**Seats appeared to be 0x0 with an empty canvas** after the change,
+which is the exact shape of the `.rail` collapse from stage 2. It was
+not. The browser was serving a cached `index.html`, and every reload I
+tried -- `ctrl+shift+r`, `location.reload(true)` -- kept serving it.
+With the changes stashed it was *still* broken; with a `?cb=` query it
+worked both stashed and not. **The harness was the fault, and a
+controlled comparison was what showed it** -- the same family as the
+wheel-residual that turned out to be integer-truncated event
+coordinates. Measured after: canvas scale 1.013, 36 seats, bottomstack
+63px.
+
+### Nothing in 774 tests read the markup
+
+The whole tab was restructured and the suite passed without noticing,
+because no test opened `index.html`. That is survivable while every tab
+gets opened by hand afterwards and not survivable across 3c, 3d, 3e and
+4. `tests/test_gui_markup.py` now checks the one contract there is --
+ids -- plus three rules that are cheap to state: every id `app.js`
+reaches for is declared or assigned, no id twice, every `?` has
+something behind it, no counter inside a heading.
+
+The runtime ids (`course-name`, `stale`) are **derived** from
+`.id = "..."` assignments rather than allowlisted. An allowlist would
+need two entries today, and the next hand-added entry is the one that
+quietly excuses a typo.
+
+It found a real violation on its first run: `<h3>Open for retake
+<span id="open-count">` on the Update form, which is 13.5's own cited
+example. Moved to a `.sec-row` header row -- the counter only, since
+that tab is stage 3d.
+
+Six mutations, all noticed, each killing exactly the tests that should
+care. 774 printit tests, 0 audit problems.
