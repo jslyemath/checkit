@@ -2537,6 +2537,23 @@ and a column with no values anywhere starts there. `Prints as` is
 empty on every roster here and was reserving 200px -- a fifth of the
 table -- while Email was clipped.
 
+**Slow work starts at boot, not at the click.** Measured on the real
+course: `/api/skills` is ~700ms warm and 1.2s cold, `/api/google` is
+**six seconds** the first time because it shells out to clasp. Both
+now start when the app opens, behind the Roster, so the tab that needs
+them usually finds the answer already there -- a warm switch to Update
+form went from about a second to **3ms**. A request is kept as a
+promise, not as data, so a second caller joins the first one instead
+of making its own.
+
+**Where a wait is unavoidable, show the shape of what is coming.**
+Placeholder rows the height of real ones and as many as the list will
+have, so the page has its layout before it has its content and nothing
+jumps when the answer lands. Still and quiet -- a shimmer travelling
+down a settings page is decoration, which is what this redesign has
+been removing -- and never a spinner, which says only that something
+is happening.
+
 **A table's header row has its own surface**, so it reads as a header
 without extra spacing.
 
