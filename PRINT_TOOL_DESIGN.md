@@ -2542,7 +2542,7 @@ branch-and-merge procedure to be skipped.
 | 2 | the shell: left rail, no top nav, no Overview | **done** |
 | 3a | a skill shows its `<title>`, not its description | **done** |
 | 3b | Print tab: editable page title, `This run` dies, annotated sections, prose behind `?` | **done** |
-| 3c | Roster: the counts question, and the `colgroup` arithmetic | next -- blocked on the counts question |
+| 3c | Roster: the counts question, and the `colgroup` arithmetic | **drawn, awaiting a verdict** |
 | 3d | Form, Setup | |
 | 3e | Record -- never drawn, and the only tab that is purely a log | |
 | 4 | save bar, warning strips, empty states, a microcopy pass | |
@@ -2564,10 +2564,24 @@ body size and its glyphs 21px. The count has left the rail.
 
 ### 13.8 Still open
 
-* **How a page header carries its counts**, now that the run-on is
-  banned. The Roster needs to say 45, 22 and 23 somehow; icons,
-  grouped pills, and putting each count beside its own thing are the
-  candidates. None has been drawn. This blocks 3c.
+* **How a page header carries its counts** -- drawn in 3c, and the
+  instructor has not ruled on it yet. Of the candidates in 13.4 the
+  last one won: *put the fact next to the thing it describes*. So the
+  page header carries only the whole-table total (`Roster` left,
+  `45 students` right), and the per-section counts ride **section
+  bands** inside the table -- a thin full-width row reading `820` with
+  `22` right-aligned, immediately above that section's rows.
+
+  Bands are drawn only while the rows are actually grouped by section,
+  which is tested on the sorted rows rather than on `sorts[0].key`:
+  that stays right for a descending section sort, for a single
+  section, and for some other sort that happens to group them anyway.
+  Sorted by email the sections interleave and the bands disappear,
+  because a band every few rows is noise rather than structure.
+
+  What this buys: no strip of facts at the top at all, and a 45-row
+  table gains structure it did not have. What it costs: the split is
+  invisible while sorted by anything else. That is the trade to judge.
 * **Section header treatment.** Six have now been tried across two
   rounds and all six were rejected. Parked deliberately: the
   instructor wants to judge it with a whole tab on screen, not in
