@@ -12758,3 +12758,82 @@ Two judgements worth recording:
 
 779 printit tests, 0 audit problems. All four built tabs now share one
 structure; Record is 3e.
+
+## The Update form tab's lag, and a tab switch that ran twice (2026-10-20)
+
+The instructor asked what the Form tab waits for, whether the parts
+that do not wait could be drawn first, and whether the slow call could
+happen at app open instead of tab open. Measuring first was worth it,
+because two of the three answers were not where I would have guessed.
+
+### What is actually slow
+
+From the page, against the real course:
+
+| call | cold | warm |
+|---|---|---|
+| `/api/skills` | 1194ms | 710ms |
+| `/api/google` | **6072ms** | 395ms |
+| `/api/course` | 268ms | |
+
+`/api/google` shells out to clasp, which is where six seconds goes.
+`/api/skills` rebuilds a `Bank` per request, which is 128ms of it --
+`bank_for` constructs a fresh one every call and six endpoints use it.
+
+**Not cached, deliberately.** One `Course` lives for the server's
+lifetime, so a cached `Bank` would also cache the lazily-loaded seed
+data, and `checkit generate` mid-term would leave the app showing
+variants that no longer exist. The variant guard reads exactly that
+data. 128ms is not worth that class of bug; prefetching gets the same
+result without it.
+
+### Almost everything on the tab waits for `/api/skills`
+
+The answer to "what does not need the call" turned out to be: the
+headings, and nothing else. The assessment fields, the skill list, the
+wording preview and the push state all come out of that one payload.
+So drawing the parts that do not wait was not the win -- **moving the
+wait off the click was.**
+
+Both calls now start at boot, unawaited, after the Roster is on screen.
+A warm switch to the tab, measured inside `renderSkills` rather than
+from a polling loop: **3.1ms**, from roughly a second.
+
+The requests are kept as promises rather than as data, so Setup and the
+Form banner join one `/api/google` instead of making one each -- that
+was twelve seconds of clasp on a first run, now six.
+
+### Prefetching broke the tab, in the way prefetching does
+
+`show()` drew the tab `if (skills === null)`. Prefetching makes that
+false before the tab has ever been opened, so it came up **blank**.
+"The data has arrived" and "the tab has been drawn" were one flag and
+are now two; `skillsDrawn` is set after a successful render.
+
+Drawing stays once-per-session on purpose: `fillAssessment` refills the
+fields from the server, so re-running it on every visit would throw
+away edits made before stepping over to the Roster.
+
+### Every tab switch ran its loader twice
+
+Found while counting requests: `show()` ends with `location.hash = id`,
+which fires `hashchange`, whose handler calls `show(id)`. **Two
+`/api/setup` calls for one click on Setup, two renders of a 45-row
+table for one click on Roster**, and the same for Print -- all of it
+invisible, because the second render produces the same thing as the
+first.
+
+The handler now ignores a hash it is already showing. Back and forward
+still work, and were checked: back, back, forward across three tabs.
+
+### Measuring a hidden page
+
+A first attempt said a warm switch took 4997ms. It did not: the browser
+pane was hidden, `requestAnimationFrame` is throttled in a hidden
+document, and the polling loop was measuring its own throttle. Checked
+`document.hidden`, re-measured with a stamp inside the render, and got
+3.1ms. Same family as the stale `index.html` and the integer-truncated
+pointer coordinates: **when a number is surprising, suspect the
+harness before the code.**
+
+779 printit tests, 0 audit problems.
