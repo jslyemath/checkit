@@ -2450,6 +2450,22 @@ The run-on is occasionally right -- for genuinely equal, genuinely
 minor metadata, three items at most. It is not the default, and it
 must never be the first thing reached for.
 
+**Plain underlined text is not how a function looks.** The
+instructor's rule, and a standing one: an underline says *this
+navigates*, and every control in this app does something instead. A
+column of underlined words reads as a paragraph that has been marked
+up rather than as a set of controls. Quiet buttons -- no border at
+rest, a surface on hover -- and for an action that repeats down every
+row, an icon: grey at rest so the column stays quiet, the accent only
+on the row under the pointer. `tests/test_gui_markup.py` enforces it.
+
+**An action outranks reference data.** When a table runs out of width
+the instinct is to protect the data, because data is what a table
+looks like it is for. It is not: Email and SID are reference, and
+dropping a student is the one thing the Roster *does*. Columns carry a
+`rank` that says what survives a squeeze, and the actions sit second,
+below only the name.
+
 **Skill names come from the bank.** Each outcome in `bank.xml` carries
 *two* strings: a short `<title>` ("Divisibility Statements") and a long
 `<description>`, the "I can..." statement. **Titles belong in tables
@@ -2498,6 +2514,28 @@ one reason, stated here so neither looks like an oversight later.
 jammed three ideas into one line. The name goes in the heading, the
 count sits right-aligned on the same row, the range belongs to the
 control it governs.
+
+**A long table scrolls inside the window, not the page.** With 45
+rows the Roster's scroller was 2158px tall, which put its horizontal
+scrollbar 1362px below the fold: sideways movement was shift-and-wheel
+only, and the rightmost column -- the drop button -- could not be
+reached at all. The table gets the window and scrolls within it, so
+both bars are on screen and the headings stay put.
+
+**Name and the actions are pinned**, left and right. Those are the two
+a row cannot do without: which student this is, and the thing you came
+to press. Everything between them scrolls.
+
+**Spare width goes into the table.** A 1100px header above an 867px
+table looked like the table had failed to load. Columns marked `grow`
+take the slack up to their own maximum; Section does not, because a
+300px Section is a worse table and not a bigger one.
+
+**An empty column is sized for its heading.** `min` is what a column
+wants when it holds something; `floor` is what it may be squeezed to,
+and a column with no values anywhere starts there. `Prints as` is
+empty on every roster here and was reserving 200px -- a fifth of the
+table -- while Email was clipped.
 
 **A table's header row has its own surface**, so it reads as a header
 without extra spacing.

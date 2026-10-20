@@ -12605,3 +12605,103 @@ row got its own surface, per 13.5.
 
 777 printit tests, 0 audit problems. Seats re-checked after the
 stylesheet change: 36 seats, scale 0.868, bottomstack 51px.
+
+## The Roster table under pressure, and three collisions (2026-10-20)
+
+The instructor used 3c and reported four things: at narrow widths Email
+and SID were kept while the drop button went off the edge; the only way
+to scroll sideways was shift-and-wheel; at wide widths the header ran to
+1100px above an 867px table; and -- a standing rule, not a one-off --
+**he does not want plain underlined text to be how a function looks.**
+
+### The scrollbar was not missing, it was below the fold
+
+Measured before changing anything: the scroller was 2158px tall and its
+bottom edge sat **1362px below the viewport**. The horizontal bar
+existed the whole time, parked under 45 rows. That is why the wheel was
+the only thing that worked, and why the drop column was unreachable.
+
+The table now takes the window and scrolls inside it (`body.tall`),
+which puts both bars on screen, keeps the headings in view, and makes
+the drop column reachable. Name is pinned left and the actions right,
+so the two things a row cannot do without never scroll away.
+
+### Getting sticky to work took two fixes, and the first was not it
+
+`position: sticky` computed correctly on the cells and did nothing.
+First theory: `border-collapse: collapse`, which genuinely does disable
+sticky table cells in Chrome. Changed it to `separate` -- and nothing
+stuck, which read as a dead end.
+
+The actual blocker was **`overflow: hidden` on the `<table>`**, put
+there to clip the rounded corners. A clipping ancestor between a sticky
+cell and the scrollport is what sticky resolves against, and that
+ancestor does not scroll. The frame and its rounding moved to
+`.scroller`, which is the scrollport and where they belonged anyway.
+Both fixes were needed; only the second was sufficient.
+
+### Priority: an action outranks reference data
+
+Columns now carry `rank`, and the actions sit second behind the name --
+above Email and SID. Written down because the default instinct is the
+other way round: a table looks like it is for its data, and this one is
+for dropping students.
+
+`floor` separates "what this column wants" from "what it may be
+squeezed to", and an empty column starts at its floor. `Prints as` is
+empty for all 45 students and was holding 200px for nothing. With that
+reclaimed, the whole table fits at 760px -- it no longer needs to
+scroll at the widths he was complaining about.
+
+### Spare width, and a measurement of nothing
+
+Wide windows now give the slack to the growing columns. The first
+attempt did nothing, because `renderRoster()` runs at boot while the
+tab is still `hidden`, a hidden element measures **zero**, and zero
+took the shrink branch and pinned every column to its floor. `show()`
+re-renders on reveal, and `sizeColumns` now treats zero as "no
+measurement" rather than as "no room".
+
+### Three collisions, one of them in a new language
+
+* `ICON`. Renaming `NAV_ICON` to `ICON` collided with **seating.js's own
+  top-level `ICON`** -- the two files are plain `<script>` tags sharing
+  one global scope, so the duplicate `const` is a SyntaxError that stops
+  *the other file* loading. The Roster rendered perfectly while Seats
+  failed entirely, with nothing on the Roster to suggest why. Renamed
+  `GLYPH`, and `test_the_two_scripts_declare_no_name_twice` now does for
+  JavaScript what the CSS collision test does for classes.
+* The stale console. The `ICON` error kept appearing after the fix,
+  because `read_console_messages` returns a buffer that survives
+  navigation. Checked `typeof` for both globals instead; both present.
+* `.link` -> `.act`. Not a collision, a lie: the class was named for the
+  thing it looked like.
+
+### A name is not a sort key
+
+The filed-name option could not use `last` and `first`: they are empty
+on every roster here, which `_sort_names` already documents. The
+derived split is available, but that docstring also says it **guesses**
+from the `First Last` form and gets a compound surname wrong -- and it
+was deliberately confined to sorting, where being wrong puts a row in
+an odd place, which you can see.
+
+Measured what it would do: this class's one three-word name came back
+as one word of surname and one of given name, so the filed form would
+have **dropped a word of a student's name** on screen. Not re-ordered
+it -- lost it.
+
+So `displayName` checks that the parts reconstruct the whole name and
+falls back to the stored name when they do not. 44 rows read `Last,
+First`; the compound one reads as stored; no name loses a word. Making
+a wrong split correctable is a roster feature, not a display toggle,
+and is not built.
+
+The option lives beside "show dropped" rather than on the Name heading,
+which already cycles four sort states. While it is on, the Name column
+is **not editable** -- 13.6's "derived things are not editable", and
+typing into a filed name would write the rendering back as the stored
+value.
+
+779 printit tests, 0 audit problems. Seats re-checked: 36 seats, scale
+0.814.
