@@ -12837,3 +12837,77 @@ pointer coordinates: **when a number is surprising, suspect the
 harness before the code.**
 
 779 printit tests, 0 audit problems.
+
+## One request, three banks (2026-10-20)
+
+The instructor read the previous entry and asked two good questions:
+what does Open for retake have to do with Google, and what about a
+shimmer goes against anything he said. Both answers were mine to
+correct.
+
+### Open for retake never touched Google
+
+It comes from `bank.xml` for the names and `availability.toml` for
+which are ticked, and `api_skills` makes no network call at all. The
+previous note said the Form tab was slow and separately that Google
+was slow, close enough together to read as one claim. It was not one
+claim, and the real cause was duller and more fixable.
+
+**`api_skills` built the bank three times for one request.** Profiled
+per step:
+
+| step | cost |
+|---|---|
+| `availability()` | 0.4ms |
+| `bank()` | 134.9ms |
+| `slugs()` | 0.0ms |
+| `form_mod.load()` | 0.4ms |
+| `_wording()` | 130.4ms |
+| `_preview()` | 129.8ms |
+
+`_wording` calls `course.bank()` itself, and `_preview` calls
+`_wording` again -- so one request parsed `bank.xml` and all 29
+outcomes three times, and computed the wording twice. `bank_for`
+builds a fresh `Bank` on every call, which is correct and is not the
+bug; calling it three times for one answer is.
+
+Both helpers now take a bank, with a sentinel default because `None`
+already means "this course has no bank", and `_preview` takes the
+wording the caller already has. `api_skills_preview` had the same
+shape and fires **on every keystroke** in the assessment fields, so
+that was three bank parses per character typed.
+
+Verified by comparing old and new output rather than by trusting the
+suite: both `wording` and `preview` serialise identically. 710ms to a
+**265ms median** over the wire, 235ms in process.
+
+Still no caching between requests, for the reason in the previous
+entry: one `Course` outlives every request, and a held `Bank` would
+hold stale seeds after a `checkit generate`.
+
+### The placeholders shimmer, and the rule against it was invented
+
+I wrote into the design document that a shimmer "is decoration, which
+is what this redesign has been removing", in a voice that implied he
+had said so. He had not. His rules are: no underlined text for
+functions, and decoration means colour, rounder corners and scattered
+illustration. A shimmer is none of those.
+
+It also turns out to be doing real work here. A **still** grey bar is
+indistinguishable from a genuine empty row, and "nothing is open for
+retake" is a perfectly plausible state on this tab -- so the still
+version has a wrong reading available to it and the moving one does
+not. The movement is the distinction, not the ornament.
+
+Added: a slow low-contrast sweep, off under
+`prefers-reduced-motion`. Worth knowing that **this machine reports
+`prefers-reduced-motion: reduce`**, so the still version is what will
+actually be seen here until Windows's animation setting changes. The
+animation was verified by overriding the query and watching
+`background-position` move.
+
+**Do not generalise one of his rules into a neighbouring one he did
+not make**, and do not write an invented rule into the document in his
+voice. That document is the record of what he decided.
+
+779 printit tests, 0 audit problems.
