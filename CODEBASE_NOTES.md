@@ -12529,3 +12529,79 @@ that tab is stage 3d.
 
 Six mutations, all noticed, each killing exactly the tests that should
 care. 774 printit tests, 0 audit problems.
+
+## Stage 3c: the Roster, and `.band` was taken too (2026-10-19)
+
+### The counts question, answered by the rule rather than by taste
+
+`45 students - 22 in 820 - 23 in 830` was banned in 13.4 without a
+replacement, and that gap blocked this stage. 13.4 lists what to reach
+for instead, in order, and the last entry is **put the fact next to
+the thing it describes**. Applied literally it answers the question:
+the only count that is about the whole table is 45, so that is the
+only one in the page header; 22 and 23 are about runs of rows, so they
+ride a band above those rows.
+
+Bands appear only while the rows are grouped by section. The test is
+on **the sorted rows themselves**, not on `sorts[0].key` -- walk the
+rows, collect runs, and draw bands only if every section appears in
+exactly one run. That is right for a descending section sort, for a
+single section (one run, so no bands, because the header already says
+it), and for an unrelated sort that happens to group them. Sorted by
+email, 820 and 830 interleave and the bands vanish.
+
+Drawn, not settled: the instructor judges it in situ. The cost is that
+the split is invisible under any other sort.
+
+### `.band` was Seating's selection rectangle
+
+The band shipped as `.band`. `seating.css` has had a `.band` since its
+own stage A -- the rubber-band marquee -- carrying `position:
+absolute`. On a `<tr>` that computes to `display: block`, which drops
+the row out of the table: it measured **58px wide with no height**,
+sitting on top of the first student's row.
+
+This is `.rail` from stage 2 exactly, **committed one stage after I
+wrote "grep `seating.css` before naming a class in the shell" into
+`CLAUDE.md` myself.** Writing the rule down demonstrably did not work.
+
+So it is a test now. `test_no_bare_class_is_defined_in_both_stylesheets`
+compares the two files and fails on any class defined **bare** in both.
+Bare is the right line, not shared: `.skill.on` and `.banner.waiting`
+share `on` and `waiting` with seating today and are harmless, because a
+compound selector cannot match an element that lacks the other class.
+A bare one claims every element in a document the two stylesheets
+share. The test asserts `.rail` and `.band` are still bare in
+seating.css, so it cannot quietly stop testing anything, and a mutation
+pass confirms it fires on both and stays quiet on a compound.
+
+I also chased the wrong fix first -- `position: sticky` on the cell,
+which is independently incompatible with a fixed table layout, so
+removing it changed nothing and looked like a dead end. Reading
+`display` off the computed style was what found it. **Ask the element
+what it is before theorising about why it is wrong.**
+
+### Shrink to fit before deciding to scroll
+
+`sizeColumns` summed 884px of content into an 875px scroller, so a
+scrollbar ran the width of the roster and moved it nine pixels. Every
+column was above its own `min` at the time, so the nine pixels existed
+-- they were simply never reclaimed.
+
+Now the excess is taken back from the columns with the most slack
+first (Email before Section: nine pixels off an email is invisible and
+off Section is a third of it), down to each column's `min` and no
+further. Measured: at a 1105px window the overflow is 0 where it used
+to be 9; at 1000px it is 102px of genuine overflow with every column at
+its minimum, and the scrollbar means something again.
+
+### Also
+
+The Roster's explanatory paragraph went behind a `?`, which needed the
+click handler widened from `.annot` to `.annot, .view` -- a page
+header's explanation belongs to the view, and `.annot` is listed first
+so the Print tab's three do not find each other's. The table header
+row got its own surface, per 13.5.
+
+777 printit tests, 0 audit problems. Seats re-checked after the
+stylesheet change: 36 seats, scale 0.868, bottomstack 51px.
