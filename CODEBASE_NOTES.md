@@ -12705,3 +12705,56 @@ value.
 
 779 printit tests, 0 audit problems. Seats re-checked: 36 seats, scale
 0.814.
+
+## The drop glyph, and stage 3d (2026-10-20)
+
+### A glyph with no `fill: none` is a filled shape
+
+The drop button shipped as a black blob with no visible button under
+it. Two causes, both mine.
+
+`fill: none; stroke: currentColor` lived on **`.navrail button svg`**,
+so the first glyph used outside the rail got neither: an SVG path with
+no fill rule is *filled*, and the colour never reached a stroke that
+was not being drawn. The rule now belongs to the glyph itself --
+`glyph()` sets `class="glyph"` on the element it builds, and the
+stroking is stated once for wherever it is used. Size stays with the
+context.
+
+The second was that `.iconbtn` had `background: none` at rest, so there
+was no button, only a picture sitting on the row. The instructor asked
+for "gray until you hover over it and it becomes the highlight colour",
+which is a chip: `--surface-2` with a `--line` border and a muted
+glyph, going to `--accent-soft` and the accent on hover. 28px, and the
+actions column went to 52px so `td { overflow: hidden }` does not clip
+it.
+
+The glyphs: a person with a minus for drop, the same person with a
+return arrow for restore, a circular arrow for reset. **Not a bin** --
+dropping deletes nothing, the student stays on the roster greyed out
+and simply stops printing, and a bin would be the control lying about
+what it does.
+
+### 3d: Form and Setup
+
+Both are settings-shaped, so both are annotated sections now, with
+their explanations behind a `?` and the page name and its `?` in a
+`.pagehead`. Nothing structural was left to invent; this was applying
+the pattern 3b settled.
+
+Two judgements worth recording:
+
+* **Setup's `attention` panel stays a card.** A section does not get a
+  boundary for being a section, but that one is not a section: it is
+  something blocking you, and a boundary is what says so.
+* **The section rule is visibility-aware now.** `.annot:first-of-type`
+  is structural, and Setup hides two of its four sections depending on
+  whether a form is connected -- so the first section *on screen* was
+  often not the first in the markup, and drew a rule across the top of
+  the page. Replaced by
+  `.annot:not([hidden]) ~ .annot:not([hidden])`, which carries both the
+  rule and the space above it. The Print tab had the same latent bug
+  whenever Variants was hidden, which is most of the time.
+
+779 printit tests, 0 audit problems. All four built tabs now share one
+structure; Record is 3e.
