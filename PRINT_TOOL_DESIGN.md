@@ -2549,10 +2549,23 @@ of making its own.
 **Where a wait is unavoidable, show the shape of what is coming.**
 Placeholder rows the height of real ones and as many as the list will
 have, so the page has its layout before it has its content and nothing
-jumps when the answer lands. Still and quiet -- a shimmer travelling
-down a settings page is decoration, which is what this redesign has
-been removing -- and never a spinner, which says only that something
-is happening.
+jumps when the answer lands. Never a spinner, which says only that
+something is happening somewhere.
+
+**And they move.** 13.4's line about decoration names colour, rounder
+corners and scattered illustration; a loading shimmer is none of
+those, and it is not decoration, because it is carrying the one
+distinction that matters here. A still grey bar is indistinguishable
+from a real empty row -- "nothing is open for retake" reads exactly
+like "this has not arrived yet", and on this tab the first is a
+plausible state. The movement is what says which. Slow, low-contrast,
+and off under `prefers-reduced-motion`.
+
+Recorded because the opposite was briefly written here, as though the
+instructor had ruled against animation. He had not: he had ruled
+against underlined text for functions, and against decoration meaning
+colour and corners and illustration. **Do not generalise one of his
+rules into a neighbouring one he did not make.**
 
 **A table's header row has its own surface**, so it reads as a header
 without extra spacing.
