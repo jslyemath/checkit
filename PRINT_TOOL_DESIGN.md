@@ -2581,8 +2581,8 @@ branch-and-merge procedure to be skipped.
 | 3a | a skill shows its `<title>`, not its description | **done** |
 | 3b | Print tab: editable page title, `This run` dies, annotated sections, prose behind `?` | **done** |
 | 3c | Roster: the counts question, and the `colgroup` arithmetic | **drawn, awaiting a verdict** |
-| 3d | Form, Setup | |
-| 3e | Record -- never drawn, and the only tab that is purely a log | |
+| 3d | Form, Setup | **done** |
+| 3e | Record -- never drawn, and the only tab that is purely a log | next |
 | 4 | save bar, warning strips, empty states, a microcopy pass | |
 
 **Settled in 3b:** an annotated section is a `.annot` grid -- a 200px
