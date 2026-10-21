@@ -12911,3 +12911,62 @@ not make**, and do not write an invented rule into the document in his
 voice. That document is the record of what he decided.
 
 779 printit tests, 0 audit problems.
+
+## The blank corner (2026-10-21)
+
+The 2026-10-19 Skill Checkpoint printed with no semester and no
+instructor in the top right. Nothing had broken; the values had never
+existed.
+
+`assemble.py` writes `\date{publication.semester}` and
+`\author{publication.professor}`, which come from `course.toml`.
+`CONFIG_TEMPLATE` creates both as `""`, `course init` is the only thing
+that has ever written that file, and the web app offered no field for
+either. So the values could only be set by hand-editing the file, and
+nobody had.
+
+Every run before 10-19 had them because they were **typed into a
+publication by hand** -- the 09-10, 09-21 and 09-28 jobs all carry
+`semester = "Fall 2026"` written directly into their own
+`publication.toml`. 10-19 was the first run built entirely through the
+app, so it was the first to go through `write_job`, which reads
+`course.toml`, which was empty.
+
+A gap of this shape -- a field that is read, printed, and unsettable --
+survives exactly as long as everyone keeps editing the file by hand.
+
+### Two fixes, because one would not have been noticed
+
+**Settable.** `course.save_identity` writes the four header scalars,
+and Setup has a "This course" section for them. It is a line rewrite
+rather than a TOML dump, because that file is mostly a comment
+explaining itself with `[bank]` underneath, and regenerating it from
+its values would throw both away.
+
+**Noticed.** `assemble.header_gaps` reports which header fields will
+print blank, and both the CLI and the web app say so after a build. A
+note and not a refusal: a course that genuinely wants no semester in
+the corner is allowed to have one.
+
+Verified against the real 10-19 job, which still says
+`NOTE this course has no semester and no instructor...`, and against a
+freshly written publication, which now carries both.
+
+### The mutation pass found dead belt-and-braces again
+
+The line rewrite anchored on column zero with
+`not line.startswith((" ", "\t", "#"))`. Removing that guard entirely
+**broke no test**, and the reason is that the `"#"` half could never
+fire: the commented example in the header is `#     name   = "MAT
+106"`, whose key splits as `#     name` and matches nothing in
+`IDENTITY`. The whitespace half does real work -- a key indented under
+another table would be un-indented and silently handed to this one --
+so the dead half is gone and the live half now has a test that kills
+the mutation.
+
+Second time a mutation pass has found two mechanisms guarding one
+rule in this codebase.
+
+790 printit tests, 0 audit problems. `course.toml` for MAT 106 now
+carries `Fall 2026` and `Slye`, which are the values its own earlier
+jobs used.
