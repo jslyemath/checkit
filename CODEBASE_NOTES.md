@@ -13059,3 +13059,73 @@ I suggested showing the cropped image of each box beside the
 classifier's reading, as an improvement on the prototype screenshot
 he sent. It was already in the screenshot -- I had misread the crops
 as the app's own checkboxes.
+
+## A real export, and four things the guides did not say (2026-10-22)
+
+The instructor sent a live Brightspace grades export for MAT106-820:
+60 columns, 22 rows. Almost everything I had written into 14.6 the day
+before, from reading institutional documentation, was wrong for this
+course. **Run it on real data** -- the file is the specification.
+
+### What the documentation got wrong
+
+* The guides all describe **`Points Grade`** columns. These are
+  **`Grade Symbol`** -- selectbox items, one point each.
+* The values are **`🏆Pass`** and **`💭Not Yet`**, emoji included. A
+  pipeline that is not UTF-8 end to end will mangle them; the Windows
+  console cannot even print them.
+* A grades export has **no name column and no `Username`** -- only
+  `OrgDefinedId`.
+
+### A blank cell is not missing data
+
+The important one. `Core Skills Progress Subtotal Denominator` turns
+out to be **the count of non-blank cells in that row**, and the
+Numerator the count of passes. Checked on all 22 rows, exact every
+time.
+
+So writing `💭Not Yet` into a blank raises that student's denominator
+and **lowers their grade**. A blank means "this skill does not count
+for them yet". Export must write only where there is a graded result
+and leave everything else exactly as found.
+
+This would have been very easy to get wrong, and the damage -- a
+quietly worse grade for every student -- is the kind nobody notices
+until a student asks.
+
+### There is no way to identify a student
+
+Brightspace's `OrgDefinedId` is `#` plus **ten digits**. The roster's
+SID is **nine**. **Zero overlap**, `alt_id` is empty for all 45, and
+the grades export carries no names to fall back on. So the export
+cannot be built at all until a mapping exists -- a classlist import
+once a term, or `Username` added to the export if it matches the
+email's local part.
+
+Written down as the blocker it is, rather than discovered during
+implementation.
+
+### The two skill lists do not match
+
+28 slugs match exactly. `FCP` is **`Fundamentals Checkpoint`** in
+Brightspace, spelled out and outside any category. `F5-E` has a
+Brightspace column and an outcome folder but is **not published in
+`bank.xml`**. Eight video items are not printit's business.
+
+Plus a `-DoNotUse` row -- a retired enrolment sharing a base id with a
+live one. So: never add or remove a row, and leave every unrecognised
+column alone.
+
+### Also decided
+
+"Recently passed", for the Progress highlight, is **the last two
+grading sets**, and can be switched off. For export, **only the pass
+mark passes**: `?`, blank, and anything another instructor invents all
+go out as not-passed.
+
+### The parked Roster comments do not exist
+
+He asked what they were. On 10-20 he said he had "some remaining
+comments" and moved on without saying them, so there is no list to
+recover. Recorded in 15 along with what *is* open on that tab, so the
+next person does not go hunting.

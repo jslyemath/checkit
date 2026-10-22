@@ -2788,7 +2788,8 @@ number in every one is a wall. Two rules cut it down:
 gradebook is scanned for trouble, and 1,300 green cells would drown
 it. **With an option to highlight recently passed skills** in the
 accent, for the pass that has just come back from a grading run.
-"Recently" is not yet defined -- see 14.8.
+**Recent means the last two grading sets**, and the highlight can be
+switched off.
 
 **Thresholds live with the course, not the bank.** They change from
 semester to semester and `bank.xml` is the shared, published file.
@@ -2859,7 +2860,8 @@ the box**, and **a `?` beside the box**. `?` is its own state, not a
 note on a failure.
 
 Other instructors will use other marks, so **states are configurable
-per course** and a mark maps to a state. Every correction the
+per course** and a mark maps to a state. Whatever states exist,
+**only the pass mark exports as a pass** -- see 14.6. Every correction the
 instructor makes during review is a labelled example, which is where
 training data comes from without anyone being asked to produce any.
 
@@ -2913,30 +2915,99 @@ what.
 
 ### 14.6 Brightspace
 
-Researched rather than guessed. Brightspace matches a grade column
-**by the grade item's name**, not by a numeric id:
+Rewritten 2026-10-22 against a real export from the live course
+(`MAT106-820`, 60 columns, 22 rows). Most of what general research
+suggested was wrong for this course, so **the file is the
+specification, not the documentation.**
 
-* The identifying column comes first: **`OrgDefinedId`**, or
-  **`Username`**, or both.
-* Each grade column is headed **`<Item name> Points Grade`**. The
-  header may carry bracketed metadata (max points, weight, category);
-  the `Points Grade` text itself must be exact.
-* The last column must be **`End-of-Line Indicator`**, with `#` in
-  every student row.
+#### What the real file looks like
 
-Every institutional guide gives the same advice: **create the grade
-items in Brightspace, export the CSV, and fill that file in** rather
-than building one from headers. A hand-built file fails with an
-unhelpful "can't read the file".
+* The identifying column is **`OrgDefinedId`**, first. There is **no
+  `Username` column and no name column of any kind** in a grades
+  export.
+* Skills are **`<slug> Grade Symbol <Selectbox MaxPoints:1
+  Category:...>`** -- *Grade Symbol*, not the *Points Grade* the
+  guides describe, because these are selectbox items.
+* The two values in use are **`🏆Pass`** and **`💭Not Yet`**, emoji
+  included.
+* Last column **`End-of-Line Indicator`**, `#` in every row.
+* UTF-8, no BOM, LF line endings.
+* Three categories: Core Skills Progress (22), Explanation Skills
+  Progress (7), Modeling Math Videos Progress (8).
 
-**So the export should take his exported CSV as a template and fill
-it**, rather than generating headers of its own. That removes the
-entire class of name-matching bugs and is the only version that
-survives an instructor renaming an item.
+#### A blank cell is not missing data
 
-Open: whether `OrgDefinedId` is the SID the roster already holds, and
-whether `Username` is the email's local part. Both look right and
-neither is confirmed; one round-trip with a real export settles it.
+**The subtotals count the cells that are filled in.** Verified on all
+22 rows: `Core Skills Progress Subtotal Denominator` equals the number
+of non-blank core cells, and the Numerator equals the number of
+passes.
+
+So writing `💭Not Yet` into a blank cell **raises that student's
+denominator and lowers their grade.** A blank means the skill does not
+count for them yet.
+
+**The export must only write a cell where the student has actually
+attempted that skill, and must leave every other cell exactly as it
+found it.** This is the single most dangerous thing in the feature.
+
+#### Rows and columns printit must not touch
+
+* **`-DoNotUse` rows.** The export contains one: the same base id as a
+  live row, a retired enrolment. More generally, **printit never adds
+  or removes a row** -- it fills cells in rows that are already there.
+* **Columns it does not own**: the videos `V1`-`V8`, the formula
+  totals, the subtotal numerator/denominator pairs, Final Course
+  Grade, Midterm Grade Estimate, Final Exam Percentage, PAHW, Tokens,
+  the Calculated and Adjusted Final Grade pairs, and the grading
+  scheme reminder. An unrecognised column is left alone, always.
+
+#### The two lists do not match, and will not
+
+Comparing the bank with this export:
+
+* 28 slugs match exactly.
+* **`FCP` is `Fundamentals Checkpoint` in Brightspace**, spelled out,
+  and sits outside any category. It needs a mapping.
+* **`F5-E` exists in Brightspace and not in the bank** -- the outcome
+  folder is there but the slug is not published in `bank.xml`.
+* The eight videos are not printit's business at all.
+
+So the mapping is: match on slug where it matches, carry a small table
+of exceptions, and **leave anything unrecognised untouched** rather
+than trying to be clever.
+
+#### There is no way to identify a student yet
+
+**This is the blocker.** Brightspace uses a 10-digit `OrgDefinedId`
+prefixed with `#`. The roster carries a 9-digit SID. **The overlap is
+zero**, `alt_id` is empty for all 45 students, and the grades export
+carries no names to fall back on.
+
+Two ways out, and the instructor picks:
+
+1. **Import a Brightspace classlist once a semester.** That export
+   does carry names alongside `OrgDefinedId` and `Username`, so the
+   mapping can be learned and stored on the roster. One extra file at
+   the start of term, correct thereafter.
+2. **Ask Brightspace to include `Username` in the grades export** and
+   match on it, if it turns out to be the local part of the email the
+   roster already holds. Cheaper, and unconfirmed.
+
+Either way the mapping is **stored on the roster**, not re-derived per
+export.
+
+#### What export therefore is
+
+Not "generate a CSV". It is: **take the file he exported, fill in the
+cells we have a graded result for, change nothing else, hand it
+back.** Same column order, same rows, same untouched values, UTF-8
+out.
+
+#### What counts as a pass
+
+The instructor's rule: **the pass symbol passes, and everything else
+does not.** A `?`, a blank, and any mark another instructor invents
+all export as `💭Not Yet`. Nothing exports as "partial".
 
 ### 14.7 Build order
 
@@ -2950,19 +3021,27 @@ neither is confirmed; one round-trip with a real export settles it.
 
 ### 14.8 Still open
 
-* **What "recently passed" means** for the highlight: since the last
-  grading run, within N days, or until acknowledged.
+Three of the five that were here on 10-21 are now answered and have
+moved into the sections above: what "recently" means (the last two
+grading sets, toggleable), how a custom mark exports (only the pass
+mark passes), and what Brightspace actually wants (14.6, rewritten
+against a real file).
+
+What remains:
+
+* **How a student is matched to Brightspace.** The blocker in 14.6 --
+  a classlist import once a term, or `Username` in the grades export.
+  Nothing else in the export can work until this is chosen.
 * **Where thresholds are stored** -- a new course file, or a table in
   an existing one.
-* **How a custom state maps to Brightspace.** A tick is a pass and a
-  blank is not; `?` and anything an instructor invents need a stated
-  answer before export can be trusted.
-* **The Brightspace identifiers**, per 14.6.
 * **How much classifier to build.** The honest first version is
   geometric, with crops stored so a trained model can replace it on
   real data later. Where that line sits is not decided.
 * **Whether Scans can place a page whose run is unknown** -- an old
   paper with no code, from before 14.5 ships.
+* **What `F5-E` is.** Brightspace grades it and `bank.xml` does not
+  publish it, though the outcome folder exists. Either the bank is
+  missing an outcome or Brightspace has a stale column.
 
 ---
 
@@ -2993,9 +3072,30 @@ it to exist, and it needs to exist before paper is printed. A term's
 worth of papers without a code can only ever be scanned by reading
 text off them.
 
-### Outstanding comments
+### Outstanding comments on the Roster
 
-The instructor has further notes on the Roster that he parked in order
-to get every tab looking alike first. They should be collected before
-stage 4 rather than after, since stage 4 is the last pass over the
-existing tabs.
+On 2026-10-20 the instructor said he had "some remaining comments" on
+the Roster and parked them to keep the tabs moving. **He never
+enumerated them, and asked on 10-22 what they were.** They are not
+recoverable, because they were never said -- recorded here so nobody
+goes looking for a list that does not exist.
+
+What *is* open on that tab, from this document and from the 3c build,
+and what he could react to instead:
+
+* **Section bands vanish under any sort that is not by section.** The
+  22/23 split is then invisible. Flagged as the trade of the design
+  and not yet ruled on.
+* **`Last, First` makes the Name column read-only**, because the
+  filed form is derived -- typing into it would write the rendering
+  back as the stored name.
+* **One student always reads in natural order** even in filed mode:
+  their surname is two words, the splitter returns one, and showing
+  the filed form would drop a word of their name. Making a split
+  correctable is a roster feature nobody has asked for yet.
+* **Row height and padding** -- `--t-base` is still 15px and the
+  midground target of 36-40px rows is untested against 45 students.
+* **Section header treatment**, six rejected, parked for a view of a
+  whole tab.
+* **The rail folds to icons below 900px**, so at a narrow window the
+  labels are never seen.
