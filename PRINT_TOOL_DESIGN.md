@@ -2621,7 +2621,7 @@ branch-and-merge procedure to be skipped.
 | 3c | Roster: the counts question, and the `colgroup` arithmetic | **done**, with comments outstanding |
 | 3d | Form, Setup | **done** |
 | 3e | Record | **superseded by section 14** -- it became three tabs |
-| 4 | save bar, warning strips, empty states, a microcopy pass | next |
+| 4 | save bar, warning strips, empty states, a microcopy pass | **done** |
 
 **Settled in 3b:** an annotated section is a `.annot` grid -- a 200px
 gutter holding the name and its `?`, the controls to the right, a
@@ -2643,6 +2643,27 @@ sections. The table scrolls inside the window rather than making the
 page tall, with the heading row, the Name column and the actions
 column all pinned; columns carry a `rank` that decides what survives
 a squeeze, and **an action outranks reference data**.
+
+**Settled in 4:**
+
+* **One save bar per tab, absent when there is nothing to save.** Four
+  tabs had grown three arrangements of the same two buttons, one of
+  them with no Discard at all, and the Print tab's bar sat there
+  permanently with both buttons greyed. A disabled Save cannot say why
+  it is disabled; an absent bar needs no explanation. The bar names
+  its own scope -- "unsaved changes to this run", "to this course" --
+  because the scope was the thing the old placements got wrong: the
+  Update form's Save lived inside one section and wrote two.
+* **A warning draws its own mark.** `.warnline::before`, not a `⚠`
+  typed into the sentence -- two of eight had one, so warnings in the
+  same report did not look alike.
+* **An empty state is a door.** "This roster is empty" restated the
+  blank screen. Each one now says what is missing and offers the way
+  out: the import command with the course already in the `-c` flag,
+  or a button that ticks "show dropped" for you.
+* **Sentence case on every control.** Quiet actions were lowercase
+  and prominent ones were not, which encoded the hierarchy twice --
+  once in the case and once in the button style. The style keeps it.
 
 **Settled in 3d:** Setup's "needs your attention" panel stays a card
 while everything around it became an annotated section -- a boundary
@@ -2972,9 +2993,17 @@ Comparing the bank with this export:
   folder is there but the slug is not published in `bank.xml`.
 * The eight videos are not printit's business at all.
 
-So the mapping is: match on slug where it matches, carry a small table
-of exceptions, and **leave anything unrecognised untouched** rather
-than trying to be clever.
+**Settled: match on slug, then ask.** Where a slug matches a column,
+use it. Where one does not -- `FCP` against `Fundamentals Checkpoint`
+-- **ask the instructor whether a column already exists, and let him
+pick it from the columns that went unmatched.** The answer is
+remembered.
+
+That is better than a hardcoded table of exceptions, because the
+exceptions belong to a course rather than to the tool: another
+instructor's bank and another institution's gradebook will disagree
+in their own way. Anything still unmatched after that is left
+untouched.
 
 #### There is no way to identify a student yet
 
@@ -2983,18 +3012,14 @@ prefixed with `#`. The roster carries a 9-digit SID. **The overlap is
 zero**, `alt_id` is empty for all 45 students, and the grades export
 carries no names to fall back on.
 
-Two ways out, and the instructor picks:
+**Settled: a classlist import.** A CSV from the LMS is imported once
+a term, the id is stored on the roster, and the Roster tab shows it in
+a column called **LMS ID** -- named for the job it does rather than
+for Brightspace, since the next institution will call it something
+else.
 
-1. **Import a Brightspace classlist once a semester.** That export
-   does carry names alongside `OrgDefinedId` and `Username`, so the
-   mapping can be learned and stored on the roster. One extra file at
-   the start of term, correct thereafter.
-2. **Ask Brightspace to include `Username` in the grades export** and
-   match on it, if it turns out to be the local part of the email the
-   roster already holds. Cheaper, and unconfirmed.
-
-Either way the mapping is **stored on the roster**, not re-derived per
-export.
+Matching the import's rows to the roster is the same reconciliation
+problem a class list import already has, and should use it.
 
 #### What export therefore is
 
@@ -3039,9 +3064,11 @@ What remains:
   real data later. Where that line sits is not decided.
 * **Whether Scans can place a page whose run is unknown** -- an old
   paper with no code, from before 14.5 ships.
-* **What `F5-E` is.** Brightspace grades it and `bank.xml` does not
-  publish it, though the outcome folder exists. Either the bank is
-  missing an outcome or Brightspace has a stale column.
+* **`F5-E` is to be added to the bank.** Brightspace grades it and
+  the outcome folder exists; `bank.xml` does not publish it. That is
+  a `mat-106-checkit` job, not a printit one, and it should happen
+  before the export is written or the column will go unmatched for no
+  good reason.
 
 ---
 
@@ -3053,7 +3080,7 @@ before the first run of next term.
 
 | # | what | why here | size |
 |---|---|---|---|
-| 1 | **Stage 4** of section 13 -- save bar, warning strips, empty states, a microcopy pass | finishes what is half-done before starting something new; every new tab inherits it | small |
+| ~~1~~ | ~~**Stage 4** of section 13~~ | **done 2026-10-22.** Runs, Progress and Scans inherit the save bar, the warning mark and the empty-state shape | |
 | 2 | **Runs** (14.2) | the data already exists; two columns and a list | small |
 | 3 | **The page marks** (14.5) -- code in the footer, run seed on the version, an id field | **deadline: before the first print of next semester.** Everything in Scans rests on it | small, but touches `printit.sty` and the theme both banks load |
 | 4 | **Scans** (14.4) | the big one. Import, split, classify, review, save | large |

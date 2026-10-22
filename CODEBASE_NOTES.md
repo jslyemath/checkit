@@ -13129,3 +13129,73 @@ He asked what they were. On 10-20 he said he had "some remaining
 comments" and moved on without saying them, so there is no list to
 recover. Recorded in 15 along with what *is* open on that tab, so the
 next person does not go hunting.
+
+## Stage 4: the four things every tab shares (2026-10-22)
+
+Done ahead of the three new tabs rather than after them, so Runs,
+Progress and Scans inherit it instead of each growing their own.
+
+### One save bar, and it is not there when there is nothing to save
+
+Four tabs had three arrangements of the same two buttons: the Roster's
+in its toolbar, the Update form's **inside one section** -- which said
+the buttons belonged to that section, and they did not, because the
+same save writes the assessment fields above it -- Setup's with **no
+Discard at all**, and the Print tab's in a bar that sat there
+permanently with both buttons greyed out.
+
+A disabled Save cannot say why it is disabled. An absent bar needs no
+explanation. So `saveBar(view, dirty, what)` replaces four
+near-identical functions, each bar names its own scope, and Setup
+gained the Discard it never had.
+
+### Moving the bar nearly hid a notice
+
+`#print-news` -- "the Roster changed since this tab last opened" --
+lived **inside** the Print tab's save bar. The moment that bar learned
+to hide itself when clean, the notice would have been visible only
+while there were unsaved changes, which is precisely when it does not
+matter. Caught by checking what else was in the element before
+changing it. It is a banner at the top of the tab now, with the other
+notices.
+
+### The warning mark was in the sentences
+
+`.warnline` is amber text, used eight times across the build report,
+the pull report and Setup. **Two of the eight had a `⚠` typed into
+the string.** So warnings in the same report did not look like each
+other, and whether a new one got a mark depended on who wrote it.
+
+`.warnline::before` draws it now, and a test fails on the character
+appearing in `app.js` at all.
+
+### "This roster is empty" told the reader nothing
+
+It restated a blank screen. 13.6 says an empty state is a door, so
+each one says what is missing and offers the way out: for an empty
+roster, the import command **with the course name already in the `-c`
+flag**, because that flag is the part people get wrong; for a roster
+where everyone is dropped, a button that ticks "show dropped".
+
+The import is still a command rather than a screen. When the class
+list import arrives -- it has to, for the LMS id in 14.6 -- that
+empty state becomes a button and the command goes.
+
+### Also: thirteen unreachable lines
+
+`renderOverview` still carried the Overview tab's eight-card renderer
+behind `const cards = null; if (!cards) return;`. The tab went in
+stage 2 and the code stayed. Removed; the function now does the one
+thing it still has to, which is name the course on the rail.
+
+### Microcopy
+
+Quiet actions were lowercase (`add a spare`, `clear all`) and
+prominent ones were not, which encodes the hierarchy twice -- once in
+the case and once in the button style. Now sentence case everywhere
+and the style carries it alone. Two labels that were not a verb and
+its object: *What would this replace?* became *Check what this
+replaces*, and *I have done it* became *I have authorised it*.
+
+793 printit tests, 0 audit problems. Four mutations against the new
+guards, all noticed.
