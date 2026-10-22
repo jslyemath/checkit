@@ -936,7 +936,9 @@ command that already does the work.
 | **Responses** | who has answered, who has not, what they chose; the addresses that matched nobody; pull into the roster | `form pull` |
 | **Seating** | drag students between seats; randomise; swap two; see version letters and empty seats | *(none -- see below)* |
 | **Print job** | the staging area for one sitting: each student's choices with a manual override, skills appended for everyone, defaults for non-responders, per-skill variant, title and date, extras, keys, names; preview the draw; build; open the PDF | `build`, `build --preview` |
-| **Record** | what has been printed, to whom, when, at which seed; per-student and per-skill views | `record runs`, `record student`, `record skills` |
+| **Runs** | past runs: when, which seeds, drill in, reprint, delist | `record runs` |
+| **Progress** | each student against each skill: passed, passes, attempts | -- |
+| **Scans** | read marked papers back in and grade them | -- |
 | **Cold call** | pick a random student, pick several, refresh the call list with its skip flags | *(none)* |
 | **Setup** | create or attach the form, map items, course settings, bank path | `course init`, `form create`, `form attach`, `form map`, `form add-items`, `form connect` |
 
@@ -1182,7 +1184,7 @@ on its own:
 | 8b | **done** -- **Roster** table, editable, with drop and restore | the most-wanted, and write-round-trip is the thing to get right early |
 | 8c | **done** -- **Update form**: the open skills, the assessment, the wording preview, the push | replaces the most tedious CLI sequence |
 | 8d | **done** -- **Print job**: choices with overrides, defaults, variants, then build | the first view that needs the bank, not just the course |
-| 8e | **Record**, and the response pull -- see "Open, and blocking" for whether Responses stays a tab | cheap once the shell exists |
+| 8e | ~~**Record**~~ -- became Runs, Progress and Scans; **see section 14**. The response pull landed inside the Print tab instead of becoming one | |
 | 8f | **Seating**, drag and drop, plus randomise and swap | genuinely new code; the interaction needs prototyping rather than specifying |
 | 8g | **Cold call** | new, and the smallest |
 | 8h | **Setup**: create or attach a form from the app -- **done**; the boilerplate editor still to come | both are start-of-semester work, and the editor needs somewhere the weekly views do not |
@@ -2306,7 +2308,9 @@ this replaces it.
 2. **Nothing in Seating has been used on a phone.** Two-finger pan and
    pinch are written and have never been under a thumb. The layout was
    checked at 530px in a desktop browser, which is not the same test.
-3. **Record** is the one view still entirely unstarted, and **Setup**
+3. **Record** was the one view still entirely unstarted. It is now
+   three -- Runs, Progress and Scans -- and is specified in section
+   14. **Setup**
    still wants its boilerplate editor.
 4. **The TOMLs want a pass.** They were designed before the GUI, in
    preparation for it; now that the GUI has settled there is almost
@@ -2323,12 +2327,15 @@ this replaces it.
    **a number that does not change when you change what it measures is
    measuring something else.**
 
-## 13. The look of the app (2026-10-13) — DRAFT
+## 13. The look of the app (2026-10-13)
 
-**Status: a draft under discussion.** What is marked *settled* has been
-decided by the instructor and should not be relitigated. What is marked
-*open* is still a judgement call and belongs to him, not to whoever is
-editing this file.
+**Status: in force.** Stages 1 to 3 are built and every tab now shares
+one structure; stage 4 is the remainder. What is marked *settled* has
+been decided by the instructor and should not be relitigated. What is
+marked *open* is still a judgement call and belongs to him, not to
+whoever is editing this file.
+
+Section 14 is written against these rules and assumes them.
 
 ### 13.1 The problem this exists to fix
 
@@ -2499,7 +2506,8 @@ settings layout, and it works because the header is distinguished by
 *position* rather than by shouting. **At narrow widths the gutter
 collapses and the header moves above its controls.**
 
-**Table-shaped tabs get no gutter.** Roster and Record are not settings
+**Table-shaped tabs get no gutter.** Roster, Runs, Progress and Scans
+are not settings
 and must not pretend to be. The gutter costs about 120px of width
 permanently, which a form does not miss and a table does: drawn both
 ways, the same Roster column went from carrying a real skill name to
@@ -2610,10 +2618,10 @@ branch-and-merge procedure to be skipped.
 | 2 | the shell: left rail, no top nav, no Overview | **done** |
 | 3a | a skill shows its `<title>`, not its description | **done** |
 | 3b | Print tab: editable page title, `This run` dies, annotated sections, prose behind `?` | **done** |
-| 3c | Roster: the counts question, and the `colgroup` arithmetic | **drawn, awaiting a verdict** |
+| 3c | Roster: the counts question, and the `colgroup` arithmetic | **done**, with comments outstanding |
 | 3d | Form, Setup | **done** |
-| 3e | Record -- never drawn, and the only tab that is purely a log | next |
-| 4 | save bar, warning strips, empty states, a microcopy pass | |
+| 3e | Record | **superseded by section 14** -- it became three tabs |
+| 4 | save bar, warning strips, empty states, a microcopy pass | next |
 
 **Settled in 3b:** an annotated section is a `.annot` grid -- a 200px
 gutter holding the name and its `?`, the controls to the right, a
@@ -2624,6 +2632,24 @@ and is wired by one delegated listener, so a section added later gets
 the behaviour without being remembered. Below 860px the gutter
 collapses and the header goes back above its controls.
 
+**Settled in 3c:** the page header carries only the whole-table
+total (`Roster` left, `45 students` right); the per-section counts
+ride **section bands** inside the table, a thin full-width row
+reading `820` with `22` right-aligned above that section's rows.
+Bands are drawn only while the rows are actually grouped by section,
+tested on the sorted rows rather than on `sorts[0].key`, so they
+survive a descending sort and vanish when a sort interleaves the
+sections. The table scrolls inside the window rather than making the
+page tall, with the heading row, the Name column and the actions
+column all pinned; columns carry a `rank` that decides what survives
+a squeeze, and **an action outranks reference data**.
+
+**Settled in 3d:** Setup's "needs your attention" panel stays a card
+while everything around it became an annotated section -- a boundary
+is what says something is blocking you. The rule between sections is
+visibility-aware, because Setup and Print both hide sections
+depending on state.
+
 **Settled during the build, beyond 13.3:** Figtree is vendored, not
 linked. The greys are OKLCH 260, Seating's own hue, several steps
 lifted unchanged. The rail is `.navrail` and carries the course name
@@ -2632,24 +2658,11 @@ body size and its glyphs 21px. The count has left the rail.
 
 ### 13.8 Still open
 
-* **How a page header carries its counts** -- drawn in 3c, and the
-  instructor has not ruled on it yet. Of the candidates in 13.4 the
-  last one won: *put the fact next to the thing it describes*. So the
-  page header carries only the whole-table total (`Roster` left,
-  `45 students` right), and the per-section counts ride **section
-  bands** inside the table -- a thin full-width row reading `820` with
-  `22` right-aligned, immediately above that section's rows.
-
-  Bands are drawn only while the rows are actually grouped by section,
-  which is tested on the sorted rows rather than on `sorts[0].key`:
-  that stays right for a descending section sort, for a single
-  section, and for some other sort that happens to group them anyway.
-  Sorted by email the sections interleave and the bands disappear,
-  because a band every few rows is noise rather than structure.
-
-  What this buys: no strip of facts at the top at all, and a 45-row
-  table gains structure it did not have. What it costs: the split is
-  invisible while sorted by anything else. That is the trade to judge.
+* **The Roster's remaining comments.** The counts question is
+  answered -- see "Settled in 3c" above -- and the instructor has
+  further notes on that tab which he has parked in order to get all
+  the tabs looking alike first. They are not written down here
+  because they have not been given yet.
 * **Section header treatment.** Six have now been tried across two
   rounds and all six were rejected. Parked deliberately: the
   instructor wants to judge it with a whole tab on screen, not in
@@ -2664,3 +2677,325 @@ body size and its glyphs 21px. The count has left the rail.
   it. Whether the app wants a thin one for global state is open;
   three save-state placements were shown and (c), a bar that appears
   only when dirty, was chosen, which may be all that is needed.
+
+---
+
+## 14. Runs, Progress and Scans (2026-10-22)
+
+Three new tabs, agreed with the instructor in a design round on
+2026-10-21/22. His answers are recorded as decisions; what he did not
+decide is in 14.8 and should not be guessed at.
+
+This is the realisation of **6c**, which anticipated "a table-style
+editor in the eventual GUI" and is otherwise unchanged -- including its
+rule that the record **does not feed back into printing**. Progress
+tells the instructor what has happened. It does not skip a skill
+somebody has passed, and it does not prioritise one they keep failing.
+
+### 14.1 Why three, and the order they depend on
+
+They are three questions with three shapes, which is why the single
+"Record" tab never got drawn:
+
+* **Runs** -- what was printed, when, with which seeds.
+* **Progress** -- where each student stands against each skill.
+* **Scans** -- read the marked papers back in.
+
+The dependency runs one way. Scans needs Runs, to know what a paper
+should be. Progress needs Scans, because of the decision below.
+
+**An attempt is logged when a paper is graded, never when it is
+printed.** A printed paper for an absent student is not an attempt.
+*Taken* means *present in the scan*, and it is the instructor's job to
+pull absentees' and empty papers out of the stack before scanning.
+That is a deliberate division: the app does not guess at attendance,
+and the person holding the stack already knows.
+
+So Progress shows nothing real until Scans works. The instructor has
+his own system for this semester and is content to wait.
+
+### 14.2 Runs
+
+The old "Record" tab, renamed. It is about past runs.
+
+**The data already exists.** `record.db`'s `run` table stores
+`built` -- the real timestamp, which genuinely differs from the date
+printed on the paper (the 10-19 run is dated the 19th and was built at
+10:43:37) -- plus the run seed, the title, the date and the output
+folder. Per-skill version seeds come out of the `printed` table; the
+Extravaganza has 57 distinct skill/version/seed combinations. Two new
+columns are needed and nothing else: **delisted** and **graded**.
+
+**The list** is every run, newest first, showing title, date, build
+time, run seed, papers, students, and whether it has been graded.
+
+**Drilling in replaces the list with that run's page**, with a back
+link, and previous/next so a run can be stepped through without going
+back each time. Not an expanding row -- the detail is 50+ rows of
+seeds and would push the list a screen and a half down. Not a side
+panel -- the content column is about 900px and a split leaves too
+little for the seed table. The same drill-in serves a single student
+in Progress, so it is one pattern used twice.
+
+The detail shows which skills were in the run, how many papers of
+each, how many versions, and the version seeds per skill.
+
+**Two actions, deliberately separate**, because merging them is how
+somebody reprints last month's papers by accident:
+
+* **Reprint exactly** -- the existing `build --replay`. Same students,
+  same seeds.
+* **Start a new run from these settings** -- the selection, variants
+  and extras, drawn fresh against today's roster. **Warns** if the
+  Print tab has unsaved work.
+
+**Delisting** moves a run into a collapsed group at the bottom of the
+list rather than hiding or deleting it. **A graded run cannot be
+delisted** -- the option is not offered at all, rather than offered
+and refused.
+
+A graded run also offers **open in Scans**, to review what was read.
+
+### 14.3 Progress
+
+Students down the left, **all of the bank's skills** across the top --
+not only the ones offered so far. Both sections together for now; an
+app-wide section filter, shared with Roster, is a later job.
+
+**Up to three facts per cell**: passed or not, how many passes, how
+many attempts. 45 students by 29 skills is about 1,300 cells, so a
+number in every one is a wall. Two rules cut it down:
+
+* **A pass count only appears where the threshold is above 1.** Where
+  one check passes a skill, "how many passes" says nothing that
+  "passed" does not. This semester that is every skill, so the third
+  fact disappears entirely -- and the design still holds next
+  semester, when some skills need two.
+* **An attempt count only appears when it is surprising.** Passed
+  first time needs no number. Four attempts and still not passed is
+  the thing worth seeing from across the room.
+
+| state | the cell |
+|---|---|
+| never taken | empty |
+| passed, first attempt | a tick, quiet |
+| passed after several | a tick with a small count |
+| not passed, one attempt | an empty box |
+| **not passed, several** | **an empty box with the count, and the loudest thing on screen** |
+| threshold 2, one so far | a half state and `1/2` |
+
+**Passing is quiet.** The instructor's call, and the right one: a
+gradebook is scanned for trouble, and 1,300 green cells would drown
+it. **With an option to highlight recently passed skills** in the
+accent, for the pass that has just come back from a grading run.
+"Recently" is not yet defined -- see 14.8.
+
+**Thresholds live with the course, not the bank.** They change from
+semester to semester and `bank.xml` is the shared, published file.
+Default 1, overridable per skill.
+
+**A single student drills in**, the same way a run does: their
+history, when each skill was attempted, at which seed, with a link to
+the scan.
+
+### 14.4 Scans
+
+The largest of the three and the one with real risk in it.
+
+#### What arrives
+
+Not a tidy stack. From the instructor:
+
+* **Several PDFs**, because one is too large for the printer to email.
+* **Both sides**, but not always -- **fronts and backs may land in
+  different batches**.
+* **Blank pages may be included.**
+* **The papers are all mixed up.**
+
+So page order carries no information whatsoever, and the two halves of
+one sheet may not even be in the same file. **Every page has to
+identify itself on its own.** That is what 14.5 is for, and it is why
+the print change is on the critical path rather than being a nicety.
+
+#### What a page already says
+
+`printit.sty` prints, today: the student's name at the top left, `v`
+and the version seed at the bottom centre, and -- **on the first page
+of a skill only** -- the skill slug and the rounded box in the outer
+bottom corner. The continuation style deliberately omits the box, with
+a comment saying one skill should be ticked once. The box swaps
+corners between left and right according to the page's side.
+
+Two consequences:
+
+* **Identity does not need handwriting recognition.** It needs a
+  printed slug and seed read from a known corner, in a known font.
+* **The mark does not need finding.** Its position is known, so the
+  job is to crop a known region and classify it, which is far smaller
+  than reading a page.
+
+But a name printed at the top is not enough on its own, for two
+reasons the instructor raised: a run can be printed with **blank name
+lines**, and **a student can sit a skill without being in the run's
+manifest** -- they pick up a spare. Both are handled in 14.5.
+
+Blank padding pages use `\pagestyle{empty}` and so carry no footer at
+all, which makes them identifiable by what they lack.
+
+#### Reviewing
+
+A grid of students against the skills in that sitting, which is close
+enough to the Progress grid to share its parts. Each cell shows **the
+cropped image of the actual box** beside the reading, so the
+instructor confirms against the paper rather than against the
+classifier's confidence. (This was already in the prototype; it is
+recorded here because it is the thing that decides whether the tab is
+trusted.)
+
+#### Marks
+
+The instructor uses exactly two: **a check whose tail comes out past
+the box**, and **a `?` beside the box**. `?` is its own state, not a
+note on a failure.
+
+Other instructors will use other marks, so **states are configurable
+per course** and a mark maps to a state. Every correction the
+instructor makes during review is a labelled example, which is where
+training data comes from without anyone being asked to produce any.
+
+Starting simple is fine: a tick against an empty box, inside a known
+rectangle, is close to a pixel-density question. Store the crops from
+day one so a classifier can be trained later on real marks rather than
+synthetic ones.
+
+#### Saving
+
+One action, with the rest following from it:
+
+1. Attempts recorded for each student and skill.
+2. Passes recorded, against the course's threshold.
+3. The runs involved marked **graded**, which also makes them
+   undeletable and gives them the "open in Scans" action.
+4. *(stretch)* Per-student PDFs into their own shared Drive folder,
+   set up once a semester.
+5. *(stretch)* An email to each student with the results and a link.
+
+#### Storage
+
+The original PDFs are kept untouched. Per-student output is **PDF**,
+not images, because that is what gets shared and what a student can
+read; images are a working step for the classifier and belong beside
+the crops, not in front of the instructor.
+
+### 14.5 What a printed page must carry
+
+The print-side change this all rests on, and **the one piece that must
+land before the first run of next semester** -- a paper printed
+without it can only be scanned by reading text.
+
+* **A machine-readable code in the footer**, carrying the run seed,
+  the skill, the version seed and the page's index within that skill,
+  plus the student id when the run has names. Splitting then needs no
+  OCR at all, and a double-feed or a missing page is **detected**
+  rather than silently filed under the wrong student.
+* **The run seed, visible**, as a dashed suffix on the version in the
+  bottom centre -- `v617-398621586`. The instructor's idea, and it
+  means a loose sheet can be traced to its run by eye.
+* **A student id field at the top**, beside the name: filled
+  automatically when the run is named, and left blank to be written in
+  when it is not. Printing it as one box per digit is worth doing;
+  separated digits are the most reliable handwriting there is, and
+  this is the only handwriting the system has to read.
+
+That last one is what lets an unnamed spare be graded at all, and it
+is why the manifest cannot be the only source of truth about who sat
+what.
+
+### 14.6 Brightspace
+
+Researched rather than guessed. Brightspace matches a grade column
+**by the grade item's name**, not by a numeric id:
+
+* The identifying column comes first: **`OrgDefinedId`**, or
+  **`Username`**, or both.
+* Each grade column is headed **`<Item name> Points Grade`**. The
+  header may carry bracketed metadata (max points, weight, category);
+  the `Points Grade` text itself must be exact.
+* The last column must be **`End-of-Line Indicator`**, with `#` in
+  every student row.
+
+Every institutional guide gives the same advice: **create the grade
+items in Brightspace, export the CSV, and fill that file in** rather
+than building one from headers. A hand-built file fails with an
+unhelpful "can't read the file".
+
+**So the export should take his exported CSV as a template and fill
+it**, rather than generating headers of its own. That removes the
+entire class of name-matching bugs and is the only version that
+survives an instructor renaming an item.
+
+Open: whether `OrgDefinedId` is the SID the roster already holds, and
+whether `Username` is the email's local part. Both look right and
+neither is confirmed; one round-trip with a real export settles it.
+
+### 14.7 Build order
+
+1. **Runs.** The data already exists; this is a list, a detail page
+   and two flags.
+2. **The page marks (14.5).** Out of order on purpose -- it has to be
+   printing before next semester's first run or Scans starts from a
+   worse position permanently.
+3. **Scans.**
+4. **Progress.**
+
+### 14.8 Still open
+
+* **What "recently passed" means** for the highlight: since the last
+  grading run, within N days, or until acknowledged.
+* **Where thresholds are stored** -- a new course file, or a table in
+  an existing one.
+* **How a custom state maps to Brightspace.** A tick is a pass and a
+  blank is not; `?` and anything an instructor invents need a stated
+  answer before export can be trusted.
+* **The Brightspace identifiers**, per 14.6.
+* **How much classifier to build.** The honest first version is
+  geometric, with crops stored so a trained model can replace it on
+  real data later. Where that line sits is not decided.
+* **Whether Scans can place a page whose run is unknown** -- an old
+  paper with no code, from before 14.5 ships.
+
+---
+
+## 15. Roadmap (2026-10-22)
+
+What is left, in the order it should happen. Dates are a semester, not
+a schedule: the only hard deadline is 14.5, which has to be printing
+before the first run of next term.
+
+| # | what | why here | size |
+|---|---|---|---|
+| 1 | **Stage 4** of section 13 -- save bar, warning strips, empty states, a microcopy pass | finishes what is half-done before starting something new; every new tab inherits it | small |
+| 2 | **Runs** (14.2) | the data already exists; two columns and a list | small |
+| 3 | **The page marks** (14.5) -- code in the footer, run seed on the version, an id field | **deadline: before the first print of next semester.** Everything in Scans rests on it | small, but touches `printit.sty` and the theme both banks load |
+| 4 | **Scans** (14.4) | the big one. Import, split, classify, review, save | large |
+| 5 | **Progress** (14.3) | cannot show anything true until 4 feeds it | medium |
+| 6 | **Brightspace export** (14.6) | needs Progress, and one round-trip with a real export file | small |
+| 7 | Drive folders and student emails | explicitly a stretch; the rest has to work first | -- |
+
+Two things worth saying about the order.
+
+**Stage 4 first, not last.** It is the smallest item here and three
+new tabs will each need a save bar, an empty state and warning
+strips. Doing it after would mean doing it four times.
+
+**Item 3 is out of dependency order on purpose.** Nothing else needs
+it to exist, and it needs to exist before paper is printed. A term's
+worth of papers without a code can only ever be scanned by reading
+text off them.
+
+### Outstanding comments
+
+The instructor has further notes on the Roster that he parked in order
+to get every tab looking alike first. They should be collected before
+stage 4 rather than after, since stage 4 is the last pass over the
+existing tabs.
