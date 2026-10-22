@@ -12970,3 +12970,92 @@ rule in this codebase.
 790 printit tests, 0 audit problems. `course.toml` for MAT 106 now
 carries `Fall 2026` and `Slye`, which are the values its own earlier
 jobs used.
+
+## Three tabs out of one, and what the paper has to say (2026-10-22)
+
+A design round, no code. The Record tab was never drawn because it was
+never one tab: `record runs`, `record student` and `record skills` are
+three questions with three shapes, and stacking them would have been
+the uniform-treatment failure section 13 exists to prevent. The
+instructor reached the same split independently and added a third
+piece nobody had specified -- reading the marked papers back in.
+
+Specified in `PRINT_TOOL_DESIGN.md` section 14, with a roadmap in 15.
+What follows is only what was learned while working it out.
+
+### Most of the Runs tab already exists
+
+`record.db` stores the build timestamp separately from the printed
+date, and they really do differ -- the 10-19 run is dated the 19th and
+was built at 10:43:37. The run seed, the output path and the
+per-skill version seeds are all there too (57 distinct
+skill/version/seed rows for the Extravaganza). It needs two columns,
+`delisted` and `graded`, and nothing else.
+
+### An attempt is a graded paper, not a printed one
+
+The instructor's call, and it settles something quietly ambiguous
+since 6c: *taken* means *present in the scan*, and pulling absentees'
+papers from the stack before scanning is his job, not the app's. The
+app does not guess at attendance.
+
+The consequence is that **Progress cannot show anything true until
+Scans works**, which fixes the build order whether or not anyone
+likes it.
+
+### The scan problem is much harder than the stack suggests
+
+Asked how scanning actually happens: several PDFs, because one is too
+big for the printer to email; both sides, but **fronts and backs may
+land in different batches**; blank pages included; and **the papers
+are all mixed up**.
+
+So page order carries no information at all, and the two halves of one
+sheet may not even be in the same file. Every page has to identify
+itself alone.
+
+### What the paper already says, and the two holes in it
+
+`printit.sty` prints the student's name top left, `v<seed>` bottom
+centre, and -- on the first page of a skill only -- the slug and the
+tick box in the outer bottom corner. The continuation page style
+deliberately drops the box, commenting that one skill should be
+ticked once. Blank padding pages use `\pagestyle{empty}` and carry no
+footer, so they are identifiable by what they lack.
+
+That is nearly enough to split a scan with no handwriting recognition
+at all. Two holes, both raised by the instructor and neither obvious
+from the code:
+
+* **A run can be printed with blank name lines**, so the name is not
+  always there.
+* **A student can sit a skill without being in the run's manifest** --
+  they take a spare. Matching every page against `printed` would
+  therefore reject legitimate papers.
+
+Hence 14.5: a machine-readable code in the footer, the run seed
+visible on the version, and a student-id field that fills itself when
+the run is named and is written in when it is not. One box per digit,
+because separated digits are the most reliable handwriting there is
+and it is the only handwriting the system must read.
+
+### Brightspace matches on the item's name
+
+Researched rather than assumed. The identifying column is
+`OrgDefinedId` or `Username`; each grade column is headed
+`<Item name> Points Grade`; the last column must be `End-of-Line
+Indicator` with `#` in every row. **There is no id in the header** --
+matching is by name, and the bracketed extras are metadata.
+
+Every institutional guide says the same thing: build the items in
+Brightspace, export, and fill that file in; a hand-built CSV fails
+with an unhelpful error. So the export should **take the instructor's
+exported file as a template** rather than generate headers, which
+removes the whole class of name-matching bugs.
+
+### A thing I got wrong
+
+I suggested showing the cropped image of each box beside the
+classifier's reading, as an improvement on the prototype screenshot
+he sent. It was already in the screenshot -- I had misread the crops
+as the app's own checkboxes.
