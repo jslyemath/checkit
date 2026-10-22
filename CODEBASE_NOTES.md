@@ -13199,3 +13199,104 @@ replaces*, and *I have done it* became *I have authorised it*.
 
 793 printit tests, 0 audit problems. Four mutations against the new
 guards, all noticed.
+
+## Drop never worked, and nine other things (2026-10-22)
+
+Ten fixes to the Roster in one pass, from a list the instructor had
+been accumulating. The interesting ones:
+
+### `confirm()` is invisible in the desktop app
+
+**The drop button did nothing.** Not a wiring fault: stubbing
+`window.confirm` showed it being called with the right message, for
+the right student, while nothing appeared on screen. The desktop
+app's browser pane suppresses native modal dialogs, so the handler ran
+and then waited for an answer nobody could give.
+
+Nothing replaced it. Drop now acts at once, because the undo is
+visible rather than promised: the student moves into a Dropped band on
+the same screen with a restore button in the same column. The one
+thing restore does not give back is the seat, and the toast says so.
+
+**Do not use `confirm`, `alert` or `prompt` anywhere in this app.**
+
+### Dropping is not a filter, it is a group
+
+"Show dropped students" could only hide them or scatter them through
+everyone else, and a sort would interleave people who have left the
+class with people who have not. Dropped is its own band at the bottom
+now, shut by default, sorted inside itself by the same keys. The tick
+is gone.
+
+Bands are collapsible generally -- the whole band row is the button --
+so the section bands fold too.
+
+### The icons came from Seating, because the meaning was already there
+
+The drop glyph was a person with a minus sign, and at 16px the minus
+*is* the meaning and it is the part that disappears. A bin was the
+obvious alternative and is wrong twice: dropping deletes nobody, and a
+bin is an unkind picture of a person. Research turned up no
+convention.
+
+The domain answered it. **What dropping does is empty their seat**, and
+`seating.js` had already drawn a chair with an arrow leaving it, plus
+the same chair with the arrow coming back. Taking both means the two
+tabs say the same thing with the same picture and only the arrow
+turns. Sized up to 18px: the chair's legs are 3.9 of 24 units, which
+at 16px is under three pixels and reads as noise.
+
+The rail's Seating icon became Seating's own chair for the same
+reason -- it had been the Groups glyph, a picture of one mode inside
+the tab rather than of the tab.
+
+### A name is editable in either order now
+
+Read-only in filed mode was the wrong answer -- the roster is the one
+place a name gets corrected. It takes `Last, First` with **exactly one
+comma**: none and there is no way to know where the surname stops, two
+and no way to know which half is which. The cell goes amber and
+records no edit until the comma is there. Verified against all four
+cases.
+
+### Also
+
+The save bar is fixed to the bottom of the work area, rail to right
+edge, because a rounded box the width of the content column looked
+like one more card with buttons in it. A floating pill was the other
+candidate and was rejected: the Roster is a fixed-height pane whose
+last row reaches the bottom, and a pill would cover it. `body.hasbar`
+pays for the space in `main`'s padding.
+
+A **yellow dot in the rail** for any tab holding unsaved work, since a
+bar that hides itself when clean also hides itself when you are
+looking at another tab. Right-aligned on the row when the rail is
+open; on the glyph's corner, smaller, when it is shut.
+
+The name format moved from a segmented control floating in a toolbar
+into the Name heading, as Seating's "two ways round" arrows. With
+"show dropped" gone too, the Roster's toolbar is gone entirely.
+
+Band counts say "22 students" rather than "22", and sit on the name's
+baseline -- they were floated, which put them above it.
+
+`Prints as` is `Print as`.
+
+### Two bugs made while fixing the others
+
+**A duplicate `const dropped`** inside `renderRoster`, which is a
+SyntaxError: a blank tab and a fully green test run, because nothing
+in the suite parses the JavaScript. `node --check` is a test now, and
+it would have caught the `ICON` collision too.
+
+**My own drop test emptied a real student's seat.** Restoring puts
+them back on the roster and deliberately does not give the seat back,
+so `room.json` -- which is the source of truth, `seating.toml` being
+generated from it -- still had a blank. Identified by three
+independent signatures (the only unseated sid, the only blank seat
+carrying version C, and the three seats beside it matching) and put
+back; the file differs from its backup by exactly that one seat.
+**Test destructive actions against a throwaway course, not the live
+one.**
+
+795 printit tests, 0 audit problems.
