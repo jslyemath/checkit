@@ -13300,3 +13300,90 @@ back; the file differs from its backup by exactly that one seat.
 one.**
 
 795 printit tests, 0 audit problems.
+
+## Nothing is written until Save, and the app grows a dialog (2026-10-22)
+
+### Dropping waits for Save like everything else
+
+It was the one control on the Roster that wrote the file the moment
+you pressed it -- and the one with the largest consequence, since it
+empties a seat. `pendingDrops` holds it as `index -> state`, the
+student moves to the Dropped band at once, the save bar counts it, and
+Discard puts them back. Pressing drop and then restore removes the
+entry rather than recording a change that is not one.
+
+On Save, **drops go before edits**: the drop call matches on name, so
+a rename applied first would leave it hunting for somebody who is no
+longer there. If a drop fails part way the table is redrawn from
+whatever the server last returned, rather than left showing a state
+nothing is in.
+
+This also closed a hazard that had bitten twice: a test click on drop
+used to write the live roster and empty a real seat. It now writes
+nothing.
+
+### `<dialog>`, because `confirm` is suppressed
+
+The ban on `window.confirm` left the app with no way to ask anything.
+`ask({title, body, yes, no})` returns a promise and is built on
+`<dialog>`, which is an element on the page rather than browser
+chrome, so the desktop pane shows it. Escape counts as cancel.
+
+### Cross-tab fallout, and only when deserved
+
+`pendingElsewhere(saving)` lists unsaved work held on tabs other than
+the one saving; `okDespitePending` asks about it and is a no-op when
+the list is empty. Seating's save calls it, because that chart is
+where the print order and every seat's version letter come from.
+
+**The first version warned when nothing was at stake.**
+`skillsDirty()` compares the server's assessment against `assessment`,
+which is only filled when the Update form is *drawn* -- and since the
+prefetch work, `skills` is loaded at boot. So a tab nobody had opened
+compared real values against an empty object and reported every field
+as changed. Harmless while only the save bar asked, because that is
+drawn after `loadSkills`; not harmless the moment something asked
+cold. The guard is `skillsDrawn`, which is the same "data arrived is
+not tab drawn" distinction the prefetch round introduced -- second
+time it has caught something.
+
+A warning that fires when nothing is at stake is one that gets clicked
+through without reading, so this one is worth the care.
+
+### The door, and four smaller things
+
+The drop glyph is a doorway with the arrow **outside** it, reaching
+the threshold. Drawn inside the frame it was a line in a box, which is
+not a picture of leaving.
+
+`#who` had no column sizing -- `sizeColumns` is the Roster's -- so a
+`table-layout: fixed` table with `width: auto` stopped at its content
+and left the rest of the row empty. `table-layout: auto` with a full
+width lets the browser size the columns and give the slack to the
+skills list. Measured: 1063 of 1063 at a wide window.
+
+"44 papers for 44 students" became two chips. It was grammar doing a
+label's job, and 13.4's own answer for facts that are peers is small
+grouped pills.
+
+Reset is an icon button like every other secondary action; it was the
+last loose piece of text sitting in a page header.
+
+Dropped rows lost their grey and their strikethrough -- they are under
+a band that says Dropped, so the formatting was saying it twice, and a
+line through a name is not a kind way to say it once.
+
+### The rail was narrow for two reasons, decided in two places
+
+A class when folded by hand, a CSS media query when the window shrank.
+Anything keyed to one of them was right half the time, and the unsaved
+dot was: it moved to the glyph's corner only when folded manually.
+`applyRail()` owns the question now and reads the media query in JS,
+so one answer drives the width rules, the save bar's left edge and the
+dot.
+
+**Verified: the Print tab does pick up Seating.** `seatVersion` comes
+from the chart, every letter shown matches it, and `loadPrint()` runs
+on every visit to the tab.
+
+795 printit tests, 0 audit problems.
