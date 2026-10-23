@@ -13387,3 +13387,124 @@ from the chart, every letter shown matches it, and `loadPrint()` runs
 on every visit to the tab.
 
 795 printit tests, 0 audit problems.
+
+## One line weight, and a filter that was pointing the wrong way (2026-10-22)
+
+Seven items off the instructor's list, two of which turned out to be
+the same kind of mistake: a thing I had reasoned about instead of
+looking at.
+
+### The calendar button was inverted into invisibility
+
+`input[type="date"]::-webkit-calendar-picker-indicator` had
+`filter: invert(var(--picker-invert))`, with the variable set to 1 in
+the dark block and a comment saying the browser draws a dark glyph we
+cannot recolour.
+
+That was true once and is not true now. Chrome already draws that
+glyph light when `color-scheme: dark` is in effect, which the app sets.
+So the invert turned a light glyph dark again, on a dark field, and the
+button was a smudge you could only find by knowing it was there.
+
+**It cannot be found by reading the computed style**, which says
+`invert(1)` whether that helps or hurts. It was found by setting the
+variable to 0 in the live page, taking the screenshot, and seeing the
+glyph appear. The filter is gone; nothing replaces it, because the
+`color-scheme` we already set is doing the whole job in both themes.
+
+The honest limit, since the instructor asked how far the date field can
+be brought into the app's look: the input box, its month/day/year
+segments, the highlight on the segment being edited, and the little
+calendar button are all page content and take our colours. The calendar
+panel that drops out of it is browser UI drawn outside the document.
+No selector reaches it. `color-scheme` is the only influence over it,
+so it arrives dark when the app is dark and that is the end of it.
+
+### One weight, stated once, and now enforced
+
+Line weights had drifted: the rail's gear and collapse chevron were
+lighter than the five icons above them. The cause is that a stroke in a
+24-unit `viewBox` scales with the glyph, so the same `stroke-width`
+draws thinner at 13px than at 21px.
+
+The rule, now in `.glyph` and in printit's map:
+
+```css
+stroke-width: calc(24 * 1.5 / var(--glyph-size, 18));
+```
+
+1.5 real pixels at every size -- but only if `--glyph-size` matches the
+width the block actually sets. Four blocks set a size today: the rail
+at 21, `.iconbtn` at 18, `.iconbtn.tiny` at 13, the band chevron at 13.
+
+Drift here is invisible one glyph at a time. A 16px glyph that inherits
+18 draws at 1.33px; nobody sees that alone and everybody sees it beside
+a 1.5px one. So it gets a test rather than a paragraph:
+`test_every_glyph_size_comes_with_its_own_variable` walks every rule
+whose selector mentions a glyph and insists the two numbers agree, and
+`test_the_one_weight_is_stated_once` insists 1.5 appears in exactly one
+declaration, because a second `stroke-width` somewhere is how a second
+weight arrives without anyone choosing it.
+
+**Both were watched failing.** Three deliberate breakages -- the
+variable forgotten, the variable left stale when the width changed, and
+a second `stroke-width` added elsewhere -- and all three were caught,
+with the stylesheet restored byte-identical afterwards.
+
+### Both tests failed first, and neither on a real fault
+
+The first run of each failed on a comment. One matched the
+`stroke-width:` written inside the comment that explains the weight
+rule. The other blamed the unsaved dot, because splitting CSS on braces
+hands you everything since the last `}` as the "selector" -- comments
+included -- and the comment above that block happens to say `svg`.
+
+This is the project's oldest hazard showing up somewhere new: prose
+about the syntax, read as the syntax. The Mustache template broke this
+way and so did the Jinja one. `rules_only()` strips comments before
+either test scans, and says why in its docstring.
+
+### The door was chosen by looking, not by arithmetic
+
+Fourth attempt at the drop glyph, and the first that was any good. The
+previous three were adjusted by moving numbers around and reasoning
+about where they would land, which is how it ended up as an arrow
+pointing at two disjoint rectangles.
+
+What worked: render four candidates into the live page at 56px and
+18px side by side, screenshot, pick one off the screen. That is the
+answer to the instructor's question about how to help -- not a better
+description of a door, but a rendered set to choose from.
+
+Two fixes on top of the chosen one. The knob is now a zero-length
+segment, `M18.4 12h0.01` with `stroke-linecap: round`, which draws a
+dot exactly one stroke-width across and therefore scales with the
+weight rule; as a stroked `r=0.6` circle it thinned away at 18px. And
+it moved to the far edge of the panel, because at the near edge it sat
+a unit and a half from the arrowhead and the two read as one smear.
+The arrow stops 1.4 units past the threshold: through the doorway,
+not parked in the middle of it, which is the in-between the instructor
+said he would accept.
+
+### The rest of the list
+
+`setup` became **Settings** with a gear -- eight teeth as short radial
+strokes plus two circles, because a toothed outline drawn as one path
+is mush at 21px.
+
+The print job's date moved under the job name, and Reset is pinned to
+the top right of that header at any width. It was being pushed onto a
+second line when the window narrowed, which put the one control that
+undoes everything somewhere different depending on the window.
+
+The reset-sort button in the Roster's action column is `tiny`, the same
+13px as the name-format switch two headings along. Measured: both 13px
+inside a 20px chip. It measures zero when the table is in default sort
+because it is correctly hidden then, which cost a few minutes.
+
+Form preview sits on its own tinted ground with the Google Form's own
+shape inside it: cards on a surface, a 6px accent bar across the top of
+the title card. It is a preview of somebody else's page and should not
+be mistaken for part of ours.
+
+798 printit tests, 0 audit problems.
