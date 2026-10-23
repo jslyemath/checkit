@@ -13795,3 +13795,76 @@ Not yet done, and recorded so it is not lost:
   names it.
 
 814 printit tests, 0 audit problems, 152 checkit tests.
+
+## A seat learns who it is (2026-10-23, last of the day)
+
+Both steps the audit proposed, done.
+
+### The rename hazard was real, not theoretical
+
+`seating.toml` matched students by name, which its own
+`index_by_name` docstring called out: "this is the one join in the
+tool made on a name". And `api_roster_save` writes the roster and
+nothing else -- confirmed by reading it, not assumed. So renaming a
+student on the Roster tab left the chart naming somebody who no longer
+existed. An unmatched seat is skipped, so they lost their seat, their
+position in the stack and their version letter, and nothing said so.
+
+`room.json` keyed its seats by student id the whole time and would
+have survived the same edit untouched. The two files disagreed about
+what a person *is*.
+
+Each seat now carries `sid` beside the name, written by `to_toml` --
+which already held the id and was deliberately converting it to a name
+on the way out. `Chart.order` matches by id first and falls back to
+the name, so every hand-written chart behaves exactly as it did. A
+stale id falls back too: a chart may predate a re-import that changed
+the numbering, and a stale id must not be worse than no id.
+
+Pinned by a test that is the inverse of the usual one --
+`test_without_an_id_a_rename_still_loses_the_seat` keeps the old
+behaviour visible, so the reason the key is *written* on every save
+rather than merely read cannot quietly erode.
+
+### And a check, because a filter would hide it
+
+`disagrees_with_room` names every divergence between the chart and the
+room: a seat one file knows and the other does not, or the same person
+on two different letters. `_build` refuses on any of them. Same
+reasoning as `check_dropped_are_unseated`, whose docstring says a
+filter would hide the divergence and a check names it.
+
+It lives in the web app, because the CLI build reads `seating.toml`
+and has never heard of `room.json`. It compares by id only, so a
+hand-written chart -- names, no ids -- returns nothing rather than a
+page of noise about a file somebody wrote on purpose.
+
+Deliberately **not** merged into one file. They are not duplicates:
+`room.json` is the room, geometry included, and `seating.toml` is the
+print order. Collapsing them would force shapes and coordinates into a
+format meant to be hand-edited.
+
+### Seven mutations, all caught
+
+The id ignored in `order`, dropped in the loader, not written by
+`to_toml`, no longer falling back on a stale value; version
+mismatches unreported, missing seats unreported, and the build not
+running the check at all. Each one failed at least one test; the files
+came back byte-identical.
+
+The harness itself followed all four rules learned earlier today:
+try/finally, an argument list rather than `shell=True`, restore from
+text held in memory rather than `git checkout`, and assert the
+unmutated baseline passes before starting. It also asserts up front
+that it can find every string it means to replace -- which is what
+caught two of the seven being written against stale text.
+
+### On the real course
+
+43 seats, **0 carrying an id**, no disagreements reported, preview
+still 43 students and 0 unseated. Correct: the existing chart predates
+the key, so it matches by name as it always has and the check stays
+quiet rather than inventing 43 complaints. The ids appear on the next
+Seats save, and the rename hazard closes then.
+
+824 printit tests, 0 audit problems, 152 checkit tests.
