@@ -13868,3 +13868,43 @@ quiet rather than inventing 43 complaints. The ids appear on the next
 Seats save, and the rename hazard closes then.
 
 824 printit tests, 0 audit problems, 152 checkit tests.
+
+## The draft stops carrying the other mode's list (2026-10-23, closing)
+
+`job.toml` held `mode = "chose"` and `simply_print = ["N2"]` together.
+Nothing read the second while the first said "chose" -- and one click
+on the Print tab's mode toggle would have made it live: 43 students,
+one paper each, from Monday's run.
+
+`write_job` already refuses to copy mode-irrelevant keys into
+`publication.toml`, and says why in a comment: such a file "will be
+read back later and believed". The draft is exactly such a file and
+the rule had simply never been applied to it. `save_draft` now writes
+`simply_print` in `same` mode and the other two in `chose` mode.
+
+Kept keys are written even when empty, which `write_job` does not do.
+Different file, different job: a draft is hand-edited, and a key that
+disappears when you clear it is a key you cannot find again.
+
+### Three tests had encoded the old rule
+
+The round trip was `for key in FULL: save, load, assert equal` -- a
+contract that every key survives. That contract is what is changing,
+so the test is now parametrised by mode as well as key, and asserts
+the unused one comes back **empty** rather than preserved. Two more
+tests cover the halves directly: the other mode's list does not ride
+along, and the mode in use keeps its own, because dropping both would
+mean the setting could never be made at all.
+
+Three mutations, all caught: writing all three again, the modes
+swapped, and the used list dropped along with the unused one.
+
+### On the real course
+
+`job.toml` rewritten through the new save with nothing else changed.
+`simply_print = ["N2"]` gone; mode, title, date, keys and all five
+`[variants]` entries intact, and the preview still reports 43
+students, 0 unseated, 0 collisions. The previous file is at
+`.backup-2026-10-23/job.toml.before-strip`.
+
+837 printit tests, 0 audit problems, 152 checkit tests.
