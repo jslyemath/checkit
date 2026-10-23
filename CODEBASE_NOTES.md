@@ -13630,3 +13630,90 @@ the Write tool, never a heredoc; a double-quoted `-c` is the same
 hazard wearing a different hat. Sixth time.
 
 807 printit tests, 0 audit problems, 152 checkit tests.
+
+## Dropping did not drop, and an audit of the TOMLs (2026-10-23, later)
+
+### A dropped student printed a three-page packet
+
+Reported, not found by a test: the run built this morning included a
+student dropped a fortnight earlier, carrying her 10/16 choices.
+
+`check_dropped_are_unseated` states the design in its own docstring --
+"printing works off the seating chart, so there is deliberately no
+filter at print time -- dropping a student empties their seat". The
+code does not do that. `build_handouts` iterates `ordered + unseated`,
+so emptying a seat moves a student out of `ordered` and straight into
+`unseated`, which prints anyway. The guard checked the opposite
+mistake, dropped-but-still-seated, and passed cleanly.
+
+Verified against the artifact rather than the preview: 45 `\setname`
+blocks in the student-copies section where 43 students are live, 17
+students with pages where 16 answered, 35 skill pages where 32 were
+expected. 35 - 32 = her three.
+
+`Roster.live()` now filters, in `assemble` **and** in `build_handouts`.
+Two copies, against this codebase's own "is there a second copy?" rule,
+because `build_handouts` is public and is the function that decides
+what prints. `check_dropped_are_unseated` runs first, since filtering
+before it leaves it nothing to find.
+
+### The mutation harness lied, twice
+
+Three mutations were scored NOTICED on the first run. One of them was
+a mutation the tests in fact *passed*. The harness used `shell=True`
+with `-k 'dropped or unseated'` quoted POSIX-style; cmd.exe does not
+treat single quotes as quotes, pytest got a malformed argument and
+exited non-zero, and every mutation therefore scored as caught. **A
+mutation harness that always reports success is the exact failure it
+exists to detect, one level up.** It now takes an argument list, and
+asserts the unmutated baseline passes before it starts.
+
+Then, rewritten, it scored MISSED for a filter that was genuinely
+pinned -- the `-k` slice did not match the new test, whose name says
+"drops" rather than "dropped". It runs the whole file now.
+
+And while restoring a mutation it ran `git checkout --` on
+`assemble.py`, which reverted two uncommitted fixes along with the
+mutation. Restore from text held in memory, never from git, when the
+tree has uncommitted work.
+
+Honest final state: neither filter -> 4 tests fail; either one alone ->
+1 test fails. Both are load-bearing. Pinning the `assemble` one needed
+a test of its own, and finding it showed the filter is not cosmetic:
+`check_flat_pins` counts skills off the roster, so a dropped student's
+leftover second skill makes a legal flat `[seeds]` pin look illegal and
+**refuses a valid run**.
+
+### The TOML audit
+
+Asked for after "that makes the backend sound like a hot mess". It is
+mostly not; the findings are:
+
+**`availability.skills` is a local copy that can drift.** It was `[]`
+while the live form offered 14 options from an earlier push. It is sent
+*to* the form and never read back, so nothing reconciles them. Nothing
+breaks silently, though: `nothing_to_say()` refuses a push with no
+skills or no date. My earlier description -- "the form would refuse
+submissions" -- was wrong; it is the push that refuses, and the form is
+left alone. `skills set` was suspected of clearing the list and does
+not: it is a line rewrite over the keys it is given.
+
+**`job.toml` keeps a setting its mode does not use.** `simply_print =
+["N2"]` is left over from the 10/19 run while `mode = "chose"`.
+`printjob.save_draft` already declines to write the unused keys into
+`publication.toml`, with a comment saying a file carrying a setting the
+run does not use will be read back later and believed -- but the draft
+itself keeps it, so the toggle is one click from printing N2 for all 43.
+
+**`seating.toml` and `room.json` hold the same seats twice.**
+43 named seats each, written in the same save (mtimes differ by a
+millisecond), and they key students differently: `room.json` by student
+id, `seating.toml` by name. The build reads `seating.toml`, the Seats
+view reads `room.json`. Keying by name is the weaker of the two and is
+what a rename would break.
+
+**`due` is empty** in `availability.toml`, so the form's "this form is
+due by on ." sentence has a hole in it -- visible in the Form preview
+and already reported there.
+
+811 printit tests, 0 audit problems, 152 checkit tests.
