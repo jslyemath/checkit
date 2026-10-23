@@ -13717,3 +13717,81 @@ due by on ." sentence has a hole in it -- visible in the Form preview
 and already reported there.
 
 811 printit tests, 0 audit problems, 152 checkit tests.
+
+## Two buttons that did nothing, silently (2026-10-23, later still)
+
+"I tried using the Push it button... but nothing happened. I looked at
+the live form, and it didn't change."
+
+`pushForm` opened with `if (!confirm(...)) return;`. The desktop pane
+suppresses native modals, so `confirm` returned falsy without drawing
+anything and the function returned immediately. The most consequential
+control in the app -- the one that changes what students see -- did
+nothing at all and said nothing about it.
+
+**This was already known and already fixed once.** The Roster's drop
+button had the identical bug earlier the same day; CLAUDE.md has a
+section headed "Never `confirm`, `alert` or `prompt`". A fix applied to
+one path is not applied to the others, and a paragraph is not a test.
+
+### And the check for it had the same blind spot as the fix
+
+The first `test_no_native_modal_is_used` matched
+`(^|[^.\w$])(confirm|alert|prompt)\s*\(` -- deliberately excluding a
+leading dot so that `dialog.confirm(...)`, somebody's own method, would
+not be flagged. That also excludes `window.confirm(...)`, which is the
+same suppressed global wearing a qualifier.
+
+A mutation run found it: three mutations caught, the fourth --
+`window.confirm` -- missed. Widening the check to scan for
+`window.`/`globalThis.`/`self.`-qualified calls as well then found a
+**second dead control in the shipped code**: `askVersionCount` in
+seating.js used `window.prompt` to ask how many versions the room has.
+Same failure, same silence, never reported because it is used twice a
+term.
+
+So: the check written to stop a recurrence immediately found a
+recurrence that was already there. That is the argument for the test
+over the paragraph, in one step.
+
+`askBox` is now the single dialog, with `ask` (yes/no) and `askFor`
+(text, resolving null on cancel like `prompt` did) over it.
+
+### Three harness failures in one session
+
+Worth recording together, because they are one habit.
+
+1. The first mutation harness used `shell=True` with POSIX quoting that
+   cmd.exe does not parse, so pytest exited non-zero on a malformed
+   argument and **every** mutation scored as caught -- including one the
+   tests passed.
+2. The second restored a mutated file with `git checkout --`, which
+   reverted two uncommitted fixes along with the mutation.
+3. The third was written inline with no try/finally; `subprocess.run`
+   raised on a relative interpreter path, the restore line below it
+   never ran, and `seating.js` was left holding a deliberate
+   `window.prompt("x")`.
+
+A harness that edits the tree gets try/finally, restores from text held
+in memory, and asserts its own baseline passes before it starts. All
+three were caught by looking, not by the suite.
+
+### What the audit says to do next
+
+Not yet done, and recorded so it is not lost:
+
+- **`job.toml`** keeps `simply_print` while `mode = "chose"`.
+  `save_draft` already declines to copy mode-irrelevant keys into
+  `publication.toml`, with a comment saying such a file "will be read
+  back later and believed". The draft is such a file. Apply the same
+  rule to it.
+- **`seating.toml` matches on name**, and `api_roster_save` writes only
+  the roster -- so renaming a student in the Roster tab silently breaks
+  their seat, while `room.json`, which keys by student id, survives it.
+  The error message in that very handler says a name "is what the
+  seating chart matches on". Key the overlap by id, and add a build
+  check that the two files agree, in the idiom of
+  `check_dropped_are_unseated`: a filter hides a divergence, a check
+  names it.
+
+814 printit tests, 0 audit problems, 152 checkit tests.
