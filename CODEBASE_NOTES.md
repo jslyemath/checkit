@@ -13508,3 +13508,125 @@ the title card. It is a preview of somebody else's page and should not
 be mistaken for part of ours.
 
 798 printit tests, 0 audit problems.
+
+## A choice with no date, and a warning that was not true (2026-10-23)
+
+Running the day's redos, the Print tab's "will get" column showed last
+week's answers. It was right to: nothing in the data said otherwise.
+
+### What had happened
+
+`availability.toml` still said `date = 2026-10-16`. That one line is
+what `form pull` scopes by -- not recency. The pull reads the
+confirmation checkbox on each response ("I understand that I am
+selecting skills for Friday, 10/16") and keeps the ones whose date
+matches the assessment. That design is right: a form accumulates all
+term, so the tickbox is the only thing that says which day an answer is
+for.
+
+So the live form, which **had** been updated for today, held 17
+responses confirming 10/23 -- and the pull threw all of them onto the
+"another day" pile and returned the same 33 as last week.
+
+Established rather than assumed, in this order:
+
+- The roster's 33 skill sets were compared against what actually
+  printed on 10/16, from `record.db`. Not similar: **identical**, all
+  33, both directions, zero differences.
+- The live responses were tallied read-only by the date each one
+  confirms. 173 in total: 41 for 9/18, 23 for 9/25, 29 for 10/2, 30 for
+  10/12, 33 for 10/16 and **17 for 10/23**, submitted between 10/21
+  15:14 and 10/23 04:00.
+- `skills set --date 2026-10-23`, then a dry run (roster verified
+  untouched by checksum), then the real pull: 16 students, one having
+  answered twice with the later winning.
+
+Clearing the silent already worked -- that was fixed on 10/16 -- so the
+17 people carrying last week's picks were emptied. There is even a
+guard refusing a pull when *no* response names the date, on the grounds
+that the likeliest cause is a wrong date on the morning of a run. It
+cannot catch a date that is wrong but still matches something.
+
+### The hole, and the thorough fix
+
+`skills` was a bare list. Nothing recorded which assessment it was for,
+so no surface could tell a current choice from a stale one, and both
+10/16 and 10/23 failed silently for the same reason.
+
+`Student.chose_for` is now a date, written by the pull from the
+assessment it scoped to and cleared along with the skills when a silent
+student is cleared. None means "written before this field existed, or
+set by hand" and is reported as **unknown** -- never as agreement,
+because every roster on disk the day this shipped had choices and no
+date, and reading those as current would have made the field
+decorative.
+
+The Print tab reports the two failures separately, because they are
+fixed differently. The **cause** is the job's date and the assessment's
+date disagreeing: while they do, a pull keeps fetching the wrong week
+however many times you press it, and the fix is one edit on Update
+form. The **symptom** is rows holding another day's answers, which
+outlive the cause -- the date can be corrected and 26 people still hold
+last week's picks until the next pull lands. Each row says which day
+its answer was for, by name: `W5, N2  (Friday, 10/16)`.
+
+Four deliberate breakages were watched failing: the pull not stamping,
+the clear not clearing the date, the writer dropping the field, and an
+unreadable date being swallowed instead of refused.
+
+### "Not signed in to Google" was false
+
+The Form tab had been showing it all morning. It was driven by
+`clasp.logged_in()`, which was genuinely false -- and the conclusion
+drawn from it, "so pushing will fail", was invented.
+
+`form push` and `form pull` both go through `form.call`: an HTTPS POST
+to the deployed Apps Script web app carrying the shared secret from
+`secrets/form-secret.toml`. No OAuth, no clasp, no browser. The pull
+that diagnosed all of the above ran while that banner was on screen.
+clasp appears nowhere outside `provision.py`, which creates the form
+and deploys the script.
+
+So "both tabs should have the same Google warnings" has a better answer
+than copying the banner across: `renderFormBar` reports `conn.ready` --
+a web app address and a secret, the thing that actually stops a push or
+a pull -- and both working tabs call it. Settings keeps the clasp
+notice, reworded to say what it really blocks.
+
+A check being real does not make the sentence attached to it true.
+
+### One table cell left the table
+
+The new "chosen for another day" cell was given `class="aged stale"`.
+`.stale` already existed: the page-is-older-than-the-server banner,
+`position: fixed`, warn background, drop shadow, bottom-centre of the
+window. One cell lifted out of the table and parked itself over the
+page as an orange blob.
+
+All 805 tests passed. It took a screenshot, and then three rounds of
+inspection -- the blob did not respond to `elementFromPoint` at the
+screenshot's coordinates, because the screenshot is 800px wide and the
+viewport 583, so the first probe landed somewhere else entirely. The
+coordinate frame is not the CSS frame whenever the pane is scaled.
+
+Fourth class collision in this app, first inside a single stylesheet,
+so the existing cross-file check did not apply. The new test is narrow
+on purpose: sharing a word is not by itself wrong --
+`.vcircle.badge.editing` wants the bare `.badge` rule to apply --
+but sharing one with a rule that takes an element out of flow always
+is, because nothing downstream can put it back. Its first draft flagged
+all 40 ordinary descendant selectors in the two stylesheets, and its
+second flagged `:has(.shape.tocount)`, where `.shape` is the head of
+its own compound rather than a modifier. Both false alarms came from
+not splitting the selector the way a browser does.
+
+### And the rule got broken again while fixing it
+
+The patch narrowing that test was written as `python -c "..."` rather
+than as a file. Bash ate every backtick in the docstring as command
+substitution, so the test shipped green with its explanation gutted:
+"descending into  and friends". CLAUDE.md says write patch scripts with
+the Write tool, never a heredoc; a double-quoted `-c` is the same
+hazard wearing a different hat. Sixth time.
+
+807 printit tests, 0 audit problems, 152 checkit tests.
