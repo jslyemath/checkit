@@ -14131,3 +14131,74 @@ blank. The first version put 1.3mm boxes on every paper including the
 named ones, which was both unusable and pointless.
 
 873 printit tests, 0 audit problems, 152 checkit tests.
+
+## The smallest code, and a tape measure that kept lying (2026-10-24)
+
+The feedback URL is dropped. The code is `C1-1513199331-347` -- a
+format tag, the run seed and the page -- at 11mm, and the run seed no
+longer prints as a dashed suffix in the footer centre, because it is
+in the code and twice on a page is clutter.
+
+### Three numbers that are one decision
+
+Payload length, error-correction level and physical size cannot be
+chosen separately, and treating them as three knobs is what made the
+first few attempts wrong.
+
+A version-1 symbol is 21 modules and holds **17 bytes at level L but
+only 14 at level M**. The payload is exactly 17. At M it spills to
+version 2, 25 modules -- and because the height is fixed, more
+modules means each one is *smaller*. Measured at 11mm/M: 0.423mm per
+module, 3.33 pixels at a 200dpi scan. At 11mm/L: 0.508mm, 4.00
+pixels.
+
+So level L here is not a concession to size. A coarser symbol
+survives a worse scan than a finer one carrying more error
+correction. What is genuinely given up is damage tolerance -- 7%
+rather than 15% -- in a footer corner, where staples and folds live.
+
+**If `\cippayload` ever grows past 17 characters this silently falls
+to version 2 and the modules shrink.** Re-measure after any change.
+
+I had also been reading the capacity table wrong, and said version 1
+held 20 bytes at M. It holds 14.
+
+### Four bad measurements, one cause
+
+The alignment and size work needed a tape measure, and mine was
+broken in four different ways before it worked:
+
+1. **Crops aimed by guesswork.** Three windows in a row landed on the
+   purple skill box, on text, or off the page. Fixed by rendering the
+   page small, *looking*, and scaling the coordinates.
+2. **PNG filter bytes read as pixels.** Rows in a PNG carry a filter
+   byte and types 1-4 store differences, not values. Reading those as
+   luminance gives numbers that look like dark pixels. This is what
+   produced "a module is 0.042mm", "the symbol is 900 modules across"
+   and "all 200 header rows are dark". `pngread.py` now defilters
+   properly and **self-tests against a blank page**, which every
+   broken version would have failed.
+3. **`min(runs)` for the module width.** A module boundary
+   antialiases to the odd single dark pixel, and the minimum picks
+   that every time. The modal run is the module.
+4. **A guard that ate the answer.** The alignment check ignored rows
+   dark in both measurement windows, to filter the full-width skill
+   box -- but once the grid's bottom rule lines up with the name
+   underline, *that* is a row dark in both windows. So the check
+   discarded the result at the exact moment the layout became
+   correct, and reported the grid 123px out. The guard now looks at
+   the white gap between the two rules instead.
+
+Number 4 is the interesting one: a check that fails specifically when
+the thing it measures starts working.
+
+### The grid meets the underline
+
+`\underline` draws its rule below the baseline; a `\framebox` stands
+on the baseline. They were never going to meet by themselves, and no
+amount of sizing would do it. Measured at 1.80pt apart, lowered by
+1.80pt, re-measured at 0px. That is the loop the instructor asked for
+-- "TeX is finnicky, so you may need to actually measure the page a
+few times".
+
+873 printit tests, 0 audit problems, 152 checkit tests.
