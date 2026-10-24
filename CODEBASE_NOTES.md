@@ -13908,3 +13908,94 @@ students, 0 unseated, 0 collisions. The previous file is at
 `.backup-2026-10-23/job.toml.before-strip`.
 
 837 printit tests, 0 audit problems, 152 checkit tests.
+
+## Runs, and two faults no test could see (2026-10-24)
+
+Roadmap item 2. The list, the detail page, delist/graded, reprint
+exactly, and start-a-new-run-from-these-settings.
+
+Nothing new is stored for the detail: `run_detail` groups the existing
+`printed` rows by skill and lists each version's seed. Two columns were
+added to `run`, with a migration in `connect()` -- `CREATE TABLE IF
+NOT EXISTS` does nothing to a table that exists, so a column added to
+SCHEMA alone would have reached new courses only, and the real course
+had three runs in it.
+
+### A rule that was never decided, caught by writing both sides of it
+
+The first draft of the tests had `test_one_flag_does_not_disturb_the_other`
+asserting that grading a delisted run leaves it delisted, and
+`test_grading_something_already_delisted_is_refused_too` asserting it
+raises. Both could not be right, and the contradiction is the tell
+that the rule had never actually been settled.
+
+The design says only that *a graded run cannot be delisted*. It says
+nothing about grading one already delisted -- and refusing that would
+block a legitimate scan to keep a list tidy. So: grading brings a run
+back into the list, because the reason a graded run may not be
+delisted is that what was read back has to be findable. Asking for
+both in one call stays a refusal.
+
+### Two faults the suite could not see, and why
+
+**`pub_mod` was never imported.** `api_run_reuse` referred to it and
+853 tests passed, because not one of them called that handler. The
+NameError appeared the first time the button was pressed in a browser.
+
+Worse, the check that should have caught it did not: `grep -c
+"pub_mod\|runner_mod\|printjob_mod"` returned 14, which was read as
+"all three are there". **A count over an alternation says nothing
+about which alternative matched.** Checked one at a time afterwards:
+`pub_mod` was 0.
+
+Worse again, the *first* set of tests written for `api_run_reuse`
+still missed it. Mutation said MISSED, and the reason was that every
+test covered a refusal -- no job folder, unknown run -- and each one
+returns before reaching the line that uses the import. A handler's
+happy path is the only path that runs most of it.
+
+**`draft` is null until the Print tab has been opened.** Runs can be
+the first tab of a session -- open the app, look at what was printed,
+reuse it -- and `reuseRun` wrote into a null draft. Found by driving
+the tab in isolation, which is how an instructor would actually meet
+it, rather than after visiting Print first.
+
+### And the server was stale twice
+
+Two rounds of browser verification reported faults that were only the
+server running pre-edit code. CLAUDE.md says to restart after editing
+`gui/`; it was not enough to have restarted once at the start of the
+work. **Restart after the edit, not before the session.**
+
+### The Windows path in a TOML string
+
+A test needed the course to name a bank, so it wrote `path = "<the
+tmp_path>"` into `course.toml` -- and `tomllib` read the backslashes
+as escapes and died on an invalid hex value. A TOML *literal* string,
+single-quoted, takes no escapes.
+
+The first attempt at that fix was written as an inline `python -c` and
+hit the identical escape problem inside the shell argument. Same
+lesson as the heredoc rule, third time today.
+
+### Verified
+
+Five mutations on the Runs layer, all caught, including the missing
+import once the happy path had a test. On the real course: four runs
+listed newest-first with build times distinct from dates, the 10/19
+detail showing 45 papers of one skill across four versions -- which is
+where that stale `simply_print = ["N2"]` came from -- and reuse
+loading it into the Print tab as unsaved work that Discard put back.
+`job.toml` on disk untouched throughout.
+
+869 printit tests, 0 audit problems, 152 checkit tests.
+
+## Brightspace ids: the blocker is answered (2026-10-24)
+
+Neither of the two options that had been written down. The instructor
+supplies a CSV with the LMS id in one column and something printit
+already holds in another -- an email or a SID -- and the import joins
+on the second. Recorded as 14.9, with the column choice made by the
+instructor at import time from the headers actually in the file, the
+`form map` rule rather than a list of names the tool hopes to see.
+`Student.alt_id` already exists for it.
