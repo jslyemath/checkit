@@ -14070,3 +14070,64 @@ theme beside it does not define -- which is the shape of the failure
 that actually happened.
 
 873 printit tests, 0 audit problems, 152 checkit tests.
+
+## The page marks, seen on a real page (2026-10-24, later)
+
+The instructor asked to see the marks on an actual skill with a real
+assessment title, and every one of his objections was right.
+
+### The probe was the problem
+
+My probe document had the title "Probe" and the body "A short
+question." On that page the footer fitted and the header fitted. On a
+real one -- "Skill Checkpoint Redo 2026-10-23", a three-word name and
+a nine-digit id -- both collided: the id ran through "MAT 106-820 -
+Fall 2026 - Slye", and the title ran through "v539-1513199331".
+
+fancyhdr does not clip. Every slot now has an explicit width, the
+name dropped from `\Large` to `\large`, and the footer title is
+`\footnotesize` in a 2.3in box. The code moved to the outer corner
+beside the skill and the grading box, which is the emptiest part of
+the footer.
+
+**Build the probe out of the real thing.** A sample small enough to
+be convenient hid the only two faults that mattered -- which is
+already in this file under a different name.
+
+### The code was sitting exactly on the legibility floor
+
+He doubted it would survive a 200dpi scan. Measured, rather than
+argued: a 600dpi render of the real page, the smallest run of dark
+pixels across a finder pattern, which is one module.
+
+At 12mm that was 0.381mm per module -- **exactly 3.00 pixels at
+200dpi**. Three is the floor every decoder quotes, so it had nothing
+in hand for a fold, a crease or a photocopy. At 15mm it is 0.508mm,
+4.00 pixels at 200dpi and 6.00 at 300.
+
+The version arithmetic I had used before was optimistic by a third,
+because `qrcode` puts the quiet zone *inside* the height it is given,
+so the data modules are smaller than height/29.
+
+### Two things I had written that were not true
+
+The theme said the payload's character set kept the code in QR's
+alphanumeric mode. **`qrcode.sty` has no alphanumeric mode** -- it
+writes mode indicator 4, binary, for everything, which is visible in
+`\qr@encode@binary`. Checked in the package source after relying on
+it twice. The narrow character set is still worth having, for reading
+aloud and for logs, but not for the reason stated.
+
+And the code was still cyan in his render because he was looking at
+the earlier image; `nolink` had fixed it, and the fix had not been
+shown.
+
+### The id field
+
+Plain text at the size of the rest of the header line when the run
+knows the student. A faint grey ruled grid of nine 4.4mm cells --
+connected, not nine separate black boxes -- only when the name is
+blank. The first version put 1.3mm boxes on every paper including the
+named ones, which was both unusable and pointless.
+
+873 printit tests, 0 audit problems, 152 checkit tests.
