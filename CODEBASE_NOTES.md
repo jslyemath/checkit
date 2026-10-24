@@ -13999,3 +13999,74 @@ on the second. Recorded as 14.9, with the column choice made by the
 instructor at import time from the headers actually in the file, the
 `form map` rule rather than a list of names the tool hopes to see.
 `Student.alt_id` already exists for it.
+
+## The page marks, and four faults only a rendered page showed (2026-10-24)
+
+Roadmap item 3, the one with a deadline. A QR in the footer, the run
+seed after the version, and a per-digit id field in the header.
+
+`qrcode.sty` ships with TeX Live and is pure TeX -- no external tool,
+which matters when the alternative is something the instructor has to
+install before a class set will build.
+
+### The payload
+
+`CIP1*<runseed>*<SLUG>*<vseed>*<sheet>*<page>*<sid>`, read back off a
+compiled page as
+`CIP1*1513199331*W5*715*1*1*806493875`.
+
+Uppercase, digits, `-` and `*` only, which keeps QR in alphanumeric
+mode. The separator cannot be `-` because a slug has one (W1-E). An
+unnamed paper writes `0` rather than nothing, so the field count never
+changes.
+
+### Four faults, none of which a test would have found
+
+**`\@tfor` needs `\makeatletter` where the macro is defined**, not
+where it is called. The first version wrapped only the caller, so the
+digit loop was defined with `@` an ordinary letter and died at the
+first named student.
+
+**The QR printed cyan.** `\textcolor{black}` around it changed
+nothing, because the colour was not coming from the surrounding text:
+`qrcode` sets `\qr@hyperlinktrue` by default, wraps the code in a
+hyperref link, and hyperref colours it. `nolink` fixes it. A payload
+of `CIP1*...` was never a URL anyway.
+
+**The id boxes were too narrow.** At `1.5ex` the digits touched both
+edges and read as one smear, which defeats the only reason to separate
+them. `2.2ex`, measured against a rendered page rather than guessed.
+
+**A theme change does not reach a bank.** The first real build against
+`mat-106-checkit` failed on an undefined `\setrunseed`:
+`theme.install` keeps a bank's own copy unless forced, which is
+correct -- that file can be a term of layout work -- and means the
+deadline is met when the bank is updated, not when the code lands.
+
+### Two measurements that lied, again
+
+A crude count of `re` operators in the PDF said 60, which looked far
+too low for a QR, and nearly sent me hunting for a bug that was not
+there. Comparing the same document against itself with the code
+removed settled it: **26.6 KB** of extra content stream on a one-page
+document. The regex had been guessing at how pdfTeX encodes a rule.
+
+Then the rendered footer came back with no QR at all -- because
+`ls -dt | head -1` picked the A/B script's *second* build, which is
+the one with the code deliberately removed. The newest file is not the
+interesting one when a script builds twice.
+
+Both are the same lesson this project keeps relearning: when a number
+is surprising, suspect the harness first.
+
+### Verified
+
+Rendered at 220dpi and looked at: black QR with clean finder patterns,
+`v715-1513199331` centred, six digits each in their own box. The
+payload printed as text on the page as well as encoded, so what the
+code carries has been read rather than assumed. Four tests on the
+Python side, including one that fails if `main.tex` calls a macro the
+theme beside it does not define -- which is the shape of the failure
+that actually happened.
+
+873 printit tests, 0 audit problems, 152 checkit tests.

@@ -2934,6 +2934,33 @@ That last one is what lets an unnamed spare be graded at all, and it
 is why the manifest cannot be the only source of truth about who sat
 what.
 
+### 14.10 What was actually built for 14.5 (2026-10-24)
+
+All three marks, with two deviations worth recording.
+
+**The payload** is `CIP1*<runseed>*<SLUG>*<vseed>*<sheet>*<page>*<sid>`.
+A format tag leads it, because Scans will meet codes printed by a
+theme that no longer exists and a reader that cannot tell which layout
+it holds has to guess. The character set is uppercase, digits, `-` and
+`*`, which keeps QR in alphanumeric mode -- smaller and more robust
+than byte mode. `*` is the separator because `-` appears in slugs.
+
+*Deviation 1.* 14.5 asked for "the page's index within that skill".
+The payload carries **both** that (`sheet`, reset by `\skillheader`
+and stepped by the footer) and the absolute page. The second is nearly
+free and makes a missing page a gap in a monotonic sequence, which is
+the easier check of the two.
+
+*Deviation 2.* `sid` is `0`, not empty, on an unnamed paper, so the
+field count never changes and a reader can split on `*` without
+thinking.
+
+**Not yet installed.** `theme.install` will not overwrite a bank's own
+`printit.sty` without `--force`, by design. Until that is run against
+`mat-106-checkit`, nothing prints these marks. The deadline in the
+roadmap is therefore *not* met by the code existing -- it is met when
+the bank is updated, and that is the instructor's call to make.
+
 ### 14.6 Brightspace
 
 Rewritten 2026-10-22 against a real export from the live course
@@ -3079,9 +3106,8 @@ one already held.
 
 1. ~~**Runs.**~~ **Done 2026-10-24.** The list, the detail page,
    delist/graded, reprint and reuse.
-2. **The page marks (14.5).** Out of order on purpose -- it has to be
-   printing before next semester's first run or Scans starts from a
-   worse position permanently.
+2. ~~**The page marks (14.5).**~~ **Built 2026-10-24**, and not yet
+   installed into any bank -- see 14.10.
 3. **Scans.**
 4. **Progress.**
 
