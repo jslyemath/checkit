@@ -14202,3 +14202,53 @@ amount of sizing would do it. Measured at 1.80pt apart, lowered by
 few times".
 
 873 printit tests, 0 audit problems, 152 checkit tests.
+
+## The marks became optional (2026-10-24)
+
+`ids` and `codes`, on all three surfaces: the draft, the publication,
+the Print tab's Paper row, and `build --no-ids` / `--no-codes`.
+
+Three defaults, all the same and all deliberate: **absence means on**.
+A draft, a publication or a theme that says nothing about these
+describes a run that had them, and reading silence as "off" would
+change what an old job reprints without anyone asking. `main_tex`
+therefore writes a switch only to turn one *off*, which also means a
+document from a newer printit still compiles against an older
+`printit.sty` -- the failure mode that bit with `\setrunseed`.
+
+The CLI flags default to `None`, not `False`. A `False` default would
+have switched the marks off for every caller that never thought about
+them, `--replay` included.
+
+### Proved on the page, not in the markup
+
+A switch written into `main.tex` proves a switch was written. Four
+combinations were compiled and the ink compared: with `ids` off the
+string "ID:" and the digits are gone from the text; with `codes` off
+the content stream is 11,470 bytes smaller, which is the symbol.
+
+### Two of my own tests were the bug
+
+**The publication fake had neither field.** `main_tex` reads
+`publication.ids`, the stand-in in `test_preferred_name` did not have
+it, and the test failed with an AttributeError instead of saying
+anything about names. Fixed in the fake rather than with a `getattr`
+default in `main_tex`: a fake missing what the boundary has cannot
+fail the way the boundary fails.
+
+**A test poisoned the whole file.** The override test called
+`runner.run(..., install_theme=True)`, and `bank_dir` is
+session-scoped -- one directory for the entire run. It left a
+`printit/printit.sty` behind, and six later theme tests then saw
+"kept" where they expected "installed" or refused to create a
+directory that already existed. Six failures, none in the code under
+test. The mutation harness caught it, by asserting its baseline
+passes before it starts -- which it does precisely because an earlier
+harness today did not.
+
+Seven mutations on the options, all caught: each switch unwritten,
+the two tied together, a missing key read as off, `write_job`
+dropping them, the runner ignoring the override, and the theme not
+defining the switches at all.
+
+885 printit tests, 0 audit problems, 152 checkit tests.
