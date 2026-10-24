@@ -3034,10 +3034,51 @@ The instructor's rule: **the pass symbol passes, and everything else
 does not.** A `?`, a blank, and any mark another instructor invents
 all export as `💭Not Yet`. Nothing exports as "partial".
 
+### 14.9 Matching a student to Brightspace (decided 2026-10-24)
+
+The blocker that had held 14.6 since 10-21, and the answer is neither
+of the two options that had been written down.
+
+**The instructor imports a CSV with two useful columns**: the LMS id,
+and something this tool already holds -- an email address or a SID.
+The join is on the second, and the first is what gets stored.
+
+Why this and not the alternatives:
+
+* *A classlist import once a term* assumed the LMS id arrives with the
+  registrar's data. It does not have to, and tying the id to a
+  whole-roster import makes a fifteen-second correction into a
+  re-import.
+* *`Username` from the grades export* assumed one particular column of
+  one particular export would always be there and would always be the
+  join. Reading a real export on 10-22 is what put that in doubt.
+
+What it needs:
+
+* The import names its own columns. Which column is the id and which
+  is the join key are **chosen by the instructor at import time**, from
+  the headers actually in the file, rather than matched against a list
+  of names the tool hopes to see. The same rule `form map` already
+  follows: ids, not positions, and nothing guessed.
+* A join on email is case-insensitive and tries every address the
+  roster has seen, which is `Student.all_emails()` and already exists
+  for exactly this reason.
+* A row that matches nobody, and a roster student no row matches, are
+  both **reported rather than dropped**. That is the `form pull`
+  pattern, and the same reasoning: a silent near-miss is how a student
+  goes missing from an export.
+* Where it is stored: `Student.alt_id` already exists and is
+  documented as "the other id system, when an export carries it". No
+  new field.
+
+Still to decide, and smaller than the thing it unblocks: whether a
+second import updates ids in place or refuses when it disagrees with
+one already held.
+
 ### 14.7 Build order
 
-1. **Runs.** The data already exists; this is a list, a detail page
-   and two flags.
+1. ~~**Runs.**~~ **Done 2026-10-24.** The list, the detail page,
+   delist/graded, reprint and reuse.
 2. **The page marks (14.5).** Out of order on purpose -- it has to be
    printing before next semester's first run or Scans starts from a
    worse position permanently.
@@ -3054,9 +3095,11 @@ against a real file).
 
 What remains:
 
-* **How a student is matched to Brightspace.** The blocker in 14.6 --
-  a classlist import once a term, or `Username` in the grades export.
-  Nothing else in the export can work until this is chosen.
+* ~~**How a student is matched to Brightspace.**~~ **Decided
+  2026-10-24.** Neither of the two that were on the table. The
+  instructor supplies a CSV holding the LMS id in one column and
+  something printit already knows in another -- an email address or a
+  SID -- and the import joins on that. See 14.9.
 * **Where thresholds are stored** -- a new course file, or a table in
   an existing one.
 * **How much classifier to build.** The honest first version is
@@ -3081,7 +3124,7 @@ before the first run of next term.
 | # | what | why here | size |
 |---|---|---|---|
 | ~~1~~ | ~~**Stage 4** of section 13~~ | **done 2026-10-22.** Runs, Progress and Scans inherit the save bar, the warning mark and the empty-state shape | |
-| 2 | **Runs** (14.2) | the data already exists; two columns and a list | small |
+| ~~2~~ | ~~**Runs** (14.2)~~ | **done 2026-10-24.** List, detail, delist, graded, reprint exactly, start-from-these-settings | |
 | 3 | **The page marks** (14.5) -- code in the footer, run seed on the version, an id field | **deadline: before the first print of next semester.** Everything in Scans rests on it | small, but touches `printit.sty` and the theme both banks load |
 | 4 | **Scans** (14.4) | the big one. Import, split, classify, review, save | large |
 | 5 | **Progress** (14.3) | cannot show anything true until 4 feeds it | medium |
