@@ -14599,3 +14599,80 @@ now measures a module off the top-left finder's bar, which is seven
 modules wide.
 
 945 printit tests, 0 audit problems, 152 checkit tests.
+
+## The documentation sweep became `tools/docs.py` (2026-10-25)
+
+Asked for a sweep of the documentation. The sweep found one thing
+worth the name and then suggested a better use of the time.
+
+### What the sweep found
+
+`checkit-printit/CLAUDE.md` described the printed page **twice**. The
+newer section was written that morning; the older one, three hundred
+lines down, still said `C1-<runseed>-<page>`, 17 characters, 11mm --
+all three wrong, and all three read perfectly well. The file warns
+about two places holding one fact, in its own words, several sections
+above.
+
+Folded into one. What the older section had that the newer did not --
+the header and footer widths, and how a theme reaches a bank -- stayed.
+
+### Reading is the wrong instrument
+
+Everything else was already right, which is the problem: a
+read-through finds what looks wrong, not what has quietly *become*
+wrong. The things that go stale without anybody touching the document
+are the things nobody can see are missing -- a flag added, a macro
+emitted, a column migrated, a dependency introduced. There is nothing
+on the page to notice.
+
+So `tools/docs.py`, wired into `tools/check.py` beside the tests and
+the audit. Each entry is a claim some document makes paired with a
+way to test it:
+
+* every CLI command is named in the platform map;
+* every `build` flag appears in the README, pairing `--x/--no-x` and
+  allowing `-o` for `--out`;
+* every macro `main_tex` emits is defined in the theme *or* provided
+  by `main.tex`, and is named in printit's map;
+* every migrated column, and the `meta` table, is documented;
+* every dependency beyond the original three is mentioned somewhere;
+* every `see 14.x` in the design points at a section that exists;
+* no document presents a superseded payload as current.
+
+Not a substitute for reading. `CODEBASE_NOTES.md` cannot be checked
+this way and neither can a decision. What it catches is drift.
+
+### The first mutation run said it was useless, and was wrong
+
+Five deliberate breakages, four MISSED. Three of those were the
+harness, not the checker:
+
+* removing the README's `--no-record` row left the flag named in the
+  prose two paragraphs below, and the check asks whether it is
+  mentioned at all;
+* renaming `\setkind` in the theme is *not* a documentation problem,
+  because `main.tex` carries `\providecommand{\setkind}` and the
+  document still compiles -- the check is right to allow it;
+* removing `pypdfium2` from one map left it named in the design,
+  which the check also reads.
+
+Rewritten to simulate what actually happens -- something new in the
+code that no document has caught up with -- all five are caught: a
+new flag, a new macro the theme never defines, a new dependency, a
+dangling cross-reference, and a superseded payload reappearing.
+
+Worth holding onto: "the test did not fire" and "the test is wrong"
+look identical from the outside, and the first guess was the less
+useful one.
+
+### A countable summary is load-bearing
+
+`check.py` refuses a check that does not say how many problems it
+found -- "a run that examined nothing is a broken invocation, not a
+clean one". `docs.py` printed "documentation matches the code" and
+was marked FAIL for saying nothing about problems. It now prints the
+count either way, which is the rule working.
+
+945 printit tests, 0 audit problems, 0 documentation problems,
+152 checkit tests.
