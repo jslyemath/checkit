@@ -2938,28 +2938,83 @@ what.
 
 All three marks, with two deviations worth recording.
 
-**The payload** is `CIP1*<runseed>*<SLUG>*<vseed>*<sheet>*<page>*<sid>`.
-A format tag leads it, because Scans will meet codes printed by a
-theme that no longer exists and a reader that cannot tell which layout
-it holds has to guess. The character set is uppercase, digits, `-` and
-`*`, which keeps QR in alphanumeric mode -- smaller and more robust
-than byte mode. `*` is the separator because `-` appears in slugs.
+**The payload** is `C1-<runseed>-<page>` -- seventeen characters,
+which is what fits a version-1 symbol and is the whole difference
+between an 11mm square and a 15mm one. A format tag leads it, because
+Scans will meet codes printed by a theme that no longer exists and a
+reader that cannot tell which layout it holds has to guess.
 
-*Deviation 1.* 14.5 asked for "the page's index within that skill".
-The payload carries **both** that (`sheet`, reset by `\skillheader`
-and stepped by the footer) and the absolute page. The second is nearly
-free and makes a missing page a gap in a monotonic sequence, which is
-the easier check of the two.
-
-*Deviation 2.* `sid` is `0`, not empty, on an unnamed paper, so the
-field count never changes and a reader can split on `*` without
-thinking.
+It began as `CIP1*<runseed>*<SLUG>*<vseed>*<sheet>*<page>*<sid>` and
+was cut down the same afternoon on the grounds that run plus page is
+already a unique key, every other field being a lookup in the run's
+record. That argument is sound and the lookup table did not exist --
+see 14.11.
 
 **Not yet installed.** `theme.install` will not overwrite a bank's own
 `printit.sty` without `--force`, by design. Until that is run against
 `mat-106-checkit`, nothing prints these marks. The deadline in the
 roadmap is therefore *not* met by the code existing -- it is met when
 the bank is updated, and that is the instructor's call to make.
+
+### 14.11 The table the code keys into (2026-10-24)
+
+The short payload rests on one claim: that run plus page is a unique
+key, and the skill, the version, the sheet and the student are "every
+one of them a lookup in that run's manifest".
+
+**They were not.** `manifest.toml` records which `(skill, version,
+seed)` were *drawn* -- four `[[paper]]` blocks and a `[[skill]]`
+block, no students and no page numbers anywhere in it. The print
+record's `printed` table has a row per student per paper, also with no
+page. So a scanned code resolved to a run and a page number and then
+stopped, and Scans could not have been started on top of it.
+
+This was found by reading `manifest.py` before writing any of Scans,
+and it is the third time this project has shipped a key whose index
+was assumed rather than checked.
+
+**Who knows which page a paper landed on.** Not Python: a skill can
+run to two sheets, so page numbers do not exist until TeX has broken
+the pages. The document therefore writes the table itself, as
+`main.pages` beside the PDF:
+
+    run*4242
+    1*student*806625853*W5*803*1
+    2*key**N2*840*1
+
+One line per page: page, kind, student id, skill, version seed, sheet
+within the skill. `*` separates because `-` occurs in slugs.
+
+**Written from the footer, not from a shipout hook**, and that is the
+whole trick for padding pages. `\preparefornextstudent` pads under
+`\pagestyle{empty}`, which has no footer, so a blank page writes no
+line. Nothing detects a blank; the absence *is* the detection, and the
+gaps in the sequence are the padding.
+
+**`\setkind` is new**, and says `student`, `spare` or `key`. Nothing
+on a printed page distinguishes the three and they are graded
+differently: a key must never become an attempt, and a spare belongs
+to nobody until someone writes an id on it. `main.tex` emits
+`\providecommand{\setkind}[1]{}` so a bank still running an older
+`printit.sty` compiles -- it then produces no index, and Scans says so
+when asked to read the run, which is a better place to find out than
+halfway through a print job.
+
+**Proved on a real build, not in the markup.** A 58-page run against
+mat-106, rasterised at 200dpi -- the low end of the instructor's
+copier -- and every code decoded and compared to the index: 58 of 58.
+Then a student was cut to one skill to force a padding sheet, and the
+index came back with a gap at page 2, that page confirmed empty, and
+page 3 belonging to the next student rather than to the shifted
+remains of the first.
+
+#### What this changes about the deadline
+
+14.5's deadline is met when the bank is updated, and the file that has
+to reach it is now this one, not the version committed earlier today.
+**Running `install --force` before this landed would have printed a
+term's worth of codes that resolve to nothing** -- which looks exactly
+like a working code until the first scan.
 
 ### 14.6 Brightspace
 
