@@ -2938,17 +2938,54 @@ what.
 
 All three marks, with two deviations worth recording.
 
-**The payload** is `C1-<runseed>-<page>` -- seventeen characters,
-which is what fits a version-1 symbol and is the whole difference
-between an 11mm square and a 15mm one. A format tag leads it, because
-Scans will meet codes printed by a theme that no longer exists and a
-reader that cannot tell which layout it holds has to guess.
+**The payload** is `C1-<runid>-<page>`, drawn 9mm square at error
+correction level M. A format tag leads it, because Scans will meet
+codes printed by a theme that no longer exists and a reader that
+cannot tell which layout it holds has to guess.
 
-It began as `CIP1*<runseed>*<SLUG>*<vseed>*<sheet>*<page>*<sid>` and
-was cut down the same afternoon on the grounds that run plus page is
-already a unique key, every other field being a lookup in the run's
-record. That argument is sound and the lookup table did not exist --
-see 14.11.
+It took three goes:
+
+| | payload | size | level |
+|---|---|---|---|
+| first | `CIP1*<runseed>*<SLUG>*<vseed>*<sheet>*<page>*<sid>` | 15mm | L |
+| then | `C1-<runseed>-<page>`, 17 characters | 11mm | L |
+| now | `C1-<runid>-<page>`, at most 12 | **9mm** | **M** |
+
+The second cut rested on run plus page being a unique key, everything
+else being a lookup in the run's record. The argument was sound and
+the lookup table did not exist -- see 14.11. The third fixed two
+further things: a seed does not identify a run (14.12), and 11mm had
+been carried over from a 33-module symbol without being revisited
+after the payload shrank it to 21.
+
+**9mm was measured, not reasoned.** Real pages at 200dpi -- the low
+end of the instructor's copier -- blurred, skewed, noised and JPEGed,
+with the decoder given the whole sheet to search:
+
+| size | straight | skewed 4deg | photocopy of a photocopy | upside down |
+|---|---|---|---|---|
+| 11mm | 36/36 | 36/36 | 36/36 | 36/36 |
+| **9mm** | **36/36** | **36/36** | **36/36** | **36/36** |
+| 8mm | 36/36 | 36/36 | 30/36 | 36/36 |
+| 7mm | 36/36 | 36/36 | 34/36 | 36/36 |
+| 6mm | 36/36 | 36/36 | 0/36 | 35/36 |
+
+Then 150 trials on the only condition that fails: 9mm reads 150/150,
+8mm 134/150. The cliff is between 9 and 8, and what finds it is a
+photocopy of a photocopy -- which is how a student who needs a blank
+copy gets one.
+
+**Error correction does not buy size.** At 8mm, level L reads
+134/150, M 135/150 and Q 137/150. The failure is not bit errors; the
+decoder either resolves the modules or it does not. The shorter
+payload therefore went into *damage tolerance* rather than
+millimetres: level M at the same 9mm, 15% of the symbol recoverable
+instead of 7%, which is what a staple through the corner costs.
+
+**A version-1 symbol holds 14 bytes at level M.** Past that the
+encoder moves to version 2 silently, the modules shrink, and 9mm
+stops reading. `test_the_symbol_is_still_one_version_1` counts the
+modules off a render to hold that line.
 
 **Not yet installed.** `theme.install` will not overwrite a bank's own
 `printit.sty` without `--force`, by design. Until that is run against
@@ -2978,12 +3015,28 @@ run to two sheets, so page numbers do not exist until TeX has broken
 the pages. The document therefore writes the table itself, as
 `main.pages` beside the PDF:
 
-    run*4242
+    run*7
     1*student*806625853*W5*803*1
+    mark*1*box*34926110*1819429*1780112*963539*399609
     2*key**N2*840*1
 
-One line per page: page, kind, student id, skill, version seed, sheet
-within the skill. `*` separates because `-` occurs in slugs.
+One line per page -- page, kind, student id, skill, version seed,
+sheet within the skill -- and a `mark` line for each thing on it that
+Scans has to cut out and look at. `*` separates because `-` occurs in
+slugs.
+
+**The marks** are `box`, `id` and `name`, recorded by `\cipmark` from
+`\pdfsavepos` in scaled points from the page's bottom-left. The id
+and the name are there for the blank-copy case: on a run printed
+without names the student writes both, and review shows the two crops
+side by side so the instructor has two independent reads of whose
+paper it is.
+
+The skill slug and the version are deliberately **not** recorded.
+Both are already known from the page index once the code has been
+read, and if the code cannot be read there is no page number to look
+any position up by. A position only available when it is not needed
+is not worth a line in the file.
 
 **Written from the footer, not from a shipout hook**, and that is the
 whole trick for padding pages. `\preparefornextstudent` pads under
@@ -3015,6 +3068,47 @@ to reach it is now this one, not the version committed earlier today.
 **Running `install --force` before this landed would have printed a
 term's worth of codes that resolve to nothing** -- which looks exactly
 like a working code until the first scan.
+
+### 14.12 The code names a run, not a seed (2026-10-25)
+
+Raised by the instructor: *"technically the run number is the seed
+and not the actual run. We may rerun that seed with a few
+corrections."* He was right, and it was worse than he framed it.
+
+`choose_run_seed` carries a replayed run's seed **on purpose** -- a
+replay draws nothing, so inventing a fresh number would be a lie
+about what was chosen, and the comment in the code says so. A replay
+also writes into a new folder, which is a new `run_id` and so a new
+row. **Every reprint therefore produced two runs sharing one seed.**
+Not hypothetical: the real record had two such pairs when this was
+found.
+
+Ambiguity is the mild reading. A replay exists to *fix* something --
+a misspelt name, a dropped student -- and that can change how many
+pages each student gets. Two runs, one seed, **different
+page-to-student mappings**. Resolving a scanned code by seed would
+not fail; it would quietly attribute papers to the wrong students.
+
+**The decision.** The record allocates a `run_no` per course, the
+code carries that, and `meta.last_run_no` is a high-water mark so a
+deleted run's number is never issued again. Rebuilding into the same
+folder keeps its number, because one folder is one printing event.
+
+Two things fall out of it:
+
+* **The code got shorter.** A run number is 1 to 3 digits where a
+  seed is 10, which is what made level M affordable at 9mm.
+* **No record, no code.** A build with no course, or
+  `build --no-record`, allocates no number -- and then `\setrunid` is
+  not written at all, which switches off the index and the symbol
+  together. A code naming a run that was never recorded would be
+  worse than no code, because it looks readable right up until the
+  scanner.
+
+**What is still open:** a run number is unique within a course, not
+across courses, because the record is per course and Scans is
+course-scoped. If Scans ever reads a stack spanning two courses it
+will need the course as well.
 
 ### 14.6 Brightspace
 
@@ -3161,8 +3255,19 @@ one already held.
 
 1. ~~**Runs.**~~ **Done 2026-10-24.** The list, the detail page,
    delist/graded, reprint and reuse.
-2. ~~**The page marks (14.5).**~~ **Built 2026-10-24**, and not yet
-   installed into any bank -- see 14.10.
+2. ~~**The page marks (14.5).**~~ **Done 2026-10-25**, and not yet
+   installed into any bank -- see 14.10. What Scans can now rely on:
+
+   * every page carries `C1-<runid>-<page>`, 9mm, level M;
+   * `main.pages` in the run folder maps page -> kind, student,
+     skill, version, sheet;
+   * the same file gives the rectangle of the grading box, the id
+     field and the name, for cropping out of a scan;
+   * the run number resolves to exactly one run, even across
+     reprints that share a seed;
+   * `pypdfium2` renders a scanned PDF and `zxing-cpp` reads the
+     codes off it; both are already dependencies.
+
 3. **Scans.**
 4. **Progress.**
 
@@ -3187,7 +3292,17 @@ What remains:
   geometric, with crops stored so a trained model can replace it on
   real data later. Where that line sits is not decided.
 * **Whether Scans can place a page whose run is unknown** -- an old
-  paper with no code, from before 14.5 ships.
+  paper with no code, from before 14.5 ships. Everything printed to
+  date is such a paper, so this is not a corner case for the first
+  term that uses Scans.
+* **Whether a run number needs its course.** It is unique within a
+  course and Scans is course-scoped, so today it does not. A stack
+  spanning two courses would need one. See 14.12.
+* **What the Scans tab does with a spare.** The code gives the skill
+  and the version; the id grid gives the student, in handwriting.
+  Whether that is read automatically, offered as a guess, or simply
+  shown beside a dropdown is not decided -- and it is the same
+  question as "how much classifier", one field over.
 * **`F5-E` is to be added to the bank.** Brightspace grades it and
   the outcome folder exists; `bank.xml` does not publish it. That is
   a `mat-106-checkit` job, not a printit one, and it should happen
@@ -3206,7 +3321,7 @@ before the first run of next term.
 |---|---|---|---|
 | ~~1~~ | ~~**Stage 4** of section 13~~ | **done 2026-10-22.** Runs, Progress and Scans inherit the save bar, the warning mark and the empty-state shape | |
 | ~~2~~ | ~~**Runs** (14.2)~~ | **done 2026-10-24.** List, detail, delist, graded, reprint exactly, start-from-these-settings | |
-| 3 | **The page marks** (14.5) -- code in the footer, run seed on the version, an id field | **deadline: before the first print of next semester.** Everything in Scans rests on it | small, but touches `printit.sty` and the theme both banks load |
+| ~~3~~ | ~~**The page marks** (14.5)~~ | **done 2026-10-25.** Footer code, page index, grading-box/id/name positions, run numbers. **Still not installed into any bank** -- see 14.10 | |
 | 4 | **Scans** (14.4) | the big one. Import, split, classify, review, save | large |
 | 5 | **Progress** (14.3) | cannot show anything true until 4 feeds it | medium |
 | 6 | **Brightspace export** (14.6) | needs Progress, and one round-trip with a real export file | small |
