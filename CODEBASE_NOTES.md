@@ -14252,3 +14252,101 @@ dropping them, the runner ignoring the override, and the theme not
 defining the switches at all.
 
 885 printit tests, 0 audit problems, 152 checkit tests.
+
+## The code had no table to key into (2026-10-24)
+
+Scans was the next item. Reading `manifest.py` first, before writing
+any of it, turned up the thing the whole design rested on and nobody
+had checked.
+
+`printit.sty` prints `C1-<runseed>-<page>` and argues, in its own
+comment, that this is enough because "the skill, the version seed, the
+sheet-within-skill and the student are every one of them a lookup in
+that run's manifest". The argument is correct. The lookup table did
+not exist:
+
+| | holds | has a page number |
+|---|---|---|
+| `manifest.toml` | `[[paper]]` per `(skill, version, seed)` | no |
+| `printed` table | a row per student per paper | no |
+
+So the code resolved to a run and a page and stopped there. A whole
+term of papers would have scanned as unreadable, and the code would
+have looked right the entire time -- it decodes, it is unique, it
+names a real run.
+
+### Who actually knows
+
+Not Python. A skill can run to two sheets, so there is no page number
+until TeX has broken the pages. The document writes the table itself,
+as `main.pages` beside the PDF: `page*kind*sid*slug*vseed*sheet`, one
+line per page, with a `run*<seed>` header written by `\setrunseed`
+because that is the moment the run seed becomes known -- the stream is
+opened when the package loads, which is earlier.
+
+### Blanks, and why the footer is the right place to write from
+
+Padding pages are set under `\pagestyle{empty}` by
+`\preparefornextstudent`, and an empty page style has no footer. Write
+the index line from the footer and a blank page writes nothing, with
+nothing having to detect one. The gaps *are* the blanks.
+
+A shipout hook would have been the obvious place and would have needed
+a flag threaded through `\preparefornextstudent`'s group to tell
+padding from paper -- a second mechanism to keep in step with the page
+style that already knows.
+
+### Two unrelated switches, nearly tied together
+
+`\cipcode` used to hold both the sheet counter and the `\ifcipcodeon`
+test. The index write went into a new `\cippagemark` *outside* that
+test, because a run printed without symbols still has pages, and an
+index that silently emptied itself when somebody turned the codes off
+does not read as "no codes" -- it reads as a run with no pages.
+
+That is not hindsight. The mutation that moved `\cipwriteindex` back
+inside `\ifcipcodeon` **passed all 26 tests**, because every compiling
+test built with codes on. Two tests now build a second document with
+`codes=False`: one asserts the index is identical, the other asserts
+no symbol can be read off the page. Without the second, the first
+would also pass if `codes=False` quietly did nothing.
+
+### A property that could not see the end of the document
+
+`Index.blanks` started as a property computing gaps in
+`range(1, max(page) + 1)`. A run ends with a `\preparefornextstudent`,
+so the *last* sheet is usually padding -- and it sits past the last
+indexed page, where that range cannot reach. It reported one blank in
+an eight-page document that had two.
+
+Found by the one test that compared the index against the PDF rather
+than against itself. It is now `blanks(total=None)`, and the page
+count comes from whoever has the PDF open.
+
+### A test that could not fail
+
+`test_the_pages_are_in_order_and_each_appears_once` asserted
+`sorted(pages) == sorted(set(pages))` over a dict's keys, which is
+true of every dict ever made -- a duplicate line would have
+overwritten the first silently. Fixed in the *parser*, which now
+refuses a repeated page number, because the duplicate is the thing
+worth refusing and the test was only ever a symptom.
+
+### Dependencies
+
+`pypdfium2` and `zxing-cpp`, both required rather than optional, both
+chosen for shipping self-contained Windows wheels. pdf2image needs
+poppler on PATH and pyzbar needs a zbar DLL; a feature that asks the
+instructor to install a binary is a feature that does not work.
+PyMuPDF is the more usual rasteriser and is AGPL. OpenCV's QR detector
+is weaker on small printed symbols, which is precisely this case.
+
+### Proof
+
+A 58-page run against the real bank, rasterised at 200dpi: 58 codes
+decoded, 58 matched their index line. Then one student cut to a single
+skill to force padding: gap at page 2, page 2 confirmed empty, page 3
+belonging to the next student. Eleven mutations, all caught -- after
+the twelfth, above, was not.
+
+913 printit tests, 0 audit problems, 152 checkit tests.
