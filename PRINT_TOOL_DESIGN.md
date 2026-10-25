@@ -2987,11 +2987,20 @@ encoder moves to version 2 silently, the modules shrink, and 9mm
 stops reading. `test_the_symbol_is_still_one_version_1` counts the
 modules off a render to hold that line.
 
-**Not yet installed.** `theme.install` will not overwrite a bank's own
-`printit.sty` without `--force`, by design. Until that is run against
-`mat-106-checkit`, nothing prints these marks. The deadline in the
-roadmap is therefore *not* met by the code existing -- it is met when
-the bank is updated, and that is the instructor's call to make.
+**Installed into `mat-106-checkit` on 2026-10-25.** `theme.install`
+will not overwrite a bank's own `printit.sty` without `--force`, by
+design, so this waited on the instructor. Before forcing, both files
+in the bank were checked against every packaged version in printit's
+history and found byte-for-byte identical to one -- nothing of his
+was lost.
+
+Verified by building his real 10/23 job from the bank's own copy:
+58 pages, every code read at 200dpi and resolving to the right page.
+Committed in the bank, not pushed, and `checkit generate` not run.
+
+Runs printed before this have `run_no` NULL and cannot be scanned by
+code. They were printed without codes, so there is nothing to
+recover.
 
 ### 14.11 The table the code keys into (2026-10-24)
 
@@ -3268,7 +3277,10 @@ one already held.
    * `pypdfium2` renders a scanned PDF and `zxing-cpp` reads the
      codes off it; both are already dependencies.
 
-3. **Scans.**
+3. **Scans.** In progress. `scans.py` places a stack and the tab
+   reports it -- what was placed, what was read twice, and what
+   never came back. Still to come: cropping the grading box,
+   classifying the mark, the review grid, and saving.
 4. **Progress.**
 
 ### 14.8 Still open

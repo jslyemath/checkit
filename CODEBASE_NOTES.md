@@ -14676,3 +14676,93 @@ count either way, which is the rule working.
 
 945 printit tests, 0 audit problems, 0 documentation problems,
 152 checkit tests.
+
+## mat-106 is current, and Scans can place a stack (2026-10-25)
+
+### The bank
+
+`install --force`, after checking what forcing would destroy.
+`theme.install` refuses without the flag because "that file is the
+author's, and may be a term's worth of layout work", and taking that
+refusal as paperwork would be the whole point of it missed. Both
+files in the bank turned out to be byte-for-byte packaged copies --
+printit.sty from 9 September, printitfigures from the 10th -- so
+nothing of the instructor's was in either.
+
+Verified by building his real 10/23 job from the bank's own copy of
+the theme, into a scratch home: 58 pages, 58 indexed, every code read
+at 200dpi and resolving to the right page. Every check before this
+had swapped the packaged theme in afterwards, which tests the file
+and not the installation.
+
+Committed in the bank, not pushed, and `checkit generate` not run --
+that is what republishes the site.
+
+Worth noting: his four existing runs have `run_no` NULL, because
+they were printed before run numbers existed. They are not scannable
+by code, which is correct and unavoidable -- they were printed
+without codes.
+
+### Placing a stack
+
+`scans.py` reads PDFs and places pages, and stops there. Classifying
+a mark is a separate job with a separate failure mode, and the
+instructor has to be able to trust the placing before a reading of
+someone's tick is worth showing him.
+
+Five statuses, because "could not place" is several problems wanting
+different responses: `placed`, `blank`, `unreadable`, `foreign`,
+`unknown-run`. And three questions of the batch -- which runs, what
+was read twice, and what never came back.
+
+**Missing is students' papers only**, and that took a screenshot to
+see. The first version listed every indexed page not scanned, which
+for a stack short of one student's two papers reported six missing,
+four of them answer keys. Keys live in the instructor's folder and
+never go out; spares are printed in case somebody needs one and most
+runs end with spares nobody took; padding has no index line at all.
+Counting them buries the answer.
+
+### The fixture is the test
+
+Scanning the PDF printit just produced would pass whatever the
+placing did, because the pages would already be in order. So the
+fixture shuffles them, splits them across two files, drops blanks
+in, rasterises every page and degrades it the way a copier does, and
+writes it back out as an image-only PDF.
+
+Eight mutations on the placing, all caught. A ninth is why there are
+eighteen tests and not sixteen: **removing the shuffle left every
+test passing.** They compare placing against where each scan came
+from, which is the right comparison and adapts to whatever order the
+fixture made. The premise is now asserted on its own -- the stack is
+checked to be out of order before anything relies on it being so.
+
+That is a pattern worth naming: a test that derives its expectation
+from the fixture cannot notice the fixture getting weaker.
+
+### Clicking found what the tests did not
+
+`run_detail(...)["papers"]` is a COUNT, not a list of papers. I read
+the name and wrote a loop over an integer. Nothing caught it until
+the button was pressed, because no test called that path -- the same
+shape as the GUI handler that went unimported for a day in October.
+
+The second was the missing-keys bug above. Both were found by
+operating the control, neither by calling the endpoint, which is the
+distinction CLAUDE.md draws and the reason it draws it.
+
+### A screenshot that looks right is not right
+
+The "every page" table showed a page 7 and no page 4, for a stack
+that was supposed to be the run's first six pages. Checked page by
+page rather than shrugged at: pages 4 and 8 are padding, so the
+first six *indexed* pages are 1, 2, 3, 5, 6, 7. The reading was
+correct and my reading of it was not.
+
+`tools/demo_scans.py` builds the course, the run and the stack, and
+`--home` keeps the whole thing out of the real print-it home. Four
+junk rows got into the instructor's record from builds that did not.
+
+963 printit tests, 0 audit problems, 0 documentation problems,
+152 checkit tests.
