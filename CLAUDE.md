@@ -45,11 +45,18 @@ mat-106's venv has checkit installed **editable**, pointing at `Projects/checkit
 - `--remote URL` — required when the bank has images
 - `--thaw SLUG` — regenerate an outcome marked `<frozen/>`
 
-`checkit-printit` has grown a lot: `build`, `init`, `install`, `gui`, plus
-`course`, `roster`, `skills`, `record` and `form` groups. It also has a local
-web app (`gui -c <course>`), six views in, of which Seating is now most
-of the work. Its own `CLAUDE.md` lists everything and says what is open —
-read that before touching it.
+`checkit-printit` has grown a lot: `build`, `init`, `install`, `import`, plus
+`course`, `form`, `gui`, `record`, `roster` and `skills` groups. It also has a
+local web app (`gui -c <course>`) with six views — Roster, Update form, Print
+job, Runs, Seating, Settings. Its own `CLAUDE.md` lists everything and says
+what is open — read that before touching it.
+
+A printed page now carries machine-readable marks (a QR in the footer and a
+`main.pages` index beside the PDF) so marked papers can be scanned back in.
+That is printit's business, not the platform's, but two things reach here:
+`printit.sty` is what the bank publishes, so the marks ship with it; and
+printit's venv — which is also where checkit's tests run — now needs
+`pypdfium2` and `zxing-cpp`.
 
 ## Seed tiers
 

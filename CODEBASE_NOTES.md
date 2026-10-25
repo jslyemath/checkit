@@ -14350,3 +14350,252 @@ belonging to the next student. Eleven mutations, all caught -- after
 the twelfth, above, was not.
 
 913 printit tests, 0 audit problems, 152 checkit tests.
+
+## One mark recorder, and a run nobody can be identified from (2026-10-25)
+
+### Which positions are worth asking the typesetter for
+
+`\cipcheckbox` recorded the grading box because the box was the only
+thing Scans needed a position for when it was written. The instructor
+asked whether there should be others, and there should: a blank-name
+paper carries a **handwritten id** and a **handwritten name**, and
+both have to be cut out of the scan and shown during review.
+
+So one macro rather than three:
+
+    \cipmark{<label>}{<content>}
+    mark*<page>*<label>*<x>*<y>*<width>*<height>*<depth>
+
+Three labels: `box`, `id`, `name`.
+
+**The slug and the version are deliberately not recorded**, and the
+reason generalises. Both are already known from the page index the
+moment the code has been read. If the code *cannot* be read, there is
+no page number, so there is no index entry to look any position up in
+-- including theirs. A position that is only available when it is not
+needed is not worth a line in the file.
+
+### The cost of the mechanism, stated where it is paid
+
+`\cipmark` typesets its argument twice: once into the measuring box,
+once onto the page. That is the price of not drawing the measured
+copy, which was tried on 10-24 and moved the page by 0.8mm because
+`\roundbox` ends in `\xspace`. So **only inert content goes in it** --
+anything that steps a counter or writes a file would do it twice. The
+three uses are a rule, a grid of rules, and a piece of text.
+
+### A run with nothing on it that says who sat it
+
+`--no-ids` arrived on 10-24 and `names = false` was already there.
+Together they print a paper with no name, no id and no grid to write
+one into. The code still resolves to a skill and a version. The owner
+is simply gone, and no amount of reviewing recovers it.
+
+`BuildResult.anonymous` now says so, and the CLI and the Print tab
+both warn. **A warning and not a refusal**: an anonymous practice set
+is a reasonable thing to want, and this is only a mistake if somebody
+meant to grade it. Refusing would have made the tool wrong about a
+legitimate use; saying nothing would have made it silent about a
+destructive one.
+
+### The same fake, the same bug, one day later
+
+The `Result` stand-in in `test_print_view_fixes.py` had no
+`anonymous`, so a test about *collisions* failed with an
+AttributeError. This is the second time in two days that a test
+double missing a new field broke a test about something else, and the
+fix is the same both times: add the field to the double, never a
+`getattr` default in the view. A fake missing what the boundary has
+cannot fail the way the boundary fails.
+
+Worth noticing that the full suite caught it and the targeted run did
+not -- `pytest tests/test_pageindex.py` was green while this was
+broken.
+
+928 printit tests, 0 audit problems, 152 checkit tests.
+
+## The code names a run, the header makes room, and I stop paying for it (2026-10-25)
+
+Four things the instructor asked for in one message, and one he did
+not ask for because I had not told him about it yet.
+
+### The seed was never an identifier
+
+*"Technically the run number is the seed and not the actual run. We
+may rerun that seed with a few corrections."*
+
+Right, and worse than that. `choose_run_seed` carries a replayed
+run's seed **deliberately** -- a replay draws nothing, so a fresh
+number would be a lie about what was chosen -- and a replay writes
+into a new folder, which is a new `run_id` and a new row. So a
+reprint has always produced two runs with one seed. The real record
+had two such pairs.
+
+The mild reading is ambiguity. The real one: a replay exists to fix
+something, which can change how many pages each student gets, so the
+two runs can have **different page-to-student mappings**. Resolving a
+scanned code by seed would not fail, it would hand papers to the
+wrong students.
+
+`run_no` is allocated per course by `record.next_run_no`, carried by
+the code, and resolved by `record.run_by_no`. Rebuilding into the
+same folder keeps its number, because one folder is one printing
+event and a reprint must not start claiming to be a different run.
+
+**The high-water mark was my own test's doing.** `next_run_no` took
+`MAX(run_no)` over the rows that exist, while the docstring claimed
+it counted from the highest ever issued. Those are the same number
+until something is deleted. The test written from the docstring
+failed, which is the useful direction for a test to fail in, and
+`meta.last_run_no` now survives the row it was given to. Nothing in
+the tool deletes a run -- but four rows were deleted from the real
+record by hand that morning, so "nothing deletes them" was a
+statement about the UI, not about the data.
+
+**The code got shorter, and that bought damage tolerance.** A run
+number is 1 to 3 digits where a seed is 10. `C1-999-9999` is 11
+characters, inside what a version-1 symbol holds at level **M**, so
+the symbol went from 7% recoverable to 15% at the same 9mm. Not
+smaller -- measured at 8mm, L reads 134/150, M 135/150 and Q 137/150,
+so correction buys nothing about size. The decoder either resolves
+the modules or it does not.
+
+### 11mm was never revisited after the payload shrank
+
+The 11mm figure came from the 33-module symbol the first payload
+needed. Cutting the payload made it 21 modules and the size stayed.
+Measured on real pages at 200dpi, blurred, skewed, noised and JPEGed,
+with the decoder given the whole sheet to search rather than a
+cropped symbol: 9mm is 36/36 in every condition and 150/150 on the
+one that fails others; 8mm is 134/150 on a photocopy of a photocopy.
+
+A photocopy of a photocopy is not a corner case. It is how a student
+who needs a blank copy gets one.
+
+**Two harnesses had to be thrown away first.** One put the symbol
+alone on a 30mm page and said 7mm read 40/40 -- but finding a small
+symbol in a full page of other ink is the part that degrades, and
+testing the symbol alone does not test it. The other rendered at a
+whole multiple of the target resolution, which puts every module
+boundary on a pixel boundary at 8mm exactly and nowhere else; the dip
+at 8mm shrank from 134/150 to 86/90 once the phase was randomised.
+
+### The header had no room, so something had to shrink
+
+The instructor wanted the id centred and the course block closed up.
+The text block is 7in and the three things in the header wanted
+roughly all of it.
+
+The id moved into fancyhdr's centre slot, which was empty and which
+centres on the head whatever the other two hold -- so a printed id
+and an empty grid now land identically, which is what was asked. That
+fixes where the id starts, so the name gets a budget and is scaled to
+fit past it rather than running into "ID:".
+
+**The budget was chosen by measuring ink, after measuring the wrong
+thing.** The first attempt read the gap between the `name` and `id`
+marks, which do not include the word "ID:" -- the label sits exactly
+in that gap. It called a 27-character name clear by 0.10in while the
+render showed it touching.
+
+### Everyone was paying for Scans
+
+Not asked, but asked about: *"is any of it slowing down the compile
+time for someone who isn't using these features?"*
+
+It was. `\openout` ran at package load, so every document dropped a
+`.pages` file; `\cipmark` ran three times a page, measuring into a
+save box and typesetting twice; and the footer drew a QR carrying
+`C1-0-17` -- run zero, which does not exist. qrcode.sty does its
+Reed-Solomon in TeX macros, so that last was the most expensive thing
+on the page.
+
+`\setrunid` is now the gate, and it gates all three. printit emits it;
+a hand-written document has never heard of it. Nothing to configure
+and nothing to get wrong.
+
+| | best of five, 58 pages | |
+|---|---|---|
+| before any of this | 8.52s | |
+| a printit run | 9.11s | +6.8%, about 10ms a page |
+| a hand-written document | 7.58s | **-11.1%** |
+
+**The first timing harness said the opposite**, and was wrong twice:
+it copied a stale `main.pages` into every folder, so a theme that
+cannot write one reported 59 index lines; and it ran the cases in a
+fixed order with no warm-up, so the first paid for a cold cache and
+came out slower than the theme doing strictly more work.
+
+Package options `[noid]` and `[nocode]` exist now so neither switch
+needs anybody to read the `.sty`.
+
+### I had been writing into the real print record
+
+Found while checking for duplicate seeds. Every `runner.run` against
+the instructor's own `publication.toml` recorded a run, because a
+publication that names a course records unconditionally and there was
+no way to say otherwise. Four rows across two courses, all pointing
+at temp folders, each dragging 32 to 49 `printed` rows with real
+student ids. Both of the duplicate seed pairs were mine.
+
+Removed with the instructor's agreement, after a timestamped copy of
+each database and a guard refusing any row whose output was not under
+a temp directory. `build --no-record` now exists, and a test that
+builds should set `CHECKIT_PRINTIT_HOME` to somewhere of its own --
+which the new tests do.
+
+### Three marks, not one, and the clock they are read on
+
+`\cipcheckbox` became `\cipmark{<label>}{<content>}` and records
+`box`, `id` and `name`. The last two are for the blank-copy case: the
+student writes both, and review shows the crops side by side.
+
+The slug and the version are not recorded, and the reason
+generalises: both are known from the page index once the code is
+read, and if the code cannot be read there is no page number to look
+any position up by.
+
+**All three reported the same width** -- the grading box's 27pt --
+because one save box serves them all and the writes are deferred to
+shipout, by which time it holds whichever was measured last.
+Positions were right, which is what made it survive a look. `\edef`
+fixes it: `\number` expands at measuring time and freezes the sizes
+into the token list, while `\noexpand` keeps `\thepage` and
+`\pdflastxpos` for shipout. That is what `\protected@write` exists
+for.
+
+Found by reading `main.pages`, not by a test. The pixel test asked
+"is there ink in this rectangle" and a 27pt rectangle starting at the
+id still lands on digits. It now also checks that the three widths
+differ and that there is white just past each right edge -- and the
+second only works because the fixture's ids are nine digits now. A
+fixture smaller than the thing it stands for hides the bugs that are
+about size.
+
+### Measuring the box moved the box
+
+`\cipmark` measures into a save box and then typesets the content
+*again*, rather than drawing the measured copy. Drawing the copy
+shifted the grading box and the skill slug 0.8mm, because `\roundbox`
+ends in `\xspace`, which decides whether to add a space by looking at
+what comes next -- and inside a save box what comes next is the end
+of the box.
+
+3,344 pixels out of 8.4 million, all in one corner. Too small to
+notice by eye on any single page, which is how it would have reached
+a print run. A test compiles the same document with the footer
+calling `\roundbox` directly and compares the pages.
+
+### Tally
+
+Seven mutations on the run number, all caught, including the payload
+outgrowing version 1 -- which matters because that failure is silent:
+the encoder moves to version 2, the modules shrink, and 9mm stops
+reading with nothing to see in the log.
+
+The version-1 guard was itself vacuous on the first try. It computed
+`round(across / (across / 21))` and asserted the answer was 21. It
+now measures a module off the top-left finder's bar, which is seven
+modules wide.
+
+945 printit tests, 0 audit problems, 152 checkit tests.
