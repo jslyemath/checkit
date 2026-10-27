@@ -2854,6 +2854,43 @@ Default 1, overridable per skill.
 history, when each skill was attempted, at which seed, with a link to
 the scan.
 
+#### What it became (2026-10-27)
+
+Built as described, with four decisions that the sketch above did
+not reach.
+
+**A query is a corner dot, not a state.** The table above predates
+the Query outcome. The instructor's call: it reads as not passed --
+which it is -- and carries a small mark so the fact that he flagged
+it for a second look does not vanish into the same box as an
+ordinary blank. Offered as its own loud state and declined; a
+seventh thing to learn costs more than the state is worth.
+
+**An absence dashes the box.** Same restraint. "Did not sit it" and
+"sat it and did not pass" both end in "offer it again", so they are
+not separate states -- but the box drawn is the box on a paper, and
+for an absence there was no paper. The tooltip says which it was,
+because "not passed, 1 attempt" about somebody who never saw the
+paper is simply a false sentence.
+
+**The grid edits.** Clicking a cell opens every printing of that
+skill for that student and lets him set any of them. His own
+argument for it, made about scanning: "if it doesn't make it through
+the scanning process for some reason, but I still have it in front
+of me, I would want to be able to still input the result" -- which
+is just as true in March about a run from October, when there is no
+stack left to re-read. Driven off `printed`, so a run that was handed
+out and never scanned is in the list with nothing against it.
+
+**Recent is `graded`, not dates.** "The last two grading sets" is
+answered by which runs have been read back, which the record already
+records. Two runs sharing a date would have broken a date-based
+answer, and dates are shared every time a redo is printed the same
+day.
+
+What is deliberately still missing: the section filter shared with
+Roster, which 14.3 already called a later job.
+
 ### 14.4 Scans
 
 The largest of the three and the one with real risk in it.
@@ -3368,8 +3405,8 @@ before the first run of next term.
 | ~~1~~ | ~~**Stage 4** of section 13~~ | **done 2026-10-22.** Runs, Progress and Scans inherit the save bar, the warning mark and the empty-state shape | |
 | ~~2~~ | ~~**Runs** (14.2)~~ | **done 2026-10-24.** List, detail, delist, graded, reprint exactly, start-from-these-settings | |
 | ~~3~~ | ~~**The page marks** (14.5)~~ | **done 2026-10-25.** Footer code, page index, grading-box/id/name positions, run numbers. **Still not installed into any bank** -- see 14.10 | |
-| 4 | **Scans** (14.4) | the big one. Import, split, classify, review, save | large |
-| 5 | **Progress** (14.3) | cannot show anything true until 4 feeds it | medium |
+| ~~4~~ | ~~**Scans** (14.4)~~ | **done 2026-10-27.** Import, split, classify, review, save. `INK_FLOOR` still wants calibrating against the real copier | |
+| ~~5~~ | ~~**Progress** (14.3)~~ | **done 2026-10-27.** The grid, thresholds, the recent highlight, and a drill-in that edits. No section filter yet -- that was always a later job | |
 | 6 | **Brightspace export** (14.6) | needs Progress, and one round-trip with a real export file | small |
 | 7 | Drive folders and student emails | explicitly a stretch; the rest has to work first | -- |
 
