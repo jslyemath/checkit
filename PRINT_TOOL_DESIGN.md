@@ -179,6 +179,40 @@ Three overrides, all in the current Apps Script, all wanted:
 
 They compose: Append applies on top of both of the others.
 
+#### Who the run is for (2026-10-26)
+
+A fourth axis, deliberately **not** a fourth mode. The three above
+answer "what does this student get". This one answers "is this
+student in the run at all", and they compose.
+
+The case that asked for it: print two skills for one student who
+missed the session. With only the modes, that was either a class set
+thrown away, or switching to Simply Print and retyping the list for
+one person -- and Simply Print would then have been left in the draft
+for the next run.
+
+| | |
+|---|---|
+| in the app | a second segmented row, `Printing for: the whole class / just the ones I tick`, with a tick column that appears only in the second state |
+| in the job file | `[selection] only_students`, absent for the class |
+| on the command line | `--only KEY`, repeatable |
+
+Three decisions worth keeping:
+
+- **Switching it on ticks everybody.** The switch by itself never
+  changes what prints; you then untick. The alternative -- switching
+  on to an empty list -- makes the control's first click destructive.
+- **Switching it off clears the list.** A list left from last week is
+  one click away from printing a class set as a single sheet. Same
+  argument as the draft's mode keys, and worse here, because the
+  wrong answer is one paper instead of forty-three.
+- **Empty is refused, absent is everybody.** Which is why the key is
+  written even when empty: the mistake has to be visible in the file
+  to be refusable.
+
+Still to come: a shorthand for "only the students I list", typed
+rather than ticked. The filter is the half that was needed first.
+
 ### 4.3 Seating chart
 
 Currently a set of sheets (one per section) with columns
