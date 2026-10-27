@@ -15023,3 +15023,212 @@ present, so it could never fire). Both are described above.
 1022 printit tests, 0 audit problems, 0 documentation problems,
 152 checkit tests. `tools/docs.py` caught `--only` missing from the
 README before I did.
+
+---
+
+## Scans saves, and Progress reads it back (2026-10-27)
+
+The review grid had worked for days and saved nothing. It said so,
+in amber, at the top: "there is nowhere for it to go until attempts
+and passes are recorded". That was the block on everything after
+it -- Progress cannot show anything true until something feeds it,
+and the Brightspace export cannot exist until Progress does.
+
+### The table, and why it is keyed the way it is
+
+`attempt`, beside `printed` in the course's `record.db`. The module
+docstring had promised it since September: "Outcomes are a later
+stage with a table of their own."
+
+Keyed **(run, student, skill)** and not by page. A page is how a
+sheet is *found*; an attempt is about the occasion. The question
+that settled it: can one run print one student the same skill
+twice? Checked rather than assumed -- 424 real rows across six runs
+in MAT 106, no duplicates, and `append_for_everyone` dedupes, so the
+app cannot make one. Only a hand-edited job file can, and two papers
+for one skill in one run are still one decision. So the key is
+right and the write is an upsert: a correction replaces, rather than
+stacking a second attempt and making Progress say she sat it twice.
+
+NULLs matter here. A paper that never reached the scanner stores no
+page, no reading and no ink -- not zero. "Page 0, no ink" is a
+reading; this is the absence of one, and a measurement nobody took
+is a number somebody later averages.
+
+### Four outcomes, and the one that is stored as itself
+
+`passed`, `queried`, `failed`, `absent`. `queried` is his "?" beside
+the box -- a paper still in question -- and it is stored as itself
+rather than folded into pass or fail, because folding it would throw
+away the only record that it was ever in doubt. Progress counts it
+as an attempt and not a pass.
+
+### The browser is not asked who the student was
+
+`/api/scan/save` takes `{id, outcome}` and nothing else. Which
+student, which skill, which page, what was measured: all read from
+the server's own copy of the scan. The browser has exactly one thing
+the server does not -- his judgment -- and that is all it is asked
+for.
+
+This is not theoretical tidiness. A reloaded page, a page left open
+across a restart, a page whose rows were rebuilt from a second read
+-- any of those sending its own `sid` would attach a decision to the
+wrong student, and nothing downstream would ever look wrong. The
+test that guards it sends `{"id": "1-1", "outcome": "passed", "sid":
+"999", "slug": "W9", "page": 77, "ink": 1.0}` and asserts that 999
+has no attempts and that 001 got page 1 and ink 0.03.
+
+The cost, stated so it is a trade and not a surprise: the read lives
+in memory, so a restart between scanning and saving loses it. The
+save then refuses and says to read the stack again.
+
+### A review row was a sheet, and should have been a paper
+
+Found by looking at the real output rather than at tests: the demo
+stack produced **nine** review rows for **eight** papers, with `1-1`
+appearing twice.
+
+`batch.placed` is every placed *sheet*, and a stack routinely has
+the same sheet in it twice -- which is why `duplicates` is one of
+the three questions a batch answers. The grid made a row per sheet.
+The count said nine of ten decided, and `setOutcome` finds a row by
+id, so clicking the second of the pair painted it and decided
+nothing.
+
+There were **no tests at all** for `_review_rows`. That is why.
+
+Grouped by (run, page) now. And since the row can have two crops, it
+carries both -- with one rule attached: **when the copies disagree,
+suggest nothing.** That is the case the duplicate report exists for,
+a double feed that loses a tick, and picking one of the two for him
+would pick the blank one half the time. The row says "scanned twice,
+and the two do not match" and goes into the pile that needs him.
+
+### The demo stack had no marks on it
+
+Every box in `tools/demo_scans.py` was empty, so every one of the
+eight papers read `empty` and suggested "Not passed". The stack was
+built to be wrong in the ways a real stack is wrong -- shuffled,
+split, a blank, a double feed, one held back -- and it never once
+exercised the reading half of the tab it exists for.
+
+Marks are drawn now, in pen, into the render at the position
+`main.pages` gives for that page's box, *before* the blur and the
+rotation and the noise -- which is where a real mark happens: on
+paper, after printing, seen through all the same degradation.
+
+Grey 40, not black. A pen on a photocopy is not black, and a harness
+kinder than reality is a harness that passes when the real thing
+fails. That is the 7mm-code lesson, written down in CLAUDE.md, and
+it applies to every simulated input.
+
+Four kinds, fixed rather than random, because a demo whose readings
+change between runs cannot be used to check that a change to the
+reader did what was intended. The double feed is now built by hand:
+the second pass of that sheet is taken before its mark, so the two
+copies genuinely disagree and the grid's new branch has something to
+be right about.
+
+### Progress
+
+Students down, every skill in the bank across -- including the ones
+not offered yet, because the empty columns are the shape of the
+term.
+
+Two rules from 14.3 keep 1,300 cells readable: a pass count only
+where the threshold is above 1, and an attempt count only when it is
+surprising. Passing is quiet; the loud cell is "not passed, more
+than once".
+
+Two decisions were his, asked rather than guessed, because this is
+his gradebook:
+
+* **a query is a corner dot, not its own loud state.** Offered as a
+  loud state -- it is the only thing on the grid that is work *he*
+  owes -- and declined. A seventh state costs more than it is worth.
+* **cells edit.** Clicking one opens every printing of that skill
+  for that student and sets any of them. His own argument, made
+  earlier about scanning: a paper he is still holding should be
+  recordable without a stack. That is just as true in March about a
+  run from October.
+
+An absence gets the same restraint as a query: the box is dashed
+rather than solid, because the box drawn is the box on a paper and
+there was no paper. The tooltip says so, since "not passed, 1
+attempt" about somebody who never saw it is a false sentence.
+
+The drill-in is driven off `printed`, not `attempt`, so a run that
+was handed out and never scanned is in the list with nothing against
+it. That row is the whole point of the feature. Recording there goes
+through the same `save_attempts` a scan does -- so a typed decision
+and a read one are the same kind of thing, and neither can produce a
+row the other could not.
+
+"Recently passed" is answered from `graded`, not from dates. Two
+runs share a date every time a redo is printed the same day, and a
+date-based answer would have been wrong the first time that
+happened.
+
+### Two things the grid got wrong on screen
+
+**It shouted the students' names.** A row's name cell is a `<th>` --
+correct markup, it heads the row -- and the app's `th` style is
+12px, muted, uppercase, letter-spaced. On a column heading that is
+right. On "Ada Lovelace" it is a person's name in block capitals.
+Caught by looking at the screenshot, not by any test, and it is the
+sort of thing that looks deliberate once it ships.
+
+**Two class names I invented already existed.** `.empty` is one
+seating.css has had since its own stage A -- the exact collision
+`test_gui_markup` was written to catch after `.rail` and `.band`
+each shipped -- and `.inline` is not a thing this app has at all.
+Both were caught before they ran, by looking for them rather than
+assuming.
+
+### A dead check, found by a mutant that survived
+
+Eighteen mutants on the Progress layer, one survivor: removing the
+outcome check from `api_progress_set` changed nothing. The test was
+not weak -- `save_attempts` owns the vocabulary and refuses with the
+identical sentence, so the behaviour was the same either way. The
+check was dead code, a second copy of a list that could go stale on
+its own.
+
+Deleted rather than pinned with a test. The similar-looking check in
+`api_scan_save` stays, and is not a copy: it validates while
+building the decision map, so a decision whose id matches no row --
+a stale page -- is refused instead of being quietly dropped before
+the record ever sees it. That difference had no test either; it has
+one now, and both checks are load-bearing under mutation.
+
+Two other mutants in the first pass were bad mutants rather than
+weak tests: `want.get(id + "-sid")` against a map keyed by id alone
+could never fire, and two more did not match the source at all
+because I had guessed the line wrapping. Rewritten and all caught.
+
+### Verified
+
+The real path, end to end, against the demo course: two PDFs posted
+to the running app through the same endpoint the file picker uses,
+read, reviewed, saved. Six results saved on the first click, the
+save bar cleared, the two that needed judgment decided and saved on
+the second -- and the second save offered two, not eight, because
+dirty is per row and per outcome.
+
+Then Progress: the grid drawn, a cell clicked, an outcome changed,
+the record checked on disk, and the cell behind the dialog redrawn
+from solid box to dashed. The highlight toggled on and the passes
+lit.
+
+The one bug this did not catch itself: `/api/scan/cell` 404ing
+because the server was still running the code from before the route
+existed. CLAUDE.md lists that one -- "after editing gui/, restart the
+server before believing the page" -- and the console had kept the
+stale errors from before the restart, which nearly sent me after a
+routing bug that was not there. The endpoint was fine; asking the
+server directly settled it in one call.
+
+70 new tests across `test_attempts.py` and `test_progress.py`, every
+one watched to fail against 38 deliberately wrong versions of the
+lines they cover.
