@@ -15207,6 +15207,37 @@ weak tests: `want.get(id + "-sid")` against a map keyed by id alone
 could never fire, and two more did not match the source at all
 because I had guessed the line wrapping. Rewritten and all caught.
 
+### A re-read offered to save what was already saved
+
+Found by using it rather than by testing it: after saving, reading
+the same two PDFs again brought every row back as undecided, and the
+bar said "6 results not saved" about six results sitting in the
+record. The save itself was harmless -- an upsert over identical
+values -- but the count was a lie, and the one thing a save bar must
+be is true.
+
+The row now carries what the record already holds for that paper.
+A re-read of a saved stack comes up clean; a row whose record
+disagrees with the reader's suggestion shows the *record's* answer,
+so a decision he made last week is not quietly offered back to him
+as a change to approve.
+
+Two of the mutants written for this could not be caught, and neither
+is a gap:
+
+* `recorded_in`'s `WHERE run_id IN (...)` can be deleted without
+  changing any answer. The lookup key is the whole (run, student,
+  skill) triple, so extra rows are simply never matched. The clause
+  is there to avoid loading a term's worth of attempts to answer
+  about one stack, which is a real reason and not a correctness one.
+* the last mutant was in `app.js`, and this project has no
+  JavaScript test runner -- the Python suite cannot fail for it
+  whatever it does. Verified in the browser instead, which is the
+  only place it can be: a re-read of the saved stack comes up "8 of
+  8 decided" with no bar, and the paper whose two scans disagreed
+  carries the `passed` he chose rather than the blank the reader
+  offers.
+
 ### Verified
 
 The real path, end to end, against the demo course: two PDFs posted
@@ -15229,6 +15260,7 @@ stale errors from before the restart, which nearly sent me after a
 routing bug that was not there. The endpoint was fine; asking the
 server directly settled it in one call.
 
-70 new tests across `test_attempts.py` and `test_progress.py`, every
-one watched to fail against 38 deliberately wrong versions of the
-lines they cover.
+74 new tests across `test_attempts.py` and `test_progress.py`, every
+one watched to fail against 42 deliberately wrong versions of the
+lines they cover -- bar the two noted above, which no Python test
+could have caught.
