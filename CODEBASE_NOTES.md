@@ -14766,3 +14766,260 @@ junk rows got into the instructor's record from builds that did not.
 
 963 printit tests, 0 audit problems, 0 documentation problems,
 152 checkit tests.
+
+---
+
+## Printing for a few students, not the class (2026-10-26)
+
+A student missed the session; two skills needed printing for them
+alone. There was no way to say so. The three selection modes all
+answer *what a student gets* -- their own form choices, a list for
+everybody, a fallback -- and none of them answers *who is in the
+run*. The options on the day were a class set thrown in the bin, or
+switching to Simply Print and retyping two skills for one person,
+which would then sit in the draft waiting for the next run.
+
+### Why it is a fourth axis and not a fourth mode
+
+The instinct was a three-way toggle: form choices / one list for
+everybody / one list for one student. That was wrong, and the reason
+is composition. Printing one student a list you type is **an
+override plus a filter**, and both of those already existed --
+per-student overrides had been in `publication.toml` and in the app
+for weeks. The only missing piece was restricting who prints.
+
+Folded into the modes, printing for one student would have discarded
+whatever the mode was already set to. As a second axis, a reprint
+for one student still reads that student's own choices. The app
+shows it as a second segmented row under the mode row rather than a
+third option within it, which is the same statement in the
+interface.
+
+### Three states, not two
+
+`[selection] only_students` in the job file:
+
+| in the file | means |
+|---|---|
+| absent | the whole class |
+| `["806001234"]` | these students, by id, alternate id or email |
+| `[]` | nobody, which the build refuses |
+
+The third state is what makes the first safe. If an empty list read
+as "everybody", unticking all forty-three boxes would print
+forty-three papers. So the key is written **even when empty** -- the
+mistake has to reach the file to be refusable -- and `assemble`
+raises rather than building an empty folder that looks like a
+success.
+
+`publication.only_students` is `None` for absent and `()` for empty,
+which is the whole reason it is not a plain tuple with a default.
+
+### The guards that would have made it useless
+
+Both filter sites were first written
+
+```python
+if publication.only_students is not None and hasattr(roster, "only"):
+```
+
+copying the `hasattr(roster, "live")` immediately above them. That
+older guard exists because callers pass a bare list of students as
+well as a `Roster`, and it is harmless: a list has no dropped
+students to filter out. This one was not harmless. A caller passing
+a list would skip the filter and print the whole class on a run that
+named one student, silently -- the exact failure the feature exists
+to prevent.
+
+Replaced with `assemble.as_roster`, which wraps a list once at the
+top so every step after it has the whole interface. Anything that is
+not a list is returned untouched, so a test double missing a method
+raises instead of being worked around.
+
+Removing the guards broke seventeen tests across three files, all
+`AttributeError: 'Pub' object has no attribute 'only_students'` --
+publication doubles that had not grown the field. Fixed in the
+doubles, never with a `getattr` default. The comment on the double
+in `test_preferred_name.py` had already counted three of these; this
+is the fourth, and the count is in the comment.
+
+### What the tests found that reading did not
+
+Fourteen mutants, all caught, but two of them only after a real fix.
+
+**`only()` reported a found student as missing.** It used
+`next((k for k in keys_of(student) if k in wanted), None)` and marked
+only that first key used. A job naming somebody by id *and* by email
+matched on the id and then reported the email as matching nobody --
+which the runner turns into "this run names old@x.edu, who is not in
+the roster at all" about a student whose paper is in the stack.
+Nothing in the app can produce it, because the tick list writes one
+key per student; an imported or hand-edited job can. Found by a test
+written for completeness, not by suspicion.
+
+**The draft never wrote `who`.** `save_draft` wrote `only` and not
+`who`, so a run set to "just the ones I tick" came back from a reload
+set to "the whole class" with the names still in the file -- and
+`publication_text` gates on `who`, so it would have printed the
+class. The feature did not survive a page reload, which is how it
+will be used: set it up, come back, print.
+
+The test meant to cover this went through `save_draft`, so it could
+not see `save_draft` dropping the value. Rewritten to write the
+draft file directly and read it back. This is the second time a test
+of a loader has been written through its own writer and been blind
+for it.
+
+The mutation "an absent key loads as empty" survived the first pass
+as well, and that one was a bad mutant, not a weak test: it put a
+`.get(key, [])` default inside a branch that only runs when the key
+is present, so it could never fire. Replaced with a mutation that
+removes the presence check.
+
+### Reported, not silently dropped
+
+A key matching nobody does not stop the build -- a stale address
+should not cost the paper you meant to print -- but it is named, and
+the two reasons are separated:
+
+```
+  students 1   (this run is for 1 of 42; the rest of the class is not in it)
+  WARNING  this run names 806001234, who has been dropped, so nothing
+           printed for them
+  WARNING  this run names old@x.edu, who is not in the roster at all, so
+           nothing printed for them
+```
+
+"Matched nobody in the roster" is misleading for a student who is
+visibly sitting on the roster page and merely dropped; it sends you
+hunting for a typo that is not there. The check runs against
+`people.live()` and then re-runs the misses against the full roster
+to tell the two apart.
+
+Reviewing the diff found that the same misleading sentence was still
+reachable: if the *only* student named has dropped, nobody matches,
+and `assemble` refuses with "none of them is in the roster" before
+any warning is printed. The runner has the distinction already and
+has it earlier, so it refuses first:
+
+| named | message |
+|---|---|
+| only a dropped student | `... would print nothing: 806001234 has been dropped.` |
+| only a typo | `... 0O1 is not in the roster.` |
+| nobody | `... no student is named. Tick somebody, or set the run back to the whole class.` |
+
+`assemble` keeps its own refusal. It is public and called directly,
+and a caller that reaches it should get a refusal rather than an
+empty folder. The two messages differ because the two functions know
+different amounts, which is the honest version.
+
+`printed_for` and `roster_size` had been declared on `BuildResult`
+when the filter went in and never assigned -- every caller read 0.
+Filled in, and the one line worth printing after a filtered run uses
+them.
+
+### In the app
+
+A second segmented row, `Printing for: the whole class / just the
+ones I tick`, with a tick column that exists only in the second
+state: forty-three permanently-ticked boxes would be furniture.
+Switching on ticks everybody, so the switch by itself never changes
+what prints; switching off clears the list, for the same reason the
+draft drops the other mode's keys. Rows not in the run are dimmed
+rather than hidden -- the row is where you tick them back in -- and
+contribute no papers to the count.
+
+The first version of the controls read `all 48   All   None`: three
+pieces of identical muted text, one a status and two buttons, all
+three containing the word "all". `button.act` is deliberately
+invisible until hovered, which works in a table header where the
+column says what it is and fails beside a label. Now `48 of 48
+ticked` with outlined `Tick all` / `Untick all`, which is what the
+screenshot showed and the code did not.
+
+The GUI refuses an unrecognised `who` the way it already refused an
+unrecognised `mode`. `load_draft` falling back to "all" is right for
+a file an older version wrote and wrong for a request arriving now.
+
+Neither refusal had a test -- not the new one, and not the `mode`
+check that has been there since the view was built. Both have one
+now, and both were watched to fail.
+
+### A new column moved an old one, exactly as the comment said
+
+Reading the diff rather than the tests found this. The Override
+column is hidden in `same` mode by
+
+```css
+#who.hide-override th:nth-child(5),
+#who.hide-override td:nth-child(5) { display: none; }
+```
+
+and the tick column inserts a new *first* cell. With both on --
+`mode = "same"` and `who = "these"` -- the fifth child is **Will
+get**, so the wrong column disappeared.
+
+That combination is not an edge case. It is "a few skills for one
+student", which is the sentence this whole feature came from.
+
+The comment sitting directly above that rule says, in these words:
+"Hidden by one rule covering the heading and the cells together: a
+rule that hid cells and left the heading once made every column
+after it read one place to the left." The hazard had been written
+down, and the fix written for it was still positional, so adding a
+column in front re-armed it.
+
+Hidden by class now -- `th.overridecell` / `td.overridecell` -- which
+no future column can shift. There is no `nth-child` left anywhere in
+the stylesheet.
+
+Caught by looking, not by a test, and not by the screenshots either:
+every screenshot up to that point was `chose` mode, where the column
+is not hidden at all. Then checked in the app in the combination
+that breaks it, which is the only one that would have shown it.
+
+### Cleared out on the way past
+
+`src/checkit_printit/gui/__init__.py.mut` -- 1,415 lines, committed
+in "Stage 3a", 600 lines behind the module it shadowed. A backup my
+own mutation harness writes before editing a file and restores in a
+`finally`; one run did not get there. Nothing can import a
+`.py.mut`, so it did no harm beyond sitting in the package
+directory. Removed, and `*.mut` is in `.gitignore` so the next crash
+cannot commit one.
+
+### Verified
+
+A copy of the real MAT 106 course, not a fixture: one student, two
+skills typed as an override, built to `main.tex`, and the document
+contains that student and nobody else. The empty case refused. Then
+the CLI with three keys -- one live student, one dropped, one typo
+-- and three distinct messages. Then the app, driven: switched on,
+unticked all, ticked two, saved, reloaded, and the choice came back
+with the counts agreeing (2 of 48 ticked, 4 papers, 2 students).
+
+The whole flow, in the app: "Students chose" plus "just the ones I
+tick", untick all, tick one, type `W1-E, W2` into that student's
+Override box. One of 48 ticked, two papers, one student, every other
+row dimmed to a dash. Both halves of what was asked for -- who
+prints, and typing their skills -- and the second half already
+existed.
+
+Two scripts lied before they told the truth. The first hand-edited
+`roster.toml` to drop a student and asserted on a format it had
+guessed wrong. The second used `roster.set_dropped` without the
+seating path, so `check_dropped_are_unseated` refused the build --
+the guard working exactly as designed. The second also printed a
+real student name to the terminal, because the masking covered ids
+and not names; it now masks every name on the roster first.
+
+Thirty-seven new tests, and twenty mutants -- every test in the file
+was watched to fail against a deliberately wrong version of the line
+it covers. Two of those mutants survived the first pass: one was a
+weak test (it went through `save_draft`) and one was a bad mutant (a
+`.get` default inside a branch that only runs when the key is
+present, so it could never fire). Both are described above.
+
+1022 printit tests, 0 audit problems, 0 documentation problems,
+152 checkit tests. `tools/docs.py` caught `--only` missing from the
+README before I did.
