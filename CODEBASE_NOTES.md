@@ -15406,3 +15406,157 @@ problems, 0 documentation problems, 152 checkit tests. The
 accident was replayed end to end against a copy of the real course
 -- Monday built, Tuesday refused, Monday intact afterwards, a plain
 rebuild still allowed, a renamed job allowed, `--replace` through.
+
+---
+
+## The mark is read in colour now, and the box is found (2026-10-29)
+
+The instructor, on the first real stack: "your algorithm isn't
+sophisticated enough... A. Jimenez N3 has nothing in the box, but
+your algorithm marked it as a pass... you even have an astounding
+number of empty boxes marked as Pass. It doesn't have much to do
+with calibrating darkness. It is the way it is or isn't noticing
+things. Are you finding the box shape first somehow?"
+
+No, it was not. He was right about all of it, including the part he
+put as a question.
+
+**Fifty-five of sixty-two pages came back "ticked".** Nearly all of
+them wrong.
+
+### Three faults, one reading
+
+Found by cutting the crops out and *looking* at them, with the
+measured region drawn on top. Reasoning about `_window` said the
+region was strictly inside the printed box; the picture said it
+clipped the outline. The picture was right.
+
+**Darkness was the wrong signal.** His check is in coloured pen. The
+printed rule, the printed question and a student's pencil are grey.
+A greyscale measure cannot tell a check from the box it sits in --
+which is why `INK` had been pushed to 80 to stop the box's own
+blurred halo reading as a tick, and at 80 a genuinely faint mark is
+invisible too. Every threshold in the old reading was a compromise
+between those two failures and there was no setting that avoided
+both.
+
+Saturation has no such problem. The box, the text and the pencil are
+grey at any darkness; the pen is not.
+
+Credit where it is due: this is the idea from the prototype he had
+built before this one, and the line in its README that gave it away
+was "It measures COLORED ink (any color - pencil and black/gray
+print are ignored)". Nothing else was taken from it -- the
+identification here is by QR and page index rather than by OCR of
+the name and the slug, which is better -- but the measurement was
+simply right and mine was simply wrong.
+
+**The recorded mark is not the drawn rectangle.** `\cipmark{box}`
+wraps trailing space, so the mark is 1780112sp where
+`\roundbox{20pt}` draws about 0.73 of that. Measured: the box is 55
+pixels across in a crop where everything derived from the mark
+expected 75.
+
+**And `_window` assumed a square box.** `pad[1] + 1 + pad[3]` uses
+one box *width* as the box's height. The box is 0.766 of its width
+tall. So the measured region was taller as well as wider, and the
+inset that was supposed to keep the printed outline out of the count
+did not reach.
+
+Put together: on an empty box, the region being measured clipped the
+printed outline, counted it as ink, and called it a tick. Which is
+exactly "an astounding number of empty boxes marked as Pass".
+
+### Finding the box
+
+The position is not reliable enough to measure from either -- what
+is left of the scan's skew after straightening moves the box up to
+fifty pixels between pages -- but its *size* is rock stable: 55 or
+56 pixels on every page measured, because it is `\roundbox{20pt}`
+and the crop is rendered at a fixed scale.
+
+A fixed shape in an uncertain place is what template matching is
+for. `find_box` scores every candidate rectangle by how much of its
+perimeter is rule -- dark **and unsaturated**, so a check drawn
+across one side is not part of the shape being matched and the
+other three sides still carry it. `_window` survives as the hint the
+search centres on.
+
+The size is searched rather than taken from the theme. `scans` must
+not know that the box is 20pt: a bank may replace `printit.sty`, and
+a constant here naming that one's geometry would be the same mistake
+as a CheckIt constant naming printit.
+
+Two false starts, both instructive:
+
+* the first `find_box` looked for the run *containing* the expected
+  centre. The centre of an empty box contains nothing -- that is
+  what makes it empty -- so it fell through to a single
+  three-pixel side and every page came back `nobox`. It wants the
+  *pair* of rules bracketing the centre.
+* widening `PAD` to give the search room made things worse, not
+  better: `cut_out` took a fixed output *height*, so more padding
+  packed more of the page into the same 120 rows and shrank the box
+  from 55 pixels to 43. Everything downstream is tuned to the box's
+  pixel size. `PX_PER_WIDTH` now fixes the scale and the height
+  follows the padding.
+
+### The threshold that is fitted to one stack, and says so
+
+`EDGE_HIT` sits at 0.50 because that is a *gap*: across the 62 pages
+the worst real box scored 0.520 and nothing scored between 0.50 and
+0.52. It was 0.55, which lost seven boxes.
+
+`BESIDE_MAX` is the one number fitted to a single example, and it is
+marked as such in the source. One student wrote their working in
+orange pen beside an empty box; colour alone cannot tell that from
+the instructor's orange `?`. What separates them is size -- every
+real `?` measured 0.23 to 0.27 of the box's area and the working
+measured 1.20 -- so a `?` is defined as a small mark near a box. The
+gap is wide and it is still one stack.
+
+### What it reads now
+
+**62 of 62 correct**, checked crop by crop on a contact sheet with
+the found box drawn on each and the call underneath, not counted
+from a summary. Including the three he named: K. Tucker's `?`, A.
+Colombo's `?`, and A. Jimenez's empty box with a student's orange
+working beside it.
+
+`beside` is claimed as a query rather than hedged. The old reading
+hedged because it could not tell a question mark from the blurred
+corner of a printed box; this one can.
+
+### The demo was testing nothing again
+
+`tools/demo_scans.py` drew its marks in grey 40, with a comment
+arguing that a pen on a photocopy is not black. True, and the wrong
+axis: the reading ignores grey on purpose, so the demo's marks were
+invisible to it. The same fault as the version that drew no marks at
+all, one layer up -- the harness was wrong in exactly the way the
+code had just been found wrong.
+
+It draws in the three pens he uses now, and keeps the stack in
+colour. Two of its eight pages still find no box, and that is the
+demo being harsher than the copier: it renders at 150dpi and blurs
+hard, where his scans are 200dpi. Worth knowing, and the reason the
+README now says to scan in colour at 200 or better.
+
+### The rest of what he asked for
+
+* the name crop is cut more generously -- a name sitting exactly in
+  its own typeset box reads as cramped;
+* the four outcomes wear glyphs: a check, a cross, a question mark,
+  and Seating's own chair struck through for "did not sit it";
+* the crops are in colour, which they now have to be;
+* the box crop is sized to the name crop, so the pair reads as one
+  line of evidence;
+* hovering a crop widens it to show what was cut off -- free, since
+  the crop is already cut wide for the reading and shown tight --
+  and clicking opens the whole scanned page, rendered on demand from
+  the file still sitting in the course's scans folder;
+* **a paper that never came back no longer "needs you".** His
+  question: "Why does that need me? Why not just mark it as not
+  taken?" The record already knows no paper arrived; asking him to
+  confirm it was asking him to agree with something nobody doubts.
+  It suggests `absent` and he can still change it.
