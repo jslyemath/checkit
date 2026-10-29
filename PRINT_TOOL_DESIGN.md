@@ -605,6 +605,8 @@ Settled in review, recorded so they are not relitigated.
 | Theme location | ships in the print package; a bank may replace it, same convention as `bank_helpers.sty` |
 | Versions needed | **two**, avoiding *immediate* neighbours — not everyone at a table |
 | Sections | share the A/B pool today; a seating chart may use other letters later |
+| One folder, one run | the folder name `{title} {date}` **is** the run's identity. A build whose papers differ from the ones that folder recorded is refused, because `main.pages` is the only record of which printed page was whose. Decided 2026-10-29, after it cost a live run of 86 papers |
+| A recovered index says so | `--rebuilt` brings the page map back from the roster and the chart, which are enough. The seeds are not recoverable, so the run carries a `rebuilt` mark and nothing prints a seed from it as though it were the one handed out |
 | Seed overrides | user picks the seeds **and** their mapping onto seating versions |
 | Extras | appended at the end, blank name line, versions shuffled among those available |
 | Roster format | the tool's own structured file; CSV is an import step, never the model |
