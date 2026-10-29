@@ -15264,3 +15264,145 @@ server directly settled it in one call.
 one watched to fail against 42 deliberately wrong versions of the
 lines they cover -- bar the two noted above, which no Python test
 could have caught.
+
+---
+
+## A live run was overwritten, and the scan said so in the wrong voice (2026-10-29)
+
+The instructor scanned Monday's N3/N4 papers, the first real use of
+Scans, and reported that "the program is talking about a completely
+different set of papers".
+
+It was. And the papers, the codes and the reader were all fine.
+
+### What happened
+
+The output folder is named `{title} {date}`, and that name is the
+run's identity.
+
+* **Monday 10-26, 10:48** -- N3 and N4 for 43 students, built into
+  `Skill Checkpoint 2026-10-26`. Run number 1. Eighty-six papers,
+  printed with footer codes `C1-1-1` through `C1-1-86`.
+* **Tuesday 10-27, 10:02** -- a three-student test of the `--only`
+  filter added the day before, built with the title and date still
+  reading "Skill Checkpoint" and 2026-10-26. Same name, same
+  folder. It rewrote `main.pages`, deleted the run row -- which
+  cascades away every `printed` row -- and **kept run number 1**,
+  because `next_run_no` returns the number a folder already has.
+* **Tuesday 10-27, 10:03** -- the same test, renamed, built
+  correctly into its own folder. By then the damage was a minute
+  old.
+
+So the codes on Monday's papers still resolved. To an eight-page
+index describing R1, W7 and N1 for one student.
+
+### What the scan actually said
+
+Re-run against a copy of his course: 62 pages, every QR decoded,
+every one `C1-1-<page>`. Fifty-eight came back `unknown-page` and
+four `placed` -- pages 1, 2, 5 and 6, which exist in the new index,
+so they were attributed confidently to the wrong student and to two
+answer keys.
+
+The wording for `unknown-page` already said the right thing: "the
+folder was built again after this was printed." It was drowned by
+four placements that looked fine. **A confident wrong answer beats a
+correct warning**, which is the general lesson and the reason for
+the name crop below.
+
+### The guard
+
+`assemble` now refuses a build whose papers differ from the ones the
+record says that folder produced. `FolderInUse`, raised after the
+handouts are built and **before anything is written** -- a refusal
+that arrives after `main.pages` has been rewritten is not a
+refusal. The message counts what would be lost, because "86 papers
+for 43 students" is a sentence that stops somebody and "folder in
+use" is one they click through.
+
+The comparison is the set of `(student, skill)` pairs. Seeds are
+deliberately not in it: redrawing the same papers for the same
+people is a rebuild, not a different run, and if the seed counted
+then every rebuild without `--seed` would be refused.
+
+The existing set is read by `runner` and passed in, rather than
+`runner` working out the new one, so `assemble` stays the only
+thing that decides what prints. `None` means "do not check", which
+is how `--replace` and a course with no record both get through.
+
+A replay is exempt on purpose.
+
+### The repair, and what could not be repaired
+
+Both inputs were untouched: `roster.toml` last written 10-23,
+`seating.toml` 10-26 at 10:16, the build 10-26 at 10:48. Page order
+comes from the chart, the roster and each student's skills, and
+`main_tex` lays out students before extras and keys -- so nothing
+after a student's pages can shift their numbers, and the mapping is
+reproducible.
+
+It was worth checking rather than assuming, and the check was in
+the data: in his surviving `main.pages`, every `box` mark has the
+same y, width, height and depth, and its x takes one of two values
+-- the document is `twoside`, so the box's position depends only on
+page parity. The name's x and y are fixed too. The geometry was
+never in doubt; only the page-to-student map was.
+
+**The seeds could not be recovered.** They were in the manifest the
+overwriting build replaced. The four seeds per skill survive in the
+filenames under `N3/` and `N4/`, but which version letter each one
+belonged to does not, and 4! guesses is not a recovery.
+
+So `--rebuilt`: build the folder again and mark the run. The record
+gains a `rebuilt` column, and the Progress drill-in says "index
+rebuilt, so the seed printed is not known" instead of printing a
+number that is fiction. The alternative -- a fresh seed sitting in
+the record looking exactly like a real one -- is the kind of quiet
+untruth everything else in this codebase is built to avoid.
+
+The repair was run against the live course with the record copied
+to a timestamped `.bak` first, and with the result checked before
+it was allowed to stand: run number still 1, 86 student pages, 43
+students, exactly N3 and N4 each, 86 `printed` rows. Any of those
+wrong and it restored the backup.
+
+Afterwards, his scans: **62 of 62 placed**, 31 students with both
+papers, 24 never handed in. Nothing unreadable.
+
+### The name crop
+
+`main.pages` already records where the name was typeset, so the
+review grid now shows the name cut off the paper underneath the
+name the index claims. A wrong index then shows as a column that
+stops agreeing with itself.
+
+This is the part that would have made Tuesday's damage obvious on
+Wednesday, and it is cheap -- one more cut per page.
+
+The grading box's padding could not be reused. Every pad in
+`cut_out` is a multiple of the mark's own *width*, which suits a
+roughly square box and not a name ten times wider than it is tall:
+1.05 of that to the right is half the page. `PADS` holds a per-mark
+pad and output height.
+
+The first attempt at the name's pad clipped the ascenders -- 0.05
+of the width sounded generous and is not, for a mark that wide.
+Found by looking at the crop, which is the only way this kind of
+thing is ever found.
+
+### A mutant that found a test of a constant
+
+Eight mutants on the new flag and the crop; one survived. Making
+`_cuts` ignore `PADS` entirely broke nothing, because all three
+tests checked what was *in* the table and none checked that the
+cutting read it. The difference between testing a constant and
+testing the code that uses it, and a distinction worth keeping in
+mind: a table with three tests on it looked thoroughly covered.
+
+### Verified
+
+1117 printit tests before this entry's own additions, 0 audit
+problems, 0 documentation problems, 152 checkit tests. The
+accident was replayed end to end against a copy of the real course
+-- Monday built, Tuesday refused, Monday intact afterwards, a plain
+rebuild still allowed, a renamed job allowed, `--replace` through.
