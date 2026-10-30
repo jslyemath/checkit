@@ -15560,3 +15560,98 @@ README now says to scan in colour at 200 or better.
   taken?" The record already knows no paper arrived; asking him to
   confirm it was asking him to agree with something nobody doubts.
   It suggests `absent` and he can still change it.
+
+---
+
+## A confidence dial, and a popover that is not inside the row (2026-10-29)
+
+Four follow-ups on the review grid, three of them corrections to
+things built the same day.
+
+### Growing a picture inside a box does not escape the box
+
+"Hover to enlarge is still clipped to that small space. I was
+thinking it would just bring up a rounded rectangle with everything
+being larger, and more context that breaks the bounds of the
+original viewbox."
+
+The first version widened the row's own `<img>` on hover, which can
+only ever show what fits in the row -- and the row clipped it. The
+mistake was treating "show more" as a sizing problem when it is a
+*containment* problem.
+
+`#peek` is one element appended to `<body>`, positioned by hand,
+shared by every crop on the page. One rather than one per row,
+because sixty hidden popovers is sixty copies of a picture already
+in the row and only one is ever shown. It flips to whichever side
+has room and is clamped to the window, since a popover running off
+the screen is the same bug pointing the other way.
+
+On the name crop as well, which he had to ask for twice over --
+it was the obvious other half and I had only done one of them.
+
+### A picture cut at the size it is shown at cannot be looked at
+
+The name crop was cut at 44 pixels tall, the height it appears at
+in the row, so the popover enlarged pixels rather than revealing
+anything. Cut at 96 and shown at 44 now. The extra costs bytes and
+nothing else, and it is the whole point of being able to look
+closer at a thing whose job is to be compared against a name.
+
+### The dial, and two numbers got wrong
+
+He asked for a confidence column: "Not a raw number from the code,
+but translated to a 0-10 or 0%-100% scale, with a circle, gauge, or
+other small inline visual."
+
+`measure` returns `sure`, from how far the measurement sits from
+the boundary it was decided on and how well the box was found.
+Out of ten rather than a percent -- a percent reads as a
+measurement, and this is a judgement about a judgement.
+
+Running it on the real stack is what found both faults in it, and
+neither would have shown up in a test written from the same
+assumptions as the code:
+
+* **the ceiling was unreachable.** Quality was scaled against a
+  rectangle whose whole perimeter is drawn, and `\roundbox` has
+  rounded corners, so a square template cannot cover them. The best
+  real box scores 0.718 and the median 0.592. Every page was being
+  marked down against a number no box can reach, and 43 of 62
+  landed on the same value.
+* **an empty box scored zero when somebody wrote near it.** The
+  margin took the larger of `inside` and `around`, so the page with
+  a student's orange working beside an empty box came out the least
+  confident reading in the stack -- about a box visibly containing
+  nothing. What `empty` claims is about the *box*.
+
+After both: 5/10 to 10/10, and the least confident rows are exactly
+the six `beside` judgements and the one page whose call rests on
+`BESIDE_MAX`. The ordering is the useful part -- the dial is worth
+having because it sorts, not because any single number is precise.
+
+`beside` is capped below the others however cleanly it measures,
+which is the honest thing for a reading that is not making the
+judgement.
+
+The ring is a conic gradient behind a ring-shaped mask rather than
+an SVG circle with a dash array. `test_the_one_weight_is_stated_once`
+allows exactly one `stroke-width` in the stylesheet -- a second is
+how a second line weight arrives without anyone deciding on it --
+and the right answer was not to make the gauge borrow the glyphs'
+weight but to draw it without a stroke at all.
+
+### The glyphs were supposed to be the glyphs
+
+"I was trying to save space by not having words." They had been
+given labels beside them, which spent exactly the width the glyph
+was there to save. The word survives as the tooltip and the
+accessible name.
+
+### And the demo was harder than the copier
+
+It rendered at 150dpi where his copier does 200, and failed two of
+its own eight pages -- the box comes out too small for a two-pixel
+rule to read as a rule. A harness harsher than the thing it stands
+in for teaches the wrong lesson as surely as one that is softer.
+At 200 it reads all eight.
