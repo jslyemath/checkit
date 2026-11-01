@@ -15655,3 +15655,156 @@ its own eight pages -- the box comes out too small for a two-pixel
 rule to read as a rule. A harness harsher than the thing it stands
 in for teaches the wrong lesson as surely as one that is softer.
 At 200 it reads all eight.
+
+---
+
+## The crop was off because the page was placed off (2026-11-01)
+
+He reported one thing: "your cut point is too far right for N3 from
+the latest scans, so something is off about the chosen area for
+front sides". Chasing it found the cause of a second complaint in
+the same message -- names cut off on the right and the bottom -- and
+they turned out to be one fault with two faces.
+
+### Measuring before changing anything
+
+The grading box sits in the **outer** bottom corner, so it is
+bottom-right on an odd page and bottom-left on an even one. In his
+stack N3 was all odd and N4 all even, and the box's place inside its
+own crop split cleanly by skill: N3 at 0.223..0.358 across, N4 at
+0.360..0.498, no overlap. The view was showing a fixed 34% window of
+that crop, so one skill was always off-centre.
+
+The question was whether the recorded mark was wrong or the
+placement was. Cutting the same crop out of the printed `main.pdf`,
+with the identity transform in place of `placement`, settled it:
+every page of both parities put the box at 0.362, 0.500, identical
+to the pixel. The mark and the crop geometry were right. The scan
+was being placed wrong.
+
+### A hundred-pixel ruler measuring two thousand pixels
+
+`placement` estimates scale and turn from the footer QR's own
+diagonal -- 9mm, about 100 pixels at 200dpi -- and then applies them
+across the page. The residual said exactly that: the box landed
+19 pixels nearer the code than it should, on **both** parities, and
+the implied scale correction was 0.985 on both skills with a
+standard deviation of 0.007. One number explained the lot. The scan
+is 1.5% smaller than the code's diagonal claims, and every error in
+reading four corners of a small symbol is multiplied by the reach.
+
+The name mark is 1970 pixels from the code, so the same 1.5% moved
+it about 29 pixels -- a third of the height of its crop. That is the
+clipped names.
+
+### The box as the second fiducial
+
+The box can be *found*, by matching its printed outline, so it can
+serve as a reference point 1300 pixels out instead of 100. A
+similarity has four degrees of freedom; the code's centre fixes the
+two of translation, and one point elsewhere on the page carries
+exactly the remaining two. So the box pins both the scale and the
+turn.
+
+`Anchor` gained `box_at`: where the box sits in its own crop on the
+printed page, measured by `anchors`, which already opens that PDF
+and renders a page of each parity. A fraction of the crop rather
+than a place on the page, because the crop is cut around the mark
+and the box's place inside the mark is a property of `\roundbox` --
+both parities of the real run and both of the demo measure 0.362,
+0.500.
+
+First attempt corrected the scale only, and it halved the error:
+across went from 0.223..0.498 to 0.360..0.364 and **down did not
+move at all**. Which is right, and worth having got wrong: the box
+is nearly due sideways from the code, so a radial scale correction
+has almost no vertical component. The 14 pixels of vertical error
+were the *turn* -- 14 over a 1336-pixel reach is 0.6 of a degree,
+which is about what a 100-pixel baseline buys you. Solving for both
+took the whole stack to 0.360..0.364 across and 0.494..0.506 down:
+mean distance from the printed truth 0.0011 against 0.0885.
+
+**The order in `_cuts` is the load-bearing part.** The box crop is
+cut first, on the code's own estimate, because it is what the
+reading measures; a correction derived from a box has no business
+moving the picture that box was found in. The calls came out
+identical -- 6 beside, 32 empty, 24 ticked -- as they must.
+
+What is left: the box pins the scale across the page and says
+nothing about the scale down it, and a copier does not always reduce
+both ways equally. About 10 pixels of vertical drift survives.
+Nothing clips, so it stands.
+
+### Framing a name by how long it is
+
+The other half, and the bigger one. `NAME_PAD` was a multiple of the
+mark's **width**, and so was the output scale. Across the real
+roster the name mark runs 23pt to 147pt wide -- six to one -- while
+its height barely moves. So a short name got an inch of paper either
+side and a long one got none, and because the output was scaled the
+same way the short one was *set larger*. Looked at on the demo
+course, "Bo Peep" had huge margins in large type and "Dara Okafor"
+was clipped at the right in small type, from the same two numbers.
+
+What overruns a crop is a letter, and a letter is the same size
+whatever the name. `Cut(pad, unit, per_unit)` lets each mark say
+which of its own measurements frames it: width for the box, height
+for the name. Right-edge and top-edge clipping both went to zero
+across the 62 papers; the left margin always holds part of the
+printed `Name:` label, deliberately, because a margin tight enough
+to drop the colon is tight enough to drop a letter.
+
+### Two pictures, not one windowed
+
+The row's crop had been the wide one shown through `object-fit:
+cover` at `object-position: 34%`. Two things wrong. The percentage
+was a constant where the box's position is measured and moves. And
+`cover` can only crop a picture, never enlarge it, so narrowing the
+window -- which he asked for -- shrank the box rather than filling
+the row with it. The server now sends a second picture cut round the
+box it found: 109x109 against the wide crop's 247x177, 13k across
+seven rows, and the popover still has the wide one.
+
+### Smaller things in the same pass
+
+* the dial's ring is drawn from the **rounded** tenth, so a reading
+  of 0.96 no longer writes "10" beside a ring with a sliver missing
+* `n/a` inside the ring rather than a dash: a dash reads as a
+  reading of nothing, and nothing was read
+* the digit was sitting high. At `line-height: 1` the text box runs
+  ascender to descender while a digit occupies cap-height to
+  baseline, which sits above the box's middle; nudged 0.055em. He
+  saw it before I did
+* the 6-7 band was grey, which read as "no answer" and broke the
+  ramp in half. `--midway` is the hue halfway between `--warn` and
+  `--accent` -- 55 and 165 give 110 -- at a lightness and chroma in
+  step with both. The palette is already OKLCH, so this is a
+  midpoint and not a guess; the same midpoint mixed in sRGB is the
+  muddy olive everyone ends up nudging by hand
+* a dashed drop target with a `+` in place of "Choose files...",
+  and the button says "Import scans"
+* the words "no paper came back" are gone from the row: the `n/a`
+  dial and the lit chair glyph already say it
+
+### A measurement that was too sensitive to mean anything
+
+Worth recording because it wasted a pass. Clipping was measured as
+"dark pixels in a 3-pixel band along each edge, above 1%". A 3x84
+band is 252 pixels, so 1% is three of them, and three dark pixels on
+a photocopy is noise. It reported 92% of names clipped on the left
+while the crops, looked at, were clean -- and it barely responded to
+changing the padding, which should have been the tell. At 6%, about
+one letter stroke, the numbers became informative.
+
+### And a masking failure
+
+Checking the real crops meant looking at real names, so they were
+rendered with the name's own typeset box filled in solid. The mask
+was misaligned and several names were partly visible in the
+resulting image. Deleted, and the approach abandoned: the rest of
+the checking is numeric -- first dark column, edge ink fractions --
+which answers the same questions and cannot leak. This is the third
+time masking has failed in this codebase by being approximately
+right; the lesson is that a mask computed from the same arithmetic
+the crop uses shares its bugs, and the safe move is not to render
+the picture at all.
