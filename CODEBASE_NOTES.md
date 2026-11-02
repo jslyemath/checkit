@@ -16105,10 +16105,46 @@ declarations, only the five `xtick` lines -- all three caught.
   being replaced, so `install --force` lost no edits. The 2,044-line
   "difference" the first diff reported was CRLF.
 
-**Still loose, not fixed here.** The bank carries three copies of
-`printitfigures.sty`: `printit/` (the one `bank.xml` declares, and the
-one that matters), `assets/`, and `docs/assets/`. The last two differ
-from the live one only by `Colours` / `Colors` in a comment, and are
-stale leftovers. They are not read by anything -- `tikz_preamble.tex`
-loads the declared copy -- but three copies of a file is how the next
-one of these starts.
+**A wrong guess about the other two copies, corrected the same day.**
+The bank holds three `printitfigures.sty`: `printit/`, `assets/`, and
+`docs/assets/`. The paragraph that first stood here called the last two
+"stale leftovers ... not read by anything" and said they should go. Both
+halves of that were wrong, and the correction is the useful part.
+
+They are **build output**, written by `Bank.copy_latex_support()` in
+`dashboard/checkit/bank.py`. Every `generate` copies each file declared
+in `<latex-support>` from the bank root into `assets/`, then sweeps any
+other `.sty` out of that directory -- the sweep is by directory rather
+than by name, precisely so a file the declaration has stopped naming
+gets cleaned up. `build_viewer` then publishes `assets/` as
+`docs/assets/`. The bank's own `.gitignore` says so in as many words:
+
+    # Copied from the bank root at build time, and published via docs/.
+    assets/*.sty
+
+Two signals were there to be read and were not. `assets/` is untracked
+and `docs/assets/` is tracked -- which is what a build directory and a
+published site look like, not what two stale source copies look like.
+Deleting either would have achieved nothing: the next `generate` writes
+them both again.
+
+They are also read. The viewer's Assessment tab exports LaTeX, and the
+declared `.sty` files are published so that export can be compiled.
+`tikz_preamble.tex` loading the declared copy says nothing about who
+else does.
+
+Nor are they out of date in the way "stale" implies. The published pair
+predates the QR work entirely: `docs/assets/printit.sty` has no
+`\usepackage{qrcode}` and no `\setrunid`, so the published
+`printitfigures.sty` still saying `\xa` is consistent with the theme
+beside it. Compiled to check, rather than reasoned about: the published
+pair draws both axis styles with 0 errors.
+
+**What is actually worth watching**, and the reason this is recorded at
+all: the next `generate` and deploy updates both published files at
+once, and they have to travel together. A deploy carrying the new
+`printit.sty` -- which loads `qrcode` -- beside the old
+`printitfigures.sty` -- which assigns to `\xa` -- is the exact
+combination that produced no PDF today. Nothing in the pipeline pairs
+them explicitly; they are two entries in one list, and that is the whole
+of the guarantee.
