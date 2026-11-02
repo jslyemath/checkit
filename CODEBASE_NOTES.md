@@ -16001,3 +16001,114 @@ rest:
 `Reading page 61 of 148` next to that bar was the bar said twice.
 The rule in CLAUDE.md now says so explicitly, with this line quoted
 as the thing being banned.
+
+
+## A package took a name, and a print job produced nothing (2026-11-02)
+
+A print run of F1, F3 and F3-E failed with no PDF at all. The log said
+
+    ! Package tikz Error: tikz math library:
+      Unknown function or keyword '='.
+    l.9     \setmyx{0}{0}
+    !  ==> Fatal error occurred, no output PDF file produced!
+
+pointing at line 9 of an F3 exercise -- a line that has been there
+unchanged for months, and is a perfectly ordinary call: `\setmyx` is
+`[3][1]`, so two braces is the right number of arguments.
+
+**What was actually wrong.** `qrcode.sty`, line 56:
+
+    \let\xa=\expandafter
+
+The package takes the bare, unnamespaced `\xa` as its own shorthand,
+globally, and never gives it back. `printitfigures.sty` had been using
+`\xa` as a tikzmath variable since long before -- the left end of a
+number line, set by `\setmyx`.
+
+The two cannot share it. The tikz math library decides whether a token
+may be assigned to by looking at its `\meaning` and accepting only
+`undefined` or `macro:->...` (`tikzlibrarymath.code.tex`, lines 22-40).
+`\expandafter` is a primitive, so it is neither, and the `=` that
+follows is then read as a keyword nobody has heard of.
+
+`qrcode` arrived with the footer code, which is this fortnight's work.
+Nothing about the figures changed; a package loaded three hundred lines
+away took the name out from under them.
+
+**How it was found.** By bisection, not by reading. A probe loaded
+`printitfigures` and then each of the eleven packages `printit.sty`
+loads after it, assigning to a tikzmath variable in between and printing
+a marker. The last marker before the error named `qrcode`, and
+`\let\xa=\expandafter` was then one grep away.
+
+Worth saying what the first guesses were, because all three were wrong
+and all three were plausible: a stale copy of the theme somewhere (there
+are four copies of `printitfigures.sty` in the bank -- all were current);
+`physunits`, which defines a great many short names (it defines none of
+these); and a `\setmyx` call with the wrong number of arguments (it has
+the right number).
+
+**What was ruled out as a fix.** Lending `\xa` back to `qrcode` inside a
+group, so both could keep the name, looked clean and passed a probe that
+drew a QR code. It fails on a real document: `qrcode` caches each
+computed code in the `.aux` file and expands its own macros again when
+that file is read, which happens outside any group the theme controls.
+The second run of the real job then died in a new place -- reading a
+bitstring out of the aux -- which is further from the cause than where it
+started.
+
+So the name goes to `qrcode`, and `printitfigures` renames its variable
+to `\xfirst`. Only `\xa` was taken; `\xz` and the ten others keep their
+names, which is why the pair now reads `\xfirst .. \xz`. The
+asymmetry is deliberate and the reason is written at the declaration.
+
+**A second mistake on the way, worth keeping.** The first attempt put
+`\printit@xa@math` into `printit.sty` near the `qrcode` load. That file
+turns `@` on and off by hand and the last `\makeatother` is nearly two
+hundred lines above, so the name parsed as `\printit` followed by the
+text `@xa@math`. It reported itself as `Missing \begin{document}` and
+left `qrcode` without its shorthand -- a different crash, further from
+the cause. In a `.sty` loaded by `\usepackage`, `@` is a letter; in the
+middle of a file that toggles it, it is whatever the last toggle said.
+
+**Why no test caught it.** There *is* a compile test --
+`TestTheOutputCompiles::test_it_builds_somewhere_else_entirely` -- and it
+was green the whole time. Its two students' pages carry no picture, and
+the break was in the figures package. The fixture did not contain the
+feature.
+
+`test_a_document_with_a_figure_in_it_compiles` now draws two: a plain
+`\draw` after `\setmyx` (the F3 case, which sets a range and then does
+not use it -- the exercise the real job died on) and a pgfplots axis
+using `printed axis style`, which is what reads the renamed variable.
+Both halves have to be in the one document: a figure, and the footer code
+that loads `qrcode`. Either alone compiles fine.
+
+Mutation-tested three ways -- the whole rename undone, only the
+declarations, only the five `xtick` lines -- all three caught.
+
+**What was verified rather than assumed.**
+
+* The real job recompiled: 0 errors in the log, 184 pages, 44 students,
+  141 sheets. The page index reconciles exactly -- 1 run line + 141
+  sheets + 423 marks = 565 lines.
+* A PDF existing is not a clean compile, so the error count was read
+  from the log, not inferred from the file appearing.
+* Compiling is not drawing, so page 2 was rendered and looked at: the
+  number line is there, arrowheads and all.
+* The five pgfplots axis styles are read by no figure in the bank, so
+  the real job did not exercise the `xtick` half of the rename at all.
+  A separate probe drew one of each.
+* `qrcode` takes no other unnamespaced name we use. Its other globals
+  are `@`-names, counters, and `\F@...`.
+* The bank's installed theme was byte-identical to the source before
+  being replaced, so `install --force` lost no edits. The 2,044-line
+  "difference" the first diff reported was CRLF.
+
+**Still loose, not fixed here.** The bank carries three copies of
+`printitfigures.sty`: `printit/` (the one `bank.xml` declares, and the
+one that matters), `assets/`, and `docs/assets/`. The last two differ
+from the live one only by `Colours` / `Colors` in a comment, and are
+stale leftovers. They are not read by anything -- `tikz_preamble.tex`
+loads the declared copy -- but three copies of a file is how the next
+one of these starts.
