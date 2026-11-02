@@ -16148,3 +16148,106 @@ once, and they have to travel together. A deploy carrying the new
 combination that produced no PDF today. Nothing in the pipeline pairs
 them explicitly; they are two entries in one list, and that is the whole
 of the guarantee.
+
+
+## The heading wandered because a deleted top bar did not (2026-11-02)
+
+His report: widen the window from narrow to wide and the page heading
+starts too far indented, not lining up with the content under it, and
+on the way to lining up it "jumps left right up and down". The content
+itself shifts around too.
+
+Measured rather than guessed, in the browser, sweeping the viewport and
+reading the left edge of the heading's text against the left edge of
+the first block beneath it:
+
+| width | rail | main pad | heading | content | off by |
+|---|---|---|---|---|---|
+| 700 | 56 | 16px | 84 | 72 | **12** |
+| 800 | 56 | 12px | 80 | 68 | **12** |
+| 830 | 56 | 16px | 72 | 72 | 0 |
+| 1300 | 188 | 16px | 204 | 204 | 0 |
+
+Three separate faults, all in the same direction.
+
+**A media query for a top bar that no longer exists.** The app had a
+banner with an `<h1>`, a `<nav>` of destinations, and two spellings of
+each label picked by `.wide-only` / `.narrow-only`. It became the rail.
+The media query stayed:
+
+    @media (max-width: 820px) {
+      .wide-only { display: none; }
+      .narrow-only { display: inline; }
+      header { padding: 7px 12px; gap: 10px; row-gap: 6px; }
+      h1 { font-size: 14px; }
+      nav { gap: 2px; }
+      nav button { padding: 3px 8px; font-size: 13px; }
+      main { padding: 10px 12px 40px; }
+      h2 { font-size: 16px; margin-bottom: 8px; }
+    }
+
+Six of those eight selectors match nothing now -- there is no `<h1>`,
+no `.wide-only`, no `.narrow-only`. Two of them are tag names, and the
+markup grew new elements with those tags:
+
+* **`header`** -- every page heading is a `<header class="pagehead">`,
+  nine of them. Below 820px each took on `padding: 7px 12px` that the
+  content beneath it did not have: 12px right, 7px down. The same rule
+  replaced the pagehead's `gap: var(--s3)` with `6px 10px`, moving
+  whatever sits beside the heading, and changed the row gap so a
+  wrapped pagehead jumped vertically as well.
+* **`nav`** -- `buildNav()` builds the rail's destination list and its
+  footer as `<nav>` elements, so below 820px the rail's buttons changed
+  padding and font size. The rail already has a threshold of its own at
+  900px. These were two thresholds 80px apart restyling the same
+  buttons.
+
+The `h2` rule in there was dead for a different reason: page headings
+carry `.pagename`, and a class beats a tag, so the 16px never applied.
+
+**Three paddings on `main` across two overlapping breakpoints.** 16px
+by default, 12px below 820, and 16px again below 720 -- the last added
+much later and three hundred lines further down the file, so it won
+wherever both matched. Narrowing the window moved the content right,
+then left again. Non-monotonic, which is why it read as random.
+
+**Two headings were not page headings.** Progress and the "Not built
+yet" placeholder used a bare `<h2>`, so they drew at the stylesheet's
+18px while the other six drew at `--t-xl`, 20px. Nothing said so,
+because two tabs are never on screen at once.
+
+**The fix is one token.** `--gutter` is the distance from the rail to
+everything in a view, at every width. `main` uses it, nothing overrides
+it, and the only thing that changes with window width is the rail,
+which has one threshold and makes a visible, deliberate move. The
+vestigial media query is deleted rather than re-scoped: re-scoping it
+to `body > header` would keep a rule for an element that does not
+exist.
+
+Afterwards, all seven views at seven widths from 700 to 1300: heading
+text and content left edge identical, heading top constant at 20px,
+gutter constant at 16px.
+
+**What was nearly recorded wrong.** The editable title on the Print and
+Runs tabs looked like a fourth fault -- `.pagetitle` is an `<input>`
+with `padding: 4px 8px` and a 1px border, which should push its text
+9px right of everything else. It does not: there is already a
+`margin-left: calc(var(--s2) * -1)` pulling it back. It was out by one
+pixel, because the pull counted the padding and not the border, and
+that is now `calc((var(--s2) + 1px) * -1)`.
+
+**The test that was written, failed, and rewritten.** The guard checks
+that no media query styles by tag name. The first version read only
+`index.html` for which tags exist, and matched only selectors that are
+a single bare tag. Mutation testing put `nav button { font-size: 13px }`
+back and the guard **missed it** -- twice over: `nav button` is two
+components, and `<nav` appears nowhere in the markup because the rail
+builds it. So the guard would not have caught half of the bug it was
+written for. It now takes tag names from `index.html` and from
+`createElement("...")` in `app.js`, and flags any selector whose
+leftmost compound is one of them. `.pagehead h2` stays legal, because a
+class-scoped selector can only reach markup that asked for it.
+
+Five mutations, all caught: the `header` rule back, a `nav` rule back,
+a second `main` padding at a breakpoint, `main` off the gutter, and a
+page heading without its class.
