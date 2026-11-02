@@ -15953,3 +15953,51 @@ listed twice, `clear()` not refusing mid-read, and `status()` not
 counting. Then the real two-PDF read above, which is what actually
 proved the missing count. 1156 printit tests, 152 checkit, audit and
 docs clean.
+
+
+### Two corrections, the same afternoon
+
+Both were the instructor's, and both were right.
+
+**A button went straight back where a button had just been removed.**
+The redesign above existed to make the drop area the only control
+there, and Start over was then put beside it -- the second time in
+one day, after Import. His words: "we just went through this redesign
+to get rid of the button next to the drop zone, and you just added a
+new button". The pair that commits or undoes already has a home: the
+save bar at the bottom of every editable tab.
+
+So Start over moved into `#scans-bar`. That needed one change to the
+shared helper, because the bar has only ever had one reason to be on
+screen:
+
+    function saveBar(view, dirty, what, shown = dirty) {
+      bar.hidden = !shown;
+      bar.querySelector(".dirty").textContent = dirty ? what : "";
+
+`shown` splits "there is a reason for this bar" from "there is
+unsaved work". Scans passes a reason of its own -- a pile has been
+read -- and the four other callers are untouched, because the default
+is the old behaviour. Keeping them apart matters for one visible
+thing: the rail's unsaved dot follows `dirty`, so a stack read and
+not yet decided on raises the bar without claiming to be unsaved
+work. Save is hidden rather than disabled in that state, which is the
+rule the bar was built on.
+
+`test_the_drop_area_has_no_button_beside_it` now guards the slot,
+and was watched to fail by putting an Import button back.
+
+**The strip was eleven words for two numbers.** "148 pages read from
+3 files -- drop more to add them" breaks the rule written down two
+days earlier, which had been read as being about paragraphs. It is
+not. The instruction half is already given by the control -- the `+`
+and the drop target both say more can go on -- and the numbers do the
+rest:
+
+    reading   61 / 148          (beside a bar that is 41% full)
+    read      13 pages / 2 files
+    idle      Drop the copier's PDFs here
+
+`Reading page 61 of 148` next to that bar was the bar said twice.
+The rule in CLAUDE.md now says so explicitly, with this line quoted
+as the thing being banned.
