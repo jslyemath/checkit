@@ -15808,3 +15808,148 @@ time masking has failed in this codebase by being approximately
 right; the lesson is that a mask computed from the same arithmetic
 the crop uses shares its bugs, and the safe move is not to render
 the picture at all.
+
+
+## A second stack joins the first, and the box reads itself (2026-11-02)
+
+Two changes to printit's Scans tab, from one question the instructor
+asked about the drop area: *if PDFs are added one at a time, will the
+final result read as if they were all added in the same go?*
+
+The answer was no, and nobody had checked.
+
+### What was wrong
+
+`Scanning.start` set `self.result = None` and then replaced it with
+the batch from the files just read. `scanChose` in the browser did
+the same thing with the chosen list: `scanChosen = all.filter(...)`,
+not an append. So a second read discarded the first, in both places
+independently.
+
+That is not a cosmetic loss. Everything the tab is *for* is derived
+from the pile: `Batch.runs`, `Batch.duplicates`, and above all
+`Batch.missing`, which is the one question nobody asks until it is
+too late. Reading one tray of a three-tray run and being told which
+papers never came back produces a list of students who are about to
+be chased for work they handed in. The copier mails a tray at a time,
+so this is the ordinary case, not an edge one.
+
+Measured on the demo course's two PDFs, which hold one run between
+them:
+
+      copier-1 alone            4 papers missing
+      copier-1 then copier-2    1 missing
+      both in one go            1 missing
+
+The first number is the bug. The second and third agreeing is the
+fix.
+
+### How it was fixed
+
+`Scanning` keeps `self.sheets` across reads and rebuilds the batch
+from the whole pile. This costs nothing, because `Batch` is a list of
+sheets and three properties computed from it -- runs, duplicates and
+missing all come out right for the joined pile with no extra code.
+The join is `_joined(kept, fresh, paths)`, and the one judgement in
+it is that pages from a file being read *again* replace that file's
+old pages rather than adding a second copy:
+
+    again = {os.path.realpath(p) for p in paths}
+    older = [s for s in kept if os.path.realpath(s.source) not in again]
+    return older + list(fresh)
+
+Dropping the same stack twice is a slip. The duplicates table is for
+paper that really did go through the feeder twice, and burying that
+signal under self-inflicted pairs would make the one duplicate in the
+demo data indistinguishable from noise. Compared on the real path
+rather than the base name: same-named files in different folders are
+different stacks, even though in practice both land in the course's
+own `scans/`.
+
+`clear()` and `/api/scan/clear` are the way out, because an
+accumulating read with no reset can only be escaped by restarting the
+server. `clear()` refuses while a read is running -- otherwise the
+thread finishes and joins its sheets onto the list that was just
+emptied, leaving one tray on screen with a missing list built as
+though the others had never been read.
+
+`status()` now carries `files` and `pages`, so the strip counts from
+the pile rather than from what was last dropped.
+
+### The drop area, and the button that was removed
+
+The instructor's words were that the Import scans button "looks
+clunky and unbalanced with the drop box", and that it "will break the
+flow of the page once we build what comes after it". Both true, and
+the button was the symptom rather than the fault: it asked for a
+second decision after the only real decision had been made. Nothing
+reaches the record until Save, so there was nothing for that second
+click to protect.
+
+So there is one control in three states, which are classes on one
+element:
+
+* idle -- the dashed rectangle, full height;
+* `.reading` -- folded to a one-line strip, which *is* the progress
+  bar; the fill is the element's own `::before`, not a second widget
+  underneath it;
+* `.read` -- the same strip, the bar drained of colour, saying how
+  much is in the pile and that more can go on it.
+
+The `+` is the circle from the seating app's corner button -- a
+filled accent disc that grows under the pointer -- borrowed as a
+shape rather than as code, because seating's `--isle-*` palette is
+local to that view. It takes `--accent` / `--accent-ink` here, which
+in dark mode happen to resolve to the same values seating hard-codes.
+
+### A real bug found by looking: the bar did not move
+
+The fill is `width: calc(var(--read) * 100%)`. Setting `--read` from
+0.41 to 1 left the bar at 41% until a class changed, and a later
+sample caught it at 287px where 358 was wanted.
+
+An unregistered custom property is a text substitution. The browser
+does not know it holds a number, cannot interpolate it, and a
+`width` that reads it through `calc()` inside a running transition
+updates unreliably. Registering it fixes it properly:
+
+    @property --read {
+      syntax: "<number>";
+      inherits: true;
+      initial-value: 0;
+    }
+
+Then `--read` itself is what transitions, and the width follows for
+free because it is recomputed from the animating value every frame.
+Verified by sampling: `--read` ramps 0.091 to 0.41 while the bar goes
+36px to 163px.
+
+Worth recording separately: the *first* readings of this were wrong
+in a way that nearly sent the fix down the wrong path.
+`getComputedStyle(el, "::before")` returns a stale snapshot within a
+script turn, so the bar appeared frozen at 0px when it was in fact
+painting correctly. Two of the three "failures" in the first trace
+were the measurement, not the page. What settled it was sampling
+across animation frames and reading `--read` on the element itself,
+where the value is real -- the same lesson as the crop investigation
+a day earlier: check whether the instrument is the thing that is
+broken.
+
+The transition list is held in `--fold` and restated by reference
+under `.reading`, because `transition` is one property and a state
+that wants one more entry has to repeat the whole list.
+
+One layout fault found the same way: `flex-basis: 100%` on the slim
+strip made the Start over button wrap onto its own line, which is the
+orphan the whole layout exists to remove. `flex: 1 1 0` takes the
+rest of the row instead.
+
+### Checked
+
+Eight new tests in `TestASecondStackJoinsTheFirst`, every one watched
+to fail: the pile replaced instead of joined (2 fail), a re-read
+doubling its pages, the new pages going in front of the old, a file
+listed twice, `clear()` not refusing mid-read, and `status()` not
+counting. Then the real two-PDF read above, which is what actually
+proved the missing count. 1156 printit tests, 152 checkit, audit and
+docs clean.
