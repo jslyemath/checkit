@@ -3450,3 +3450,103 @@ and what he could react to instead:
   whole tab.
 * **The rail folds to icons below 900px**, so at a narrow window the
   labels are never seen.
+
+
+## 16. What the Scans tab shows after a read (2026-11-02)
+
+**Written down because it was lost.** This was agreed from three
+mockups over a couple of messages, built a day later from a one-line
+description of it, and came out wrong in four ways at once -- no
+glyphs, chips in the page header instead of on the job, a card that
+was not a card, and wordier than what it replaced. The design lived
+only in the conversation, and a conversation is not a place to keep a
+decision. It lives here now.
+
+**The rule this leaves behind: a mockup that is agreed gets written
+into this document before it is built.** Not into the commit, not into
+the notes -- here, where the next piece of work reads it.
+
+### The job header
+
+One card per print job the stack came from.
+
+    +---------------------------------------------------------------+
+    |  Skill Checkpoint   10/26                                      |
+    |                                                                |
+    |  62 matched   1 blank        [(x) 24 missing]  [(?) 2 unmatched]|
+    +---------------------------------------------------------------+
+
+* **A card**: panel background, hairline border, `--r-md`.
+* **Title** at `--t-lg`, then the date **`m/d`** in `--muted`. Not the
+  long spoken form -- that belongs on Update form, where it matches
+  the wording a student ticked.
+* **Settled facts, plain text, left**: `62 matched`, then `1 blank` in
+  `--muted`. Matched counts **papers, not sheets**: a double feed puts
+  one paper through twice.
+* **Work, as chips, right**: `--warn` on `--warn-soft`, filled rather
+  than outlined, because the outlined `.chip` is how the app says "a
+  small fact" and this is the opposite. Each carries the mark he would
+  make on the paper himself -- the struck-through sheet (`absent`) for
+  one that never came back, the `?` (`query`) for one that could not
+  be placed. **Absent at zero**, never "0 missing".
+* **No totals, no bar, no run badge.** The page total is on the drop
+  strip already; `matched + missing` is the job.
+
+`unmatched` is the three statuses marked `chase` -- no code, a code
+naming a job this course has not got, a page past the end of the job
+it names. **Not `foreign`**: a barcode from something else is a cover
+sheet, and chasing it is chasing the copier.
+
+Blank and unmatched belong to the *pile*, not to a job -- the pages
+carrying them name no job. With one job, which is the ordinary case
+and what the mockup shows, they go on its card. With several they
+would be a guess, so they get a card of their own.
+
+### The drop area
+
+Built, and still as agreed: one control, three states. Idle is a
+dashed rectangle with the seating app's filled accent `+` circle.
+Dropping reads straight away -- there is no second decision to
+confirm, and no button beside it, ever. While reading it folds to a
+one-line strip that **is its own progress bar**, filling left to right
+in `--accent-soft` as the pages are read, with `n / total` as the only
+words. When it finishes the fill goes grey over 700ms and the strip
+reads `13 pages . 2 files`.
+
+### Still to build
+
+**One matched table.** Not sure/unsure/rest -- one table of every
+matched paper, sortable.
+
+| column | note |
+|---|---|
+| Paper name | extra padding before Section |
+| Section | |
+| Skill | |
+| Confidence | a dial, before the paper mark |
+| Paper mark | the box crop |
+| Mark | last column |
+
+One row height, everything side by side. Sortable on all six; default
+**confidence, then section, then name**. Rows with nothing scanned sink
+to the bottom when sorting by confidence. The app's existing `GLYPH`
+marks, with the **background** coloured, never the glyph alone.
+
+The sort machinery is the roster's and must be **lifted, not copied**
+-- `sorts`, `SORT_DEPTH`, `DEFAULT_SORT`, `cycleOf`, `columnOwning`,
+`rankOf`, `sortBy`, `clearSort`, `sortRoster`, `renderHeader` are
+welded to the `COLUMNS` global and to `renderRoster()`. All the name
+options come too, last/first swap included.
+
+Its student dropdown guesses from the box slug and the name crop, but
+**not exclusively**: guesses at the top, then every other name in
+roster order, by surname within section.
+
+**One unplaceable table.** Preview | File | Page | Description |
+Match. The action is **"Match to..."**, not "Assign to". Pick the
+skill first, then the student -- from anyone in that job who took that
+skill, read from the `printed` table, because not everyone takes the
+same skills in a run.
+
+**Then** the duplicates section goes: it still reads in the old voice,
+a five-word heading over a three-line muted paragraph.
