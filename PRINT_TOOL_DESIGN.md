@@ -3661,8 +3661,45 @@ matched table already says as two crops in one row.
 
 #### Still open
 
-* **Saving.** Nothing on this tab writes. The save bar counts the
-  decisions and the re-matches, and the Save itself is not built.
+* **Saving is built**, and this list said twice that it was not --
+  from a stale comment in the old review code, `"the saving is one
+  action at the end, and it is not built yet"`, which predates the
+  implementation and was repeated without being checked.
+
+  What it does: Save posts the decisions to `/api/scan/save`, which
+  matches each one against `SCANNING.result` -- the server's own copy
+  of the read, never the page's -- and calls
+  `record.save_attempts()`. That writes one attempt row per paper
+  into the course's `record.db` and marks the run graded. The
+  Progress tab has no storage of its own; `api_progress` reads
+  `record.progress()` out of the same file, so saving a stack is what
+  puts marks on that grid.
+
+  The one real limit: `SCANNING.result` lives in memory for the life
+  of the process, so a restart between reading and saving loses the
+  stack. The handler says so rather than taking the page's word for
+  whose paper was whose.
+
+* **A re-match or a hand match does not reach the record.** Found by
+  asking what Save actually writes, and it is a real fault in the work
+  above rather than something left for later.
+
+  The browser sends `{id, outcome}` and nothing else. The server
+  builds its rows from `SCANNING.result`, taking `sid` from its own
+  copy of the read -- so a paper re-matched on screen **saves against
+  the student the code originally named**. A hand-matched page is
+  worse: its id is `hand-<file>-<at>`, which matches no row in the
+  server's review list, so it is skipped and nothing is written at
+  all. In both cases `saveScans` then sets `row.saved`, so the page
+  reports success.
+
+  The server is right not to take the page's word for whose paper is
+  whose -- that rule is why a restart refuses rather than guesses.
+  The fix is to widen the contract rather than drop it: send `sid`
+  and `skill` with the decision, and have the server accept them only
+  when the `printed` table says that student was handed that skill in
+  that run. That is the same test `rematchPool` applies in the
+  browser, enforced where it counts.
 * **A clash is warned about and not prevented.** Two papers may still
   be saved against one student and one skill if he ignores the flag.
   Whether the Save should refuse that is undecided.
