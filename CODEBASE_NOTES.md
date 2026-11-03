@@ -16468,3 +16468,112 @@ it does not cover the wiring, and the wiring is where this went wrong.
 save bar counts decisions and re-matches; Save is next. And a clash is
 warned about rather than prevented -- whether Save should refuse one
 is his call.
+
+
+## The id grid is found, not predicted (2026-11-03)
+
+He printed the four-page blank-name run, wrote four student ids into
+the grids by hand and scanned them back. The point of the run was to
+find out whether the nine cells could be cut out reliably before
+choosing anything to read them with. They could not, and the reason
+is worth writing down because every piece of it reported success.
+
+**All four pages placed, and the crops looked right.** The footer code
+read on every page, the run and page resolved, and the `id` crop came
+back with nine digits in it on all four. Looked at in a chat window,
+that is a working feature.
+
+**The cells were a quarter of a cell out.** The first thing that
+looked wrong was the last digit clipped at the right edge of a
+zero-padded crop. Measuring the printed rules against the predicted
+cell positions gave a uniform 25-pixel offset, with the *spacing*
+exactly right -- so a translation, not a scale error.
+
+**Where the millimetre comes from.** Rendering the original PDF at the
+same 200dpi and measuring the same way put the recorded rectangle on
+the ink to within 1.2 pixels, mean, across all ten rules. So
+`\cipmark` is right and the cell arithmetic is right; it is the
+scan's own transform that is off by about 1.15mm at the header. That
+transform is fitted from the footer code and its scale pinned by the
+footer's grading box, and the header is nine inches from both, so a
+fraction of a degree down there is a millimetre up here.
+
+This is also why it had never shown up. A millimetre is nothing to a
+name crop, which is padded on four sides and only has to be legible --
+and the name crop is what every previous look at the header was
+looking at. A 4.4mm cell is a different matter: a quarter of a cell of
+drift, plus a digit that leans, and the neighbour's ink is in the
+picture. A digit read off the wrong cell is a wrong student with
+nothing on screen to say so.
+
+**The vertical rules are the wrong landmark, and they looked like the
+right one.** The obvious fix is to slide the nine-tooth comb along the
+column profile and take the best fit. It locked onto handwriting on
+two pages out of four and gave answers of -45 and -33 pixels against
+the +26 and +23 the other two found, while reporting a confident peak.
+The cause is that the rules print at 0.4pt in 30% black, which is
+paler than anybody's pen: a digit with a long downstroke outscores a
+real rule. Any landmark scored by darkness has this problem.
+
+**The horizontal rule is the right one.** The grid's top rule runs the
+full 40mm and nothing else in the header does -- no digit is 40mm
+wide and no letter is a straight line. Found as a row holding a long
+run of ink, it came back on all four pages at 897 to 902 pixels of a
+predicted 898, which is a position *and* a scale check rather than a
+scale assumption. The bottom rule is no good for the left edge: it is
+drawn 1.80pt low so it meets the blank name's underline, the two are
+collinear, and on two of the four pages its left half had faded out
+anyway.
+
+**Three grey levels, measured not guessed.** Paper came back at 250 to
+255, the rules at 205 to 235, pen below 150. The first threshold tried
+was 215 and found nothing at all; printing the row profile showed why
+in one line. 240 separates paper from print, which is all the test
+has to do, because the rule is being found by its shape and pen
+counting as print costs nothing.
+
+One more thing the profile settled: at 60 output pixels to the grid's
+height a 0.4pt rule is under two pixels and the scan had smeared it
+into the paper. At 120 it is three and survives. The crop is cut at
+120 for that reason.
+
+**What the mutations found.** Ten passing tests, and then: replacing
+the whole measurement with the prediction failed three of them, but
+taking the *first* long rule instead of the one nearest the prediction
+failed none -- the test for it drew the underline where the real one
+is, below the grid, where the topmost band is the right answer either
+way. It never exercised the choice. And dropping the rule's own width
+when stepping into the first cell failed nothing, being a 3px error in
+a 96px cell.
+
+So the nine boxes came out into `id_boxes`, where the correspondence
+with `\cipidgrid` -- a cell one rule in from the edge, one rule
+between each pair, 4.4 wide by 5.2 tall -- is asserted as numbers
+rather than inferred from a picture. Eight mutations are caught now,
+each one a plausible mistake rather than a nonsense edit.
+
+Looking that closely turned up a half-rule bias in `top`: `left` and
+the width come from where a run starts and stops, so they are the
+grid's outer edges, while the band's mean is the top rule's *centre*.
+The first version corrected it with arithmetic and no test could see
+1.5 pixels. Taking the band's first row instead says the same thing
+with no arithmetic and can be checked with a rule drawn thick, which
+is what a scan run dark produces.
+
+**Verified against the real thing, twice.** The prototype proved the
+idea on the scan; the shipped code was then run on the same four pages
+again, because the constants had moved into the module and the ratios
+were being derived from `Cut.pad` instead of written out twice, and
+either could have gone wrong in the copying. Nine cells on every page,
+one digit each, every digit whole.
+
+And a compiled blank-name run is in the suite now. Cells cut from it
+have to hold *no print at all*, because nobody wrote on them and a
+cell is cut inside the rules -- so a cut a few pixels out puts a rule
+in the picture. That is the only check that would notice `\cipidgrid`
+being changed underneath this code.
+
+**Not built: reading a digit.** Segmentation is arithmetic and now
+verified; recognition is a classifier, a new dependency and a new way
+to be confidently wrong. The 36 real digits exist to judge one
+against, which was the point of asking him to write them.
