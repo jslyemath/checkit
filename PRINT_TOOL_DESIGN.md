@@ -3539,14 +3539,22 @@ sortable. Taken from the mockup, left to right:
 | column | what is in it |
 |---|---|
 | Last name | `Lovelace, Ada`. Carries the roster's own last/first swap control |
-| Paper name | the name crop off the paper, in a box |
+| Paper name | **the cropped name image** off the paper |
 | Section | `820` |
 | Skill | `N3` |
-| Sure | the confidence dial: a ring with a number in it |
-| Paper box | the box crop |
-| Paper mark | the four marks, the current one filled |
+| Confidence | the dial: a ring with a number in it |
+| Paper mark | **the cropped box area** -- the photograph of his own tick |
+| Mark | the four marks, the current one filled |
 
 One row height, everything side by side.
+
+The last two are **Paper mark** then **Mark**: the picture of what is on
+the paper, then the decision. The mockup labelled them `Paper box` and
+`Paper mark`, which was the older naming.
+
+`Confidence`, not `Sure`. It is the longer word by about 30px beside a
+34px dial -- measured, not guessed -- and that is cheap on a table this
+wide. If it reads fat in place, `Sure` is a one-word revert.
 
 * **Sortable on every column**, with the header showing direction and
   **priority number**: the default is `Sure` descending (1), then
@@ -3557,8 +3565,14 @@ One row height, everything side by side.
 * **Paper mark** uses the app's existing `GLYPH` marks -- `pass`,
   `query`, `fail`, `absent` -- and colours the **background** of the
   chosen one, never the glyph alone.
-* The dial is green when sure, amber when not, grey when there is
-  nothing to be sure about.
+* **The dial already exists** -- `sureDial()` in `app.js`, `.suredial`
+  in the stylesheet, built for the old review grid and lifted as it
+  is. Out of ten, `Math.round(sure * 10)`, never a percent, because a
+  percent reads as a measurement and this is a judgement about a
+  judgement. The ring is a conic gradient drawn from the **rounded**
+  tenth so the ring and the number can never disagree. `>= 8` is
+  `--accent`, `>= 6` is `--midway`, below that `--warn`; a paper that
+  never came back gets `n/a` in `--dim` and no ring at all.
 
 The sort machinery is the roster's and must be **lifted, not copied**
 -- `sorts`, `SORT_DEPTH`, `DEFAULT_SORT`, `cycleOf`, `columnOwning`,
@@ -3585,15 +3599,39 @@ The action is **"Match to..."**, not "Assign to". A blank page gets
 student -- from anyone in that job who took that skill, read from the
 `printed` table, because not everyone takes the same skills in a run.
 
-#### Open, and worth asking before building
+#### Re-matching: proposed, not yet chosen
 
-* **The dial's number.** The mockup shows `10` and `6` in the ring and
-  `n/a` for a row with no paper. The reader's own figure is `sure`, a
-  fraction -- `0.893` on a real row. Out of ten, rounded? And where
-  does green stop and amber start?
-* **The Paper name cell.** The crop as an image, or something typed
-  into? The mockup draws it as a bordered box with the name in it,
-  which reads as a field.
-* **Where the student dropdown lives.** The mockup shows no control
-  for re-matching a paper to a different student; the guesses-first
-  dropdown has to hang off one of the two name columns.
+Never designed. Writing the options down so the choice is a choice.
+
+**What makes it hard.** Nothing can detect a bad match on its own.
+The reader does no OCR -- `nameCrop` is a picture and `name` comes
+out of the record -- so the only detector is the instructor's eye on
+the crop sitting beside the indexed name. That is why those two
+columns are adjacent, and it means the gesture has to be reachable
+from any row rather than offered only where something looks wrong.
+
+**It is also rare.** Nought to three rows in a run of ninety, and
+only after something has gone wrong upstream -- the run overwritten
+on 2026-10-27 is the case it exists for. A permanent control on every
+row is a lot of chrome for that.
+
+* **A -- the name cell is the control.** Hovering shows a hairline
+  box, which is what `.pagetitle` already does to say "this text is
+  editable"; clicking turns the cell into the picker. No new glyph
+  anywhere, and it reuses an idiom the app already has.
+* **B -- click the name, a button appears.** His suggestion. The
+  first click is harmless and reveals the affordance, the second
+  opens the picker, and a stray click on a ninety-row table cannot
+  re-match anything. The button would be `swapby`, which already
+  means two ways round in Seating.
+* **D -- a permanent `swapby` on every row**, dim until hovered.
+  Discoverable without being told, at the cost of ninety faint
+  glyphs down a column meant to be scanned.
+
+A mode -- "re-match..." above the table putting every name cell into
+an editable state -- was considered and dropped: a mode is a thing to
+get stuck in, and the save bar already owns commit and undo.
+
+**The picker is the same whichever opens it**: guesses from the box
+slug and the name crop at the top, then everyone else in roster
+order, by surname within section.
