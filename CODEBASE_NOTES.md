@@ -16577,3 +16577,118 @@ being changed underneath this code.
 verified; recognition is a classifier, a new dependency and a new way
 to be confidently wrong. The 36 real digits exist to judge one
 against, which was the point of asking him to write them.
+
+
+## The grid is read, and the margin is the wrong signal (2026-11-03)
+
+Reading the nine digits a student writes into the header of a
+blank-name paper. Built the same day the cells became reliable; see
+"The id grid is found, not predicted" above for that half.
+
+**The choice he made.** Three ways to turn a cell into a digit were put
+to him: train a small net once and commit the numbers, install
+onnxruntime and use an off-the-shelf model, or write shape rules by
+hand. He took the first. It costs a 372KB file in the repository that
+cannot be read by eye; it costs no new dependency at all, which was the
+point -- `pip install checkit-printit` is the whole installation and a
+15MB binary wheel is a thing that can fail to install.
+
+`tools/train_digits.py` is committed so the file is reproducible rather
+than something that turned up. It is deterministic: run twice, same
+0.9807 on MNIST's test set, same 372KB. MNIST is fetched on first run
+to a cache outside the repository.
+
+**The bar is much lower than "read nine digits".** Worth measuring
+before choosing anything, and it was. In MAT 106: 45 students, every id
+nine digits beginning `800`, so six digits carry any information at
+all; the closest pair differs in two places and only 8 of the 45 have a
+neighbour that close. A paper does not have to be read in the abstract,
+only told apart from those 45. Eight digits of nine is enough to land
+on one student.
+
+That is what decided the model. Effort went into *presenting* a cell --
+MNIST's own recipe, scaled to 20x20 and centred on the centre of mass
+in a 28x28 field -- rather than into the net, and one hidden layer then
+read all thirty-six real digits.
+
+**The margin is the wrong confidence signal, and it is the obvious
+one.** How far the winner leads the runner-up is how a classifier
+usually says it is unsure. Here it says nothing. Scoring each page
+against the pool with its own student removed left the lead at 9.21,
+9.00 and 9.21 on three pages of four -- as wide as with the answer
+present -- because the *least bad* remaining candidate still beats the
+next one easily. The lead measures how spread out the pool is.
+
+The winner's own score separates cleanly: -0.15 to -1.23 with the
+writer in the pool, -8.59 to -10.20 without. A factor of about three
+thousand with nothing in between. That is what `ACCEPT` tests, at -4.5,
+and a page that cannot clear it is left blank rather than given to
+whoever fits least badly.
+
+This one would not have been caught by reasoning. The measurement that
+caught it -- score each page against a pool with its own student taken
+out -- took ten minutes and is now a test, with a second test that
+fails if the fixture ever stops demonstrating why.
+
+**The floor, and what it is actually for.** Each digit's probability is
+floored at 1e-4. The first comment on it said this stops one hopeless
+cell making every candidate's score vanish, and the mutation run showed
+that is not the mechanism: a cell where every digit is equally hopeless
+costs every candidate the same and decides nothing.
+
+What it guards against is the recogniser being confidently *wrong*. A
+softmax has no bottom, so a smudge that scores the digit actually
+written at a billionth imposes -20.7 on the one candidate who is right
+-- more than being wrong in two other places costs anybody else, so one
+cell picks the student. The floor caps any single cell at -9.2. It does
+not rescue a pair of ids differing in that one position alone; nothing
+could, and the score threshold catches those.
+
+**Three mutation rounds, and the tests were worse than they looked.**
+Eight deliberate breakages of `digits.py`. The first round caught five.
+The three that survived were all tests that proved nothing:
+
+* the centring test used a symmetric blob, whose centre of mass *is*
+  the middle of its bounding box, so it could not tell the two apart;
+* the rule-sliver test drew the sliver at grey 200, which is above the
+  ink level, so trimming changed nothing -- and working that out showed
+  the trim does nothing on his scanner either, the real rules being
+  paler still. It stays as insurance against a darker machine, and the
+  comment now says that instead of implying it was needed;
+* the floor test used a uniformly hopeless cell, per the wrong
+  mechanism above.
+
+Five more against the wiring, and three of those survived too: the read
+id reaching the row, `byId` being set, and the grid not being read on a
+named run. All three had been checked by hand against the real scan and
+by nothing else -- which is precisely how a feature whose halves both
+work ships with wiring that does not, twice on this tab already. They
+have tests now. Thirteen mutations, thirteen caught.
+
+**Found on the way: two things that do not ship.** Declaring numpy
+meant building a wheel to check the data file was in it, and the wheel
+showed `gui/static/*` matching only the files directly in `static` --
+so both web fonts and the whole of `static/seating` had never shipped.
+An installed copy served the seating view with no stylesheet and no
+script. `**` fixes it. This is only ever findable by building the
+wheel: the repository has every file, so every check run against a
+working tree passes.
+
+numpy and Pillow were themselves undeclared, and `scans` has imported
+both inside its functions since it was written. They were present only
+because matplotlib, a long way down the chain from checkit-dashboard,
+pulls numpy in. An install without it would have got as far as the
+first scan.
+
+**Verified on the real thing at three levels**, because the joins are
+where this breaks: `read_pdfs` gives the right sid and score for all
+four pages; `_review_rows` turns that into a name, a section, a `byId`
+flag and a score; and `api_scan_save` takes the row's own student
+without treating the browser echoing it as a re-match -- which it would
+have refused, failing at the last step with every part working.
+
+**One stack.** Four pages, one scanner, two pens, thirty-six digits.
+At a true per-digit accuracy of 95% a clean sweep of thirty-six still
+happens one time in six, so this is encouragement, not proof. The
+thirty-six are kept as a fixture in `tests/data/real_digits.npz`,
+which is the one thing that will notice if a change makes it worse.
