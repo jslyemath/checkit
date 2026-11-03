@@ -16385,3 +16385,86 @@ after the drop area turning into a loading bar. It was built two days
 ago and I had been editing around it, so it was measured rather than
 claimed: at `41 / 89` the fill is 225px of a 490px strip -- 46% -- and
 the state flips to `.read` with `--read: 1` when the read finishes.
+
+
+## The Scans tab, finished (2026-11-03)
+
+Two tables now stand where a job header, three stacked lists, a
+duplicates table and a fold-away listing of the whole stack used to
+be. What is worth keeping is mostly the things that were wrong on the
+way, because none of them were visible from the code.
+
+**The sort machinery was lifted, not copied.** `makeSorter` came out
+of the Roster, where it was welded to the `COLUMNS` global and called
+`renderRoster()` by name from four places. The two controls that were
+hard-coded into `renderHeader` -- the reset button and the name-order
+switch -- became column properties, `resetHere` and `headExtra`, so
+the Roster declares them and Scans does not inherit them. Three tables
+share it now.
+
+The extraction script cut functions by brace matching, and the first
+version counted braces inside strings and `${...}` -- it swallowed a
+function and a half and left the file unparseable. It skips strings,
+template literals and comments now, and prints what each cut would
+take before taking it. That print-out is the reason the second attempt
+was trusted.
+
+**One row height took three tries to understand.** A cell's `height`
+is a floor for its content, not a setting, so a row of dashes came out
+6px shorter than a row holding a crop: an image sits on a text
+baseline and drags the descender space with it. Fixing the *line box*
+fixes both ends at once. The crops then grew to the row's height,
+which is what made the box marks readable -- "too hard to see without
+squinting" was a padding problem, not a size problem.
+
+**A flex line centres the margin box.** The re-match button sat 6px
+above the middle of its row, and nothing about the glyph or the cell
+explained it: `button.iconbtn` carries `margin-bottom: 12px`, right in
+the Roster's action column, and a 30px button with 12px under it
+centres nowhere near the middle of a 42px flex line.
+
+**Two of the four glyph faults were measurable and one was not.** The
+`?` mark centred its ink on 12.53 where `pass`, `fail` and `absent`
+all centre on 12 -- half a unit, and it read as dropped wherever it
+stood beside text. The `rematch` glyph had its second figure's head a
+unit inside its own shoulders, because the shoulder baseline is head
+centre + 6.6 on the first and was + 5.6 on the second. Both of those
+are arithmetic. That the whole figure then needed dropping 1.3 units
+to centre like its siblings was only visible by looking.
+
+**Two papers can claim one student for one skill.** Only a re-match or
+a hand match can cause it, and nothing warned. Every row in such a pair
+now wears a warning triangle at its left -- at the left because a
+different sort can throw the pair apart, and both ends have to carry
+it. Computed on every draw rather than stored, so it follows a row
+through any sort and clears itself when the clash goes. It was found
+by using the thing: re-matching one paper onto a student who already
+had one left two rows reading the same name, and nothing said so.
+
+**The thumbnail had to be cut where the page was.** `Sheet.cuts`
+exists because the full render is thrown away immediately -- a few
+hundred will not fit in memory -- so a preview could not be taken
+later. It is cut in `read_page`, at 150px, and only for the pages that
+failed; a thumbnail of every page would have walked back into the
+problem that comment was written about.
+
+**What the suite caught, and what it did not.** Removing the stack
+listing's markup left `getElementById("scan-sheets")` in the script,
+and `test_every_id_the_script_reaches_for_exists` failed on it -- the
+exact silent inertness it was written for. It also refused the chip
+glyph's `width: 18px` until it declared `--glyph-size: 18`, which is
+what keeps every stroke in the app at 1.5px.
+
+What it did not catch: `openRematch` was called and never written. The
+button armed and then threw, and it was reported as working because
+the arming half was the half that had been looked at. Nothing in the
+suite runs a line of this file beyond `node --check`, which parses and
+does not execute -- so a call to a function that does not exist is
+invisible from Python. The scan arithmetic is extracted into a pure
+block the tests do run under `node -e`, and that covers the counting;
+it does not cover the wiring, and the wiring is where this went wrong.
+
+**Deliberately not built.** Nothing on the tab writes anything. The
+save bar counts decisions and re-matches; Save is next. And a clash is
+warned about rather than prevented -- whether Save should refuse one
+is his call.

@@ -3599,39 +3599,70 @@ The action is **"Match to..."**, not "Assign to". A blank page gets
 student -- from anyone in that job who took that skill, read from the
 `printed` table, because not everyone takes the same skills in a run.
 
-#### Re-matching: proposed, not yet chosen
+#### Built, and what it came out as
 
-Never designed. Writing the options down so the choice is a choice.
+All of section 16 is built. What changed on the way, so the next
+reader is not working from the sketch:
 
-**What makes it hard.** Nothing can detect a bad match on its own.
-The reader does no OCR -- `nameCrop` is a picture and `name` comes
-out of the record -- so the only detector is the instructor's eye on
-the crop sitting beside the indexed name. That is why those two
-columns are adjacent, and it means the gesture has to be reachable
-from any row rather than offered only where something looks wrong.
+**The columns** are `Name`, `Paper name`, `Sec`, `Skill`, `Conf`,
+`Box`, `Mark`. `Name` rather than `Last name`, because the heading is
+rendered as `<note> <label>` and follows the name-order switch beside
+it -- `Last name` produced "last last name". `Sec` and `Conf` because
+`Section` and `Confidence` were wider than the things under them, and
+`Box` then `Mark` is the crop of his tick followed by the decision.
 
-**It is also rare.** Nought to three rows in a run of ninety, and
-only after something has gone wrong upstream -- the run overwritten
-on 2026-10-27 is the case it exists for. A permanent control on every
-row is a lot of chrome for that.
+**One row height**, 36px, set by the line box rather than by the
+content: a cell's `height` is only a floor, so a row of dashes came
+out shorter than a row holding a crop. The crops are the row's height
+too, which is also what made the marks readable without squinting.
 
-* **A -- the name cell is the control.** Hovering shows a hairline
-  box, which is what `.pagetitle` already does to say "this text is
-  editable"; clicking turns the cell into the picker. No new glyph
-  anywhere, and it reuses an idiom the app already has.
-* **B -- click the name, a button appears.** His suggestion. The
-  first click is harmless and reveals the affordance, the second
-  opens the picker, and a stray click on a ninety-row table cannot
-  re-match anything. The button would be `swapby`, which already
-  means two ways round in Seating.
-* **D -- a permanent `swapby` on every row**, dim until hovered.
-  Discoverable without being told, at the cost of ninety faint
-  glyphs down a column meant to be scanned.
+**The Mark column is a track** -- one pill with the verdict filled in
+place -- chosen over three squares and over a segmented box because
+the filled spot then sits somewhere different in each row, so the
+column's shape says the shape of the marking before any of it is
+read. Honest here only because the three marks are an order he reads
+in; it would be a lie for an unordered set.
 
-A mode -- "re-match..." above the table putting every name cell into
-an editable state -- was considered and dropped: a mode is a thing to
-get stuck in, and the save bar already owns commit and undo.
+**Re-matching** is option B: click the name, a `rematch` button
+appears, click that for the picker. The glyph is his -- a person, an
+arrow, a person -- drawn at **21px**, not the 18 the rest of
+`.iconbtn` uses, because two figures and an arrow is more ink than
+the rest of the set and at 18 the arrow closes up. The button is
+pinned to the right edge of the name column rather than following the
+end of the name, which landed it somewhere different on every row.
 
-**The picker is the same whichever opens it**: guesses from the box
-slug and the name crop at the top, then everyone else in roster
-order, by surname within section.
+**Two papers can claim one student for one skill**, and both a
+re-match and a hand match can cause it. Every row in such a pair wears
+a `warn` triangle at its left -- at the left so that a different sort
+can throw the pair apart and both ends still carry it. Computed on
+every draw, so it travels with a row and clears itself the moment the
+clash is resolved; a flag stored on the row would outlive the clash
+that earned it.
+
+**The unplaceable table** is `Preview | File | Page | Description |
+Match`, and the preview is the point of it. The thumbnail is cut in
+`read_page` while the page is still in hand, at 150px, and **only for
+the pages that failed** -- `Sheet.cuts` exists because the full render
+is thrown away immediately, and a thumbnail of every page would walk
+back into the memory problem it was built to avoid. A blank page gets
+no Match control, there being nobody to match it to.
+
+**Match to...** asks the skill first and the student second, because
+the skill narrows the field: on a redo each student takes one or two
+of fourteen skills, so "who took N3" is a far shorter question than
+the other way round. A hand-matched page joins the matched table with
+no box crop and no confidence -- the reader found no anchor, which is
+why it was unplaceable -- so Box shows a dash, the dial says `n/a`,
+and the mark is made from the preview.
+
+**Gone with it**: the fold-away listing of the whole stack, which was
+94 rows to find 4 in, and the duplicates table, which said what the
+matched table already says as two crops in one row.
+
+#### Still open
+
+* **Saving.** Nothing on this tab writes. The save bar counts the
+  decisions and the re-matches, and the Save itself is not built.
+* **A clash is warned about and not prevented.** Two papers may still
+  be saved against one student and one skill if he ignores the flag.
+  Whether the Save should refuse that is undecided.
