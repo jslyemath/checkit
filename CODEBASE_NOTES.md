@@ -16333,3 +16333,55 @@ and docs clean.
 in the old voice -- a heading of five words over a three-line muted
 paragraph -- and now sits directly under a header that says everything
 in four. It goes when the two tables do.
+
+
+### The header was built from a summary of the mockup, not the mockup
+
+The section above describes a header he did not agree to. Four things
+were wrong at once, and he caught all four:
+
+* **No glyphs.** Option C had the mark on each chip -- the
+  struck-through sheet for missing, the `?` for unmatched, the same
+  two the review uses for `absent` and `queried`.
+* **Chips in the wrong place.** They belong on the job, at the right
+  of its own line, not in the page header at the top of the tab.
+* **No card.** Each job is a panel, not a run of bare text.
+* **Wordier than agreed, again.** `3 of 12 back . 1 key . 2 not back`
+  where the mockup says `62 matched   1 blank`. The third wordiness
+  correction in three days.
+
+**Why.** The conversation compacted between agreeing the mockup and
+building it. What survived was a one-line description -- "settled
+facts as plain text, the two actionable counts as `--bg-warning` chips
+on the right" -- and that line got treated as the specification. It is
+not; it is a summary of a picture, and every one of the four details
+above lives in the picture.
+
+The failure is not the compaction. It is building from a one-line
+description without saying "a one-line description is all I have".
+His words: "I don't know how to work with you when you lose so much
+information from your context every time we move on by just a few
+messages."
+
+**The fix is not to remember harder.** The agreed design is now
+section 16 of `PRINT_TOOL_DESIGN.md` -- the card, the chips, the
+glyphs, the wording, what `unmatched` counts and why `foreign` is not
+in it, the drop area's three states, and both tables still to build.
+That document is the plan, it is in the repo, and it is what the next
+piece of work reads. A decision agreed in conversation gets written
+there before it is built.
+
+**What the rebuild kept.** The two counting bugs the real stack found
+are real regardless of layout, so `jobCounts` still counts papers
+rather than sheets, and blank is still a pile count rather than a job
+one -- now as `pileCounts`, with the node tests following. An existing
+guard caught a third thing on the way in:
+`test_every_glyph_size_comes_with_its_own_variable` refused the chip's
+`width: 18px` until it declared `--glyph-size: 18`, which is the rule
+that keeps every stroke in the app at 1.5px.
+
+**And a thing that was checked rather than assumed.** He also asked
+after the drop area turning into a loading bar. It was built two days
+ago and I had been editing around it, so it was measured rather than
+claimed: at `41 / 89` the fill is 225px of a 490px strip -- 46% -- and
+the state flips to `.read` with `--read: 1` when the read finishes.
