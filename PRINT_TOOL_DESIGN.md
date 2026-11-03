@@ -3700,6 +3700,104 @@ matched table already says as two crops in one row.
   when the `printed` table says that student was handed that skill in
   that run. That is the same test `rematchPool` applies in the
   browser, enforced where it counts.
+
+  **Fixed, that same day.** `owner()` in `api_scan_save` does exactly
+  that, and a hand-matched page is now found by the file and page it
+  came out of rather than by an id the server has never seen.
 * **A clash is warned about and not prevented.** Two papers may still
   be saved against one student and one skill if he ignores the flag.
   Whether the Save should refuse that is undecided.
+
+### The handwritten id (2026-11-03)
+
+On a run printed with `names = false` the header draws a ruled blank
+for a name and a grid of nine cells for the student's id. Nothing on
+such a sheet says whose paper it is: `assemble` writes no student into
+the index for a blank-name handout, so the footer code places the page
+and says nothing about its owner.
+
+The grid exists so the program can work that out. It reads the nine
+digits, finds the student, and puts the **name** in the name column --
+the same column a printed code fills. The check is the handwritten
+name in the column beside it, which is ringed in warning yellow on
+these rows and only on these rows: every other row has a printed name
+to agree with, and a highlight that is always on is not a highlight.
+
+#### Finding the cells
+
+The grid's position is arithmetic off `\cipidgrid`'s own lengths --
+nine 4.4mm cells with a 0.4pt rule between each pair -- and
+`\cipmark{id}` records the framebox exactly, to within a pixel at
+200dpi on the original PDF.
+
+On a *scan* that rectangle lands about a millimetre out. The transform
+is fitted from the footer code and its scale pinned by the footer's
+grading box, and the header is nine inches from both, so a fraction of
+a degree down there is a millimetre up here. A millimetre is nothing to
+a padded name crop and a quarter of a 4.4mm cell.
+
+So the grid is found rather than predicted, by its own top rule: 40mm
+of straight line in a header that holds no other. Its ends give the
+left and right edges and so a width, which is checked against the
+prediction -- past 3% the find is thrown away and the grid is reported
+as unplaceable rather than cut from the wrong place. That check is also
+what answers "does this work on another scanner": a differently scaled
+scan either works or says it could not place the grid.
+
+The nine *vertical* rules are the obvious landmark and the wrong one.
+They print at 0.4pt in 30% black, paler than anybody's pen, so a comb
+fitted to them locks onto a digit's downstroke -- which it did, on two
+of the first four real pages, half a cell out and confident about it.
+
+#### Reading them
+
+Not by reading nine digits and looking the number up. The question is
+which of the students on the roster wrote them, and in MAT 106 that is
+forty-five people whose ids differ in at least two places and usually
+three or four, with the first three digits the same on every one. So
+each candidate is scored on how likely its own digits are, and one
+misread digit costs the right student a little and the wrong ones a
+lot.
+
+The recogniser is one hidden layer, 372KB of numbers in
+`data/digits.npz`, trained by `tools/train_digits.py` on MNIST with the
+strokes thickened and thinned. Inference is a matrix multiply, so this
+adds no dependency: numpy was already needed to read a scan at all --
+indeed it was needed and undeclared, and is now declared along with
+Pillow.
+
+The effort went into *presenting* a cell, not into the model. MNIST's
+digits are scaled to a 20x20 box and centred on their centre of mass in
+a 28x28 field, and a cell handed over as it comes off the page is a
+different shape from anything the recogniser has seen. Same recipe, and
+a one-layer net then reads all thirty-six real digits.
+
+#### How it knows it is unsure
+
+The usual signal is how far the winner leads the runner-up, and here it
+is useless. With the true student removed from the pool the lead stayed
+at 9.2, 9.0 and 9.2 on three pages out of four -- as wide as when the
+answer was there -- because the *least bad* candidate still beats the
+next one easily. The lead measures how spread out the pool is.
+
+The winner's own score is the signal: between -0.15 and -1.23 with the
+writer in the pool, and between -8.59 and -10.20 with that student
+taken out. The threshold sits at -4.5, between the two groups rather
+than at the edge of either, and a page that cannot clear it is left
+blank for him to match by hand. An invented student he has to catch is
+worse than a blank row, because the blank row is the one he looks at.
+
+**This is one stack**: four pages, one scanner, two pens, thirty-six
+digits. A clean sweep of thirty-six would still happen one time in six
+at a true accuracy of 95%, so it is encouragement and not proof. The
+thirty-six are kept as a fixture in `tests/data/real_digits.npz`.
+
+#### Still open there
+
+* **No second scanner has been tried.** The rules came back at 205 to
+  235 against paper at 250 to 255 on his copier. A machine that runs
+  darker or lighter would move both the rule-finding and the ink level,
+  and the 3% width check is the only thing standing behind it.
+* **A spare still has to be matched by hand** unless its writer filled
+  the grid in, which is the same situation as before for anybody who
+  leaves it blank.
