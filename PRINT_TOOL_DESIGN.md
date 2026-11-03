@@ -3489,6 +3489,17 @@ One card per print job the stack came from.
   make on the paper himself -- the struck-through sheet (`absent`) for
   one that never came back, the `?` (`query`) for one that could not
   be placed. **Absent at zero**, never "0 missing".
+* **A chip never wraps.** A card two rows tall with one word on the
+  end of it is the thing this layout exists to avoid. When the words
+  stop fitting, the chips drop to **glyph and number** -- the number
+  stays, because a glyph alone says which problem and not how much of
+  it -- and the words come back when the room does.
+* **All the cards change together.** If one card's line is short of
+  room, every chip on the tab collapses, so two cards side by side
+  never disagree about how a count is written. `fitChips()` always
+  measures in the roomy state and a `ResizeObserver` on the container
+  re-runs it; measuring in whichever state happens to be current is
+  how a fitter ends up flapping between two answers.
 * **No totals, no bar, no run badge.** The page total is on the drop
   strip already; `matched + missing` is the job.
 
@@ -3515,22 +3526,39 @@ reads `13 pages . 2 files`.
 
 ### Still to build
 
-**One matched table.** Not sure/unsure/rest -- one table of every
-matched paper, sortable.
+The collapsible **"Everything in the stack"** goes. Two tables stand
+in its place: the matched papers, then the pages that could not be
+placed. The duplicates section goes with it -- it still reads in the
+old voice, a five-word heading over a three-line muted paragraph.
 
-| column | note |
+#### The matched table
+
+Not sure / unsure / the rest. **One table of every matched paper**,
+sortable. Taken from the mockup, left to right:
+
+| column | what is in it |
 |---|---|
-| Paper name | extra padding before Section |
-| Section | |
-| Skill | |
-| Confidence | a dial, before the paper mark |
-| Paper mark | the box crop |
-| Mark | last column |
+| Last name | `Lovelace, Ada`. Carries the roster's own last/first swap control |
+| Paper name | the name crop off the paper, in a box |
+| Section | `820` |
+| Skill | `N3` |
+| Sure | the confidence dial: a ring with a number in it |
+| Paper box | the box crop |
+| Paper mark | the four marks, the current one filled |
 
-One row height, everything side by side. Sortable on all six; default
-**confidence, then section, then name**. Rows with nothing scanned sink
-to the bottom when sorting by confidence. The app's existing `GLYPH`
-marks, with the **background** coloured, never the glyph alone.
+One row height, everything side by side.
+
+* **Sortable on every column**, with the header showing direction and
+  **priority number**: the default is `Sure` descending (1), then
+  `Section` ascending (2), then `Last name` ascending (3).
+* **Nothing-scanned rows sink to the bottom** when sorting by
+  confidence: muted name, `--` for the paper name and the paper box,
+  `n/a` in a grey dial, and `absent` already chosen in Paper mark.
+* **Paper mark** uses the app's existing `GLYPH` marks -- `pass`,
+  `query`, `fail`, `absent` -- and colours the **background** of the
+  chosen one, never the glyph alone.
+* The dial is green when sure, amber when not, grey when there is
+  nothing to be sure about.
 
 The sort machinery is the roster's and must be **lifted, not copied**
 -- `sorts`, `SORT_DEPTH`, `DEFAULT_SORT`, `cycleOf`, `columnOwning`,
@@ -3542,11 +3570,30 @@ Its student dropdown guesses from the box slug and the name crop, but
 **not exclusively**: guesses at the top, then every other name in
 roster order, by surname within section.
 
-**One unplaceable table.** Preview | File | Page | Description |
-Match. The action is **"Match to..."**, not "Assign to". Pick the
-skill first, then the student -- from anyone in that job who took that
-skill, read from the `printed` table, because not everyone takes the
-same skills in a run.
+#### The unplaceable table
 
-**Then** the duplicates section goes: it still reads in the old voice,
-a five-word heading over a three-line muted paragraph.
+| column | what is in it |
+|---|---|
+| Preview | a thumbnail of the page |
+| File | `copier-2.pdf` |
+| Page | `7` |
+| Description | `Blank`, `No code found` |
+| Match | `--`, or a **"Match to..."** control |
+
+The action is **"Match to..."**, not "Assign to". A blank page gets
+`--`: there is nothing to match it to. Pick the skill first, then the
+student -- from anyone in that job who took that skill, read from the
+`printed` table, because not everyone takes the same skills in a run.
+
+#### Open, and worth asking before building
+
+* **The dial's number.** The mockup shows `10` and `6` in the ring and
+  `n/a` for a row with no paper. The reader's own figure is `sure`, a
+  fraction -- `0.893` on a real row. Out of ten, rounded? And where
+  does green stop and amber start?
+* **The Paper name cell.** The crop as an image, or something typed
+  into? The mockup draws it as a bordered box with the name in it,
+  which reads as a field.
+* **Where the student dropdown lives.** The mockup shows no control
+  for re-matching a paper to a different student; the guesses-first
+  dropdown has to hang off one of the two name columns.
