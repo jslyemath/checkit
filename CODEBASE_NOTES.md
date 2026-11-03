@@ -16251,3 +16251,85 @@ class-scoped selector can only reach markup that asked for it.
 Five mutations, all caught: the `header` rule back, a `nav` rule back,
 a second `main` padding at a breakpoint, `main` off the gutter, and a
 page heading without its class.
+
+
+## The Scans job header, and two counting bugs (2026-11-02)
+
+What stood above the scan results was a sentence and a list of outcome
+sentences: "These are from Checkpoint, printed Sunday, 10/25. That job
+was 12 pages." then "3 pages I could not read. There is something on
+these, but no code I could find. A torn corner, a very dark scan..."
+-- eleven lines of explanation above a table showing the same pages.
+
+Replaced with option C of three he was shown: settled facts as plain
+text, and the two counts that are *work* as chips on the right of the
+page header. Chips are absent at zero rather than reading "0 missing",
+which is a thing to notice and then dismiss.
+
+    Scans  ?                            [3 missing] [4 unmatched]
+
+    Checkpoint  10/25
+    3 of 12 back . 1 key . 2 not back
+
+    SCP Redo  11/2
+    3 of 8 back . 1 key . 1 not back
+
+    Other pages
+    2 blank . 3 no code . 1 unknown job . 1 other code
+
+One section per print job, because a stack routinely spans two and a
+count only means something against the job it belongs to: "137 of 141
+back" is an answer, "137 pages" is not. The page total is not repeated
+-- it is already on the drop strip, and the strip said twice is what
+the wordiness rule is about.
+
+The job's own share of what is missing only prints when there is more
+than one job to tell apart; with one job it is the chip said twice.
+
+**`unmatched` is not every page that is not placed.** It is the three
+statuses marked `chase`: no code at all, a code naming a job this
+course has not got, and a page numbered past the end of the job it
+names. `foreign` -- a barcode from something else -- is almost always
+a cover sheet, and chasing it would be chasing the copier.
+
+**Two counting bugs, both found by reading the real stack.**
+
+*Papers, not sheets.* The first version counted placed **sheets**
+against the job's page count. The demo stack has a double feed, so it
+reported "12 of 12 back" directly above a chip reading "1 missing" --
+two numbers that cannot both be true. It is 11 papers. Nothing smaller
+than the real stack would have shown this; a fixture without a repeat
+gives the same answer either way.
+
+*A blank page has no run.* Blanks were a fact on the job's line, and a
+job's sheets are selected by run number -- which a blank, carrying no
+code, does not have. So the one blank page in the stack was reported
+nowhere on the page at all. Blanks moved to the "Other pages" section
+with everything else that names no job.
+
+**Nothing in the suite had ever run a line of app.js.** There is a
+`node --check` test, but that only parses. Both bugs were arithmetic,
+so the counting is now one marked, DOM-free block in app.js that
+`tests/test_gui_markup.py` lifts out between `--- begin pure ---` and
+`--- end pure ---` and runs under `node -e`.
+
+**The fixture was wrong too, and mutation testing is what said so.**
+Seven mutations; five caught first time, two not:
+
+* *Keys counted as sheets* was **missed**, because the fixture had
+  four distinct key pages and no repeat -- so key sheets and key
+  papers were the same number and the test passed either way. The
+  fixture now feeds a key twice as well.
+* *Blank back on a job's line* was **missed**, and that one was my
+  mutation rather than the test: it computed the blank count from the
+  job's own sheets, which is exactly the bug -- that list is empty of
+  blanks, so the mutation produced nothing to find. Rewritten to count
+  from all sheets, and then caught.
+
+All seven caught after that. 1167 printit tests, 152 checkit, audit
+and docs clean.
+
+**Left for the table round.** The duplicates section below still reads
+in the old voice -- a heading of five words over a three-line muted
+paragraph -- and now sits directly under a header that says everything
+in four. It goes when the two tables do.
