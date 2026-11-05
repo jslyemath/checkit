@@ -519,10 +519,16 @@ works is easier than debugging both at once.
 
 Everything the current tool does, plus what is wanted. Marked by state.
 
+**Swept 2026-11-05.** This table was written against the pre-port Apps
+Script and not revisited after the port, so twelve rows still said
+"not built" about things that had been in for weeks. Each cell now
+names the call that does it, so the next sweep can check rather than
+remember.
+
 | feature | today | proposed |
 |---|---|---|
 | Per-student skill selection | ✅ roster columns `1:`, `2:`… | keep |
-| Variant → seed mapping | ✅ random 5-digit seeds | change to pregenerated 400–999 |
+| Variant → seed mapping | ✅ **done** — `choose_seeds` draws from `bank.seeds_with_variant`, the print-only range, without replacement | |
 | Seed override | ✅ | keep, in the publication file |
 | Sections in header | ✅ `\setsect` | keep |
 | Key packets, N copies | ✅ `Key Amount:` | keep |
@@ -533,23 +539,23 @@ Everything the current tool does, plus what is wanted. Marked by state.
 | Version stamp in footer | ✅ `\setvseed` | keep |
 | LaTeX error log to file | ✅ | keep |
 | PDF location: default folder or choose | ✅ `pdf_location_raw` drives a save dialog | keep |
-| **Names on/off** | ⚠️ dead *in Python* — the Sheet already applied it | one place, not two |
-| **Submission cutoff** | ⚠️ read, never used, in both | implement or drop |
-| **Seating-chart ordering** | ❌ prints in roster order | build |
-| **Version count from seating** | ❌ | build |
-| **Extras with blank names** | ❌ (`\setname{Blank}` exists) | build |
-| **Shuffled extras** | ❌ | build |
-| **Keys optional** | ❌ always emitted if `Key Amount` > 0 | make an explicit toggle |
-| **Recompilable output folder** | ⚠️ partly — `TeX Outputs/` exists | make it a guarantee |
-| **Google Forms read** | ❌ manual CSV export | build |
-| **Google Forms write** | ❌ | build |
-| **Selecting variants** | ❌ n/a | build |
+| **Names on/off** | ✅ **done** — `Publication.names`, one place; false draws the ruled blank and the id grid | |
+| **Submission cutoff** | ❌ **dropped** — never ported. Only in `reference/control_center.gs`; neither side reads it | |
+| **Seating-chart ordering** | ✅ **done** — the chart is passed to `assemble`; `section.print_by` picks group or seat order | |
+| **Version count from seating** | ✅ **done** — `versions = list(chart.versions)`, falling back to one | |
+| **Extras with blank names** | ✅ **done** — `build_extras` sets `blank_name=True` | |
+| **Shuffled extras** | ✅ **done** — `build_extras` shuffles the pool, so three extras of one skill are three different papers | |
+| **Keys optional** | ✅ **done** — `Publication.keys`, separate from `key_copies` | |
+| **Recompilable output folder** | ✅ **done** — a run folder carries `main.tex`, both `.sty` files, `Skill Descriptions.tex`, the per-skill sources and `manifest.toml` | |
+| **Google Forms read** | ✅ **done** — stage 7b, `form pull`, and the Print tab's first card | |
+| **Google Forms write** | ✅ **done** — stage 7a, create/attach/map/add-items/push, from the app | |
+| **Selecting variants** | ✅ **done** — `[variants]` in the publication file; an unchosen variant is refused | |
 | Simply Print / No-Sub default / Append | ✅ in Apps Script | keep all three |
 | Available-skills list drives the Form | ✅ Apps Script | keep |
 | Form validation (at most / least / exactly N) | ✅ Apps Script | keep |
-| Email students who did not respond | ✅ Apps Script | **eventually**, in the tool |
+| Email students who did not respond | ✅ Apps Script | **eventually**, in the tool — still not started, roadmap item 7 |
 | Printed log | ✅ a sheet | becomes tracking, §6c |
-| **Attempt outcomes (took / passed / failed)** | ❌ | build, §6c |
+| **Attempt outcomes (took / passed / failed)** | ✅ **done** — `record.save_attempts`, written by Scans, read by Progress | |
 | Per-skill print counts, page estimate | ✅ Apps Script | keep as a preview |
 | Reset settings after a run | ✅ `printAndReset` | keep |
 | **Auto-attached explanation skills** | ✅ Apps Script | **deprecated** — explanations are standalone outcomes now |
@@ -635,8 +641,12 @@ Settled in review, recorded so they are not relitigated.
 4. What a hand-authored bank's `bank.xml` looks like, given the tool should keep
    `Skill Descriptions.tex` in step with it — MAT 206 has a real `bank.xml`
    already, so possibly nothing special is needed.
-5. Whether `Submission Cutoff:` is implemented or dropped. It is read and unused
-   on both sides today.
+5. ~~Whether `Submission Cutoff:` is implemented or dropped.~~
+   **Dropped by not being ported.** It survives only in
+   `reference/control_center.gs`, the pre-port script kept for
+   reference; neither printit nor the live Apps Script reads it. The
+   "grade cutoffs" that do appear in `form.py` and `provision.py` are
+   a different thing -- the banner on the form.
 
 ---
 
@@ -3337,8 +3347,10 @@ one already held.
 
 1. ~~**Runs.**~~ **Done 2026-10-24.** The list, the detail page,
    delist/graded, reprint and reuse.
-2. ~~**The page marks (14.5).**~~ **Done 2026-10-25**, and not yet
-   installed into any bank -- see 14.10. What Scans can now rely on:
+2. ~~**The page marks (14.5).**~~ **Done 2026-10-25**; see 14.10.
+   **Installed in mat-106 and pushed 2026-11-05**, so every paper
+   printed from that bank from now on carries them. What Scans can
+   rely on:
 
    * every page carries `C1-<runid>-<page>`, 9mm, level M;
    * `main.pages` in the run folder maps page -> kind, student,
@@ -3350,11 +3362,15 @@ one already held.
    * `pypdfium2` renders a scanned PDF and `zxing-cpp` reads the
      codes off it; both are already dependencies.
 
-3. **Scans.** In progress. `scans.py` places a stack and the tab
-   reports it -- what was placed, what was read twice, and what
-   never came back. Still to come: cropping the grading box,
-   classifying the mark, the review grid, and saving.
-4. **Progress.**
+3. ~~**Scans.**~~ **Done 2026-10-27**, and rebuilt 2026-11-02/03
+   into the shape section 16 describes: two sortable tables instead
+   of three stacked lists, re-matching, a mark track, and a save that
+   refuses an undecided row. Cropping, classifying, the review grid
+   and saving are all in. A paper printed without a name finds its
+   own student from the id grid.
+4. ~~**Progress.**~~ **Done 2026-10-27.** The grid, thresholds, the
+   recent highlight, and a drill-in that edits. No section filter --
+   that was always a later job.
 
 ### 14.8 Still open
 
@@ -3373,9 +3389,15 @@ What remains:
   SID -- and the import joins on that. See 14.9.
 * **Where thresholds are stored** -- a new course file, or a table in
   an existing one.
-* **How much classifier to build.** The honest first version is
-  geometric, with crops stored so a trained model can replace it on
-  real data later. Where that line sits is not decided.
+* ~~**How much classifier to build.**~~ **Decided, and it fell in
+  two different places for the two readings.** The grading box is
+  geometric and always will be: what separates a tick from the
+  printed form is that the instructor's pen is *coloured* and
+  everything else in the crop is grey, which no model is needed for.
+  The handwritten id is a trained one -- 372KB of numbers in
+  `digits.npz`, trained by `tools/train_digits.py`, inference in
+  numpy so nothing new installs. He chose that on 2026-11-03 over
+  installing a model runner or writing shape rules by hand.
 * **Whether Scans can place a page whose run is unknown** -- an old
   paper with no code, from before 14.5 ships. Everything printed to
   date is such a paper, so this is not a corner case for the first
@@ -3383,16 +3405,29 @@ What remains:
 * **Whether a run number needs its course.** It is unique within a
   course and Scans is course-scoped, so today it does not. A stack
   spanning two courses would need one. See 14.12.
-* **What the Scans tab does with a spare.** The code gives the skill
-  and the version; the id grid gives the student, in handwriting.
-  Whether that is read automatically, offered as a guess, or simply
-  shown beside a dropdown is not decided -- and it is the same
-  question as "how much classifier", one field over.
-* **`F5-E` is to be added to the bank.** Brightspace grades it and
-  the outcome folder exists; `bank.xml` does not publish it. That is
-  a `mat-106-checkit` job, not a printit one, and it should happen
-  before the export is written or the column will go unmatched for no
-  good reason.
+* ~~**What the Scans tab does with a spare.**~~ **Read
+  automatically, 2026-11-03.** The grid is found by its own top rule,
+  the nine cells are read, and the result is matched against the
+  roster rather than looked up as a number -- so the name lands in
+  the name column the way a printed code's would, with the section
+  filled in. The handwriting beside it is ringed in warning yellow,
+  on those rows and no others, because they are the only ones where
+  it is the sole check. A grid that cannot be read clearly enough
+  leaves the row blank for him rather than guessing.
+
+  Spares also *appear* on the tab now. `_review_rows` grouped on
+  `kind == "student"`, so a spare -- printed with an empty name for
+  exactly this purpose -- was dropped and could not be recorded at
+  all.
+* **`F5-E` is to be added to the bank.** Still open, and sharper
+  than it was. `outcomes/F5-E/` exists, and `bank.xml` *does* mention
+  the slug -- but inside an `<associates>` block, pointing at
+  `outcomes/F5`, and **nothing reads `<associates>`**: the word does
+  not appear in `dashboard/checkit/` or in printit outside a doc
+  test. So it generates nothing and publishes nothing, and
+  `assets/F5-E/` has never existed. It needs a real `<outcome>` entry
+  with `<path>outcomes/F5-E</path>`, the way F2-E has. A
+  `mat-106-checkit` job, before the export is written.
 
 ---
 
@@ -3406,11 +3441,48 @@ before the first run of next term.
 |---|---|---|---|
 | ~~1~~ | ~~**Stage 4** of section 13~~ | **done 2026-10-22.** Runs, Progress and Scans inherit the save bar, the warning mark and the empty-state shape | |
 | ~~2~~ | ~~**Runs** (14.2)~~ | **done 2026-10-24.** List, detail, delist, graded, reprint exactly, start-from-these-settings | |
-| ~~3~~ | ~~**The page marks** (14.5)~~ | **done 2026-10-25.** Footer code, page index, grading-box/id/name positions, run numbers. **Still not installed into any bank** -- see 14.10 | |
-| ~~4~~ | ~~**Scans** (14.4)~~ | **done 2026-10-27.** Import, split, classify, review, save. `INK_FLOOR` still wants calibrating against the real copier | |
+| ~~3~~ | ~~**The page marks** (14.5)~~ | **done 2026-10-25**, and **installed in mat-106 and pushed 2026-11-05.** Footer code, page index, grading-box/id/name positions, run numbers | |
+| ~~4~~ | ~~**Scans** (14.4)~~ | **done 2026-10-27.** Import, split, classify, review, save | |
 | ~~5~~ | ~~**Progress** (14.3)~~ | **done 2026-10-27.** The grid, thresholds, the recent highlight, and a drill-in that edits. No section filter yet -- that was always a later job | |
-| 6 | **Brightspace export** (14.6) | needs Progress, and one round-trip with a real export file | small |
+| ~~5b~~ | ~~**The Scans tab, rebuilt** (16)~~ | **done 2026-11-03.** Not planned -- it came out of him using the tab on his own scans. Two sortable tables instead of three stacked lists, re-matching, a mark track, a save that refuses an undecided row, and the save actually reaching the record, which it had not been | |
+| ~~5c~~ | ~~**The handwritten id**~~ | **done 2026-11-03.** A paper printed without a name finds its own student from the grid in its header | |
+| 6 | **Brightspace export** (14.6) | needs Progress, and one round-trip with a real export file. `F5-E` should be published first -- see 14.8 | small |
 | 7 | Drive folders and student emails | explicitly a stretch; the rest has to work first | -- |
+
+### What is left, as of 2026-11-05
+
+The three tabs the term needs are built and have been used on real
+paper. What remains is one feature and a list of things that are only
+known to work on one machine.
+
+**The feature:** Brightspace export (item 6). It needs the roster's
+LMS ids imported once (14.9) and `F5-E` published in the bank (14.8),
+and then one round trip against a real export file.
+
+**The calibrations**, each of which is a number fitted to a single
+stack off a single copier, and each of which will be wrong on a
+different one:
+
+* `INK_FLOOR` (0.005) -- below this a page with no code is called
+  blank rather than unreadable. Still the guess it always was, made
+  against simulated scans.
+* `BESIDE_MAX` (0.60) -- more ink than this beside the box is the
+  student's working, not an instructor's `?`. Fitted to the 62 pages
+  of 2026-10-26.
+* `digits.ACCEPT` (-4.5) -- below this the id grid is left for him to
+  match by hand. Fitted to four pages, two pens, thirty-six digits.
+* `scans.ID_INK` (240) -- the grey that separates paper from a printed
+  rule when finding the id grid. His copier returns rules at 205-235
+  and paper at 250-255; a machine that runs darker moves both.
+
+None of these is worth guessing at again in the abstract. They want a
+second scanner, or a second term's stack, which is a thing to do when
+one exists rather than a thing to plan.
+
+**And one that is not a number:** nothing on the Scans tab has been
+driven by anyone but its author. The save path, the re-match and the
+clash warning have tests and have been run against real pages, but
+not by somebody who did not write them.
 
 Two things worth saying about the order.
 
