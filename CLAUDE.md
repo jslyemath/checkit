@@ -47,9 +47,11 @@ mat-106's venv has checkit installed **editable**, pointing at `Projects/checkit
 
 `checkit-printit` has grown a lot: `build`, `init`, `install`, `import`, plus
 `course`, `form`, `gui`, `record`, `roster` and `skills` groups. It also has a
-local web app (`gui -c <course>`) with six views — Roster, Update form, Print
-job, Runs, Seating, Settings. Its own `CLAUDE.md` lists everything and says
-what is open — read that before touching it.
+local web app (`gui -c <course>`) with eight views — Roster, Update form,
+Print job, Runs, Scans, Progress, Seating, Settings. All eight are built; the
+"not built yet" placeholder is still in the page for the next one. Its own
+`CLAUDE.md` lists everything and says what is open — read that before
+touching it.
 
 A printed page now carries machine-readable marks (a QR in the footer and a
 `main.pages` index beside the PDF) so marked papers can be scanned back in.
