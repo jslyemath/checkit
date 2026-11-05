@@ -16692,3 +16692,72 @@ At a true per-digit accuracy of 95% a clean sweep of thirty-six still
 happens one time in six, so this is encouragement, not proof. The
 thirty-six are kept as a fixture in `tests/data/real_digits.npz`,
 which is the one thing that will notice if a change makes it worse.
+
+
+## A figure is stale against its .tikz, never against its style (2026-11-04)
+
+He asked whether mat-106 could be regenerated without re-rolling the
+versions, and said he suspected the web figures had been broken before
+the `\xa` clash rather than by it. The first has a clean answer; the
+second was right to doubt me, and checking it turned up something
+worth knowing.
+
+**I was wrong about the figures.** The last message said the published
+figures "aren't fixed yet", which implied the `\xa` clash had broken
+them. It cannot have. `tikz_preamble.tex` is a complete preamble --
+`standalone`, `pgfplots`, `printitfigures` -- and it never loads
+`printit.sty`, so it never loads `qrcode`, so the name `qrcode` took
+was never taken during a figure compile. The clash could only ever
+break *print*, which is exactly where it did break.
+
+**Checked four ways, because that reasoning is still only reasoning.**
+Every one of the 2,418 figures in F2 and F2-E's first 400 seeds exists,
+opens as a PNG and is no older than its `.tikz`. Six of them
+recompiled against the package as it stands today came out
+**pixel-identical** -- worst channel difference zero. The live site
+loads all four images on F2 version 1 and draws them correctly: the
+hexagons for 3/2, the number line, and 5/6 marked on it. And the only
+committed change to `printitfigures.sty` since those PNGs were written
+in September is one comment's spelling, "Colours" to "Colors".
+
+**The thing worth keeping.** `_png_is_current` compares the PNG's
+mtime against **the `.tikz`'s, and nothing else**:
+
+    return os.path.getmtime(png_path) >= os.path.getmtime(tikz_path)
+
+The style package is not in that comparison, and neither is
+`tikz_preamble.tex`. So a change to `printitfigures.sty` -- a colour, a
+tick length, an axis style -- re-rasterizes *nothing*. `generate -i`
+reports "skipped" for every figure and the site keeps serving pictures
+drawn under the old rules, while the printed handouts, which compile
+from the `.tikz` every time, immediately use the new ones. The two
+surfaces silently stop matching, which is the one promise
+`printitfigures.sty` exists to keep.
+
+It did not bite here only because the change was a rename with no
+visual effect. To force it: delete the PNGs, or touch the `.tikz`
+files. The seeds are untouched either way -- `seeds.json` is what holds
+the versions and neither the `.tikz` files nor the PNGs feed back into
+it.
+
+**Regenerating without re-rolling.** `generate` without `-r` is exactly
+that, and the code is explicit (`outcome.py`): without `regenerate` it
+calls `load_exercises()` and returns, so the existing `seeds.json`
+stands and not one version changes. It still rasterizes when `-i` is
+given, subject to the staleness test above.
+
+`--remote` is not optional for this bank: `write_json` refuses to
+precompute HTML for an outcome with images unless it is given an
+absolute base URL, and F2 and F2-E have images.
+
+**What is actually out of date on the site**, and it is not the
+pictures: `docs/assets/printit.sty` and `printitfigures.sty`, published
+2026-09-19 and two revisions behind. They get there through
+`copy_latex_support()`, which `write_json` calls, so a plain `generate`
+is what moves them. Nothing a student sees depends on them -- they are
+there for anyone consuming the bank over the web -- and his own
+printing reads the local clone, which has been correct on disk since
+the clash was fixed.
+
+Also found: mat-106 is one commit ahead of its remote. `2590eca`, the
+2026-10-25 theme update, was committed and never pushed.
