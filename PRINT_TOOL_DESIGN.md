@@ -3605,6 +3605,50 @@ attempts, which is what he opens this to see. Still open: whether it
 stays a modal or becomes a side panel with next/previous, which
 changes the width the layout gets.
 
+### Three fly-out timelines, drawn (2026-11-07)
+
+A panel, not a modal. The grid stays visible behind it and the cell
+it came from stays lit, so working down a column after a scan does
+not mean closing and reopening one dialog per student. That costs
+width -- about 400px against the dialog's 620 -- and the width is
+most of what separates the three.
+
+Two fields were dropped before drawing:
+
+* the **version letter**. It tells one paper from the other versions
+  of a run. In a list of one student's own papers there is nothing
+  to tell apart.
+* **what the scanner read**. The final mark is the answer; the
+  reading is how it was arrived at, and belongs where a disagreement
+  is being looked into, not in every row for ever.
+
+The code is `tools/mockups/drillin.js` in checkit-printit, and it
+draws inside the running app with the app's own stylesheet, so these
+are the real marks at the real sizes. All three share a header
+(name, section, skill pill, the grid's own verdict) and a footer
+that steps to the student above or below.
+
+| | shape | per paper | holds |
+|---|---|---|---|
+| **A** node and card | dot on a rail, card beside it | date / run and number / a labelled `SEED` row with *see the paper* beside it / the mark track | 4 attempts |
+| **B** tight | same rail, two lines a paper | date and seed on line one, run and the mark track on line two; the paper is an icon | 8-9 attempts |
+| **C** the work itself | the scanned page is the node | thumbnail with the mark as a corner badge, then date / run / seed / mark track | 4 attempts |
+
+**A** is the most legible and the least dense. Nothing is run
+together with commas, which is the tic section 13 bans, and the seed
+gets a key above a value rather than a `seed: 998`.
+
+**B** fits a whole term without scrolling, which matters for a skill
+a student has attempted eight times. It is also the one with no
+slack: at 400px the right-hand group (paper icon plus four marks)
+wants about 210px and leaves 190 for the date and the run, so a
+longer run title will crowd it.
+
+**C** is the only one that answers what he said the paper is *for* --
+seeing how the working changed -- without opening anything. It costs
+the most vertical room per attempt and needs a real page render
+behind it, not a cutout.
+
 ### Decided: the cell vocabulary (2026-11-07)
 
 Seven states drawn as outlined boxes became five marks, agreed cell
