@@ -16912,3 +16912,137 @@ first time:
   question about the mutation as well as about the suite.
 * The project's own `--glyph-size` guard caught both new CSS rules
   setting a glyph width without it, which is exactly what it is for.
+
+
+## Names that lied, paths that broke, and runs nobody sat (2026-11-07)
+
+Three commits, all of them clearing ground before the Scans tab gains
+a memory. `ecece04`, `fe53ec4`, `d0b7628`.
+
+### Two page numbers, neither named for which page it was
+
+He asked why `attempt.page` is called that when it is not about the
+attempt. It is not: it is which page of the printed job the paper
+was. On a row about a decision, `page` reads as "the page I am
+looking at", which is the other number entirely.
+
+`Sheet` had both of them and named neither. `at` was the page within
+the copier's PDF and `page` the page within the printed run. **They
+are unrelated numbers** -- a stack comes back shuffled, split across
+files and padded with blanks, which is the entire reason the footer
+code exists -- and they are `scan_page` and `run_page` now.
+
+Renamed *before* a scan pointer arrives rather than after. `page` and
+`scan_page` side by side would be a trap laid for whoever read it
+next.
+
+**The column rename is new machinery.** `ADDED` only ever added,
+because `CREATE TABLE IF NOT EXISTS` does nothing to a table that
+exists. `RENAMED` joins it: table, old name, new name, applied on
+open and a no-op every time after. Checked on a copy of the live
+record -- 86 attempts, every value through unchanged, opening twice
+does nothing, a fresh database the same shape as a migrated one.
+
+Four mutations, and the first round left one alive: dropping half the
+guard changed nothing, because no test had a file holding *both*
+column names. That only happens after a half-finished migration or
+hand-editing, both of which happen to a record with a term in it, and
+the cost of getting it wrong is the course not opening. Tested rather
+than removed.
+
+Twenty-seven test failures on the way, every one the rename being
+caught where it reached. One of my own regexes walked past three
+multi-line constructions under a different module alias. **The
+project's own note says replace by anchor and not by pattern**, and
+it was right.
+
+### A run folder that survives the home moving
+
+Nine rows in the live record held absolute paths:
+
+    C:\Users\slye\CheckItPrintIt\MAT 106\Extravaganza 2026-10-12
+
+All nine break if that moves -- and moving it is supported,
+`CHECKIT_PRINTIT_HOME` exists for exactly that. A second machine, a
+renamed account, a restored backup.
+
+Stored relative to the home now, resolved on read. **Readers did not
+change**: `runs`, `run_by_no`, `run_detail` and `set_flags` all hand
+back an absolute path as they always did, resolved against the home
+*as it is at that moment*. Only the database holds the short form.
+
+A folder genuinely outside the home is stored as given -- making it
+relative would mean a stored path full of `..`, which is worse than
+an honest absolute one.
+
+**The test was wrong before the code was.** The first version moved
+the home and *then* opened the record, so the migration correctly
+found nothing under the home and did nothing. It would have passed
+either way. An upgrade happens the other way round: the new code
+opens the record where it already is, the paths shorten, and the move
+comes later. Rewritten in that order it fails on the old code and
+passes on the new, which is the only arrangement worth having.
+
+Also renamed: `grading_sets` to `graded_runs`, and the progress
+payload's `recent` to `graded`. **That one was mine, two days old.**
+When the thresholds moved into the browser the server stopped knowing
+what "recent" meant and began sending every graded run; the name
+stayed, and `app.js` was already renaming it on arrival with
+`const graded = data.recent`. A name the receiving code immediately
+corrects is a name that has already been reported as wrong.
+
+Left alone: `run.seed` and `printed.seed`, the job's seed and a
+paper's seed sharing a word. They never appear in one row together,
+so it is latent rather than live, and a migration is worth spending
+on things that are actually wrong.
+
+### Discarding a run that was never handed out
+
+His point, and it matters more than the image feature it came up
+alongside. A day of fixes leaves runs in the record that never went
+near a classroom, and each one puts a row in `printed` for every
+student it would have been for. `history()` is built from `printed`,
+so they follow a student into their drill-in as papers that were
+never on a desk -- mixed in with the ones they actually sat, which is
+the list he reads to see whether somebody is improving.
+
+`delisted` does not solve it. It moves a run down the Runs list and
+leaves every printed row exactly where it was.
+
+**The guard was already written, for something else.** A graded run
+cannot be delisted, because what was read back from it is the record
+of an attempt and the list is where it is found. The same reasoning
+refuses a discard, and more strongly -- so the only runs this can
+touch are ones no judgement depends on.
+
+It checks the `graded` flag and the attempt rows **separately**. The
+flag is something the Runs tab can set on its own; the rows are the
+thing that actually has to stay findable. Either check alone leaves a
+case uncovered, and I only found that because a mutation survived the
+first round -- no test had a run flagged graded with no marks yet.
+
+Everything else had been waiting: `printed` and `attempt` both
+declare `ON DELETE CASCADE`, `connect` turns foreign keys on, and
+`_high_water` keeps the run counter in `meta` with the comment
+*"because the rows can go"*. Somebody had already thought this
+through. The number is not reused, so a code on a sheet from a
+discarded run goes on failing to resolve rather than resolving to
+somebody else's job.
+
+**What the guard cannot do, and the UI has to.** On the live record
+*eight of nine* runs pass it -- and most of those were genuinely
+handed out, they simply have not been scanned yet. Nothing knows
+whether paper left the printer. So discard is offered only on a run
+already delisted, making the irreversible step the second of two, and
+the confirmation names the paper count, because the date and the
+count are the only things that tell a rebuild from a real job.
+
+Checked on a copy of the live record: eight discardable, the graded
+one refused, 258 printed rows freed by one discard, all 86 attempts
+untouched.
+
+A bin glyph was needed -- `drop` is the delist arrow, and one shape
+for two meanings is what the Progress grid's outlined box had been.
+And `--bad` gets its first use on a control: quiet until hovered,
+because green means "the thing to do here" and forgetting a run never
+is.
