@@ -3572,6 +3572,39 @@ from that when it does. Building a second way to choose them now
 would be the thing this codebase keeps doing: two mechanisms for one
 decision, and the one nobody looks at drifts.
 
+### The drill-in: what it has to lay out (2026-11-07)
+
+Blocked until now on content that was not settled. It is settled.
+
+Per paper, oldest first, for one student and one skill:
+
+| | |
+|---|---|
+| when | the run's date |
+| which job | title, and the run number |
+| which paper | version and seed, so the sheet can be found |
+| what the reader said | `reading` -- beside what he decided |
+| what he decided | the outcome, set here and saved on the click |
+| the picture | `scan` and `scanPage`, when the stack is still here |
+| flags | `rebuilt` (the seed is not what was printed), `delisted` |
+
+Papers printed and never scanned are in the list -- `history` is
+driven off `printed` -- which is the point: that is a sheet he may
+be holding.
+
+**What it must not do**, from section 13 and from the current one
+breaking all three: run facts together with separators
+(`Checkpoint 1, version A, seed 998` is the banned tic verbatim);
+say with a sentence what a layout can say (`scanner read it as
+empty`); or put an explanation in the open rather than behind a `?`.
+
+Three layouts were drawn against the real stylesheet -- rows with
+air, a table, and a timeline -- and the timeline is the one to
+build: it is the only one that shows the *shape* of a student's
+attempts, which is what he opens this to see. Still open: whether it
+stays a modal or becomes a side panel with next/previous, which
+changes the width the layout gets.
+
 ### Decided: the cell vocabulary (2026-11-07)
 
 Seven states drawn as outlined boxes became five marks, agreed cell
