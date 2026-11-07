@@ -17046,3 +17046,104 @@ for two meanings is what the Progress grid's outlined box had been.
 And `--bad` gets its first use on a control: quiet until hovered,
 because green means "the thing to do here" and forgetting a run never
 is.
+
+
+## The scan store, and a stack that comes back as he left it (2026-11-07)
+
+`e6bc656`, `a9bcf84`, `5aaa517`. Three commits that began as "let the
+drill-in show the paper" and turned into the record learning what a
+scan is -- because the first design for that feature was fragile and
+he said so.
+
+### What was fragile
+
+A scan was stored under whatever the copier called it. Two files with
+one name replaced each other silently, which cost nothing while
+nothing pointed at them and would have cost a wrong picture the
+moment the record did. The folder had no lifecycle at all: the word
+`"scans"` appeared twice in the whole codebase, the upload and the
+reader, and 9MB was sitting in MAT 106 with nothing able to list it.
+
+And the first fix was wrong too. **The whole filename was the
+identity** -- date, copier's name, hash -- so the same bytes imported
+a day later, or after the download was renamed, landed on a different
+name and became a second copy with a second row. Re-importing
+yesterday's stack because something went wrong is an ordinary thing
+to do. The sha is a column now and the name is decoration:
+
+    2026-11-07 DOC110326-11032026150756 a3f9c2.pdf
+
+Date sorts the folder, the middle is how he recognises a stack when
+he opens it by hand, the hash is the part that cannot lie.
+
+### The thing that made the whole design
+
+He asked that reopening a stack bring it back **in the corrected
+state he saved**, not as a fresh read. Checking what already survived
+turned up the real gap, and it was larger than the picture feature:
+
+* an **outcome** already came back -- `recorded_in` finds one by
+  (run, student, skill), and the browser has done
+  `outcome: recorded || outcome` for a while;
+* a **re-match** did not. The record holds the student he chose; a
+  fresh read recomputes the one the index names; the lookup misses,
+  and the match and the mark are lost together;
+* a **page matched by hand** has no run and no page to look up at
+  all.
+
+So `scan_page`: one row per page of each stack, saying which run and
+which student that page was attributed to *after he corrected it*.
+That one table answers four things -- which runs a stack holds, how
+much of each, where a decision's picture is, and what a re-read has
+to be told. A saved choice beats both readings now, because it is the
+only one of the three that is a judgement rather than a measurement.
+
+A page nobody claimed still gets a row. It says the page was seen and
+dismissed, so a re-read does not keep offering it as new.
+
+### Found by looking rather than by testing
+
+`restored` was true on **every row** of a blank-name run. It compared
+the saved student against `entry.sid`, which is empty for every paper
+on such a run, so a row where the id grid had agreed with him
+perfectly was flagged as a restoration. It means "he chose this and
+the read would not have", so it compares against what the read
+actually produced.
+
+The Imported column showed `2026-11-07T14:49:10`. `added` is a
+timestamp and `spokenDay` wants a date: it splits on `-` and gives up
+on `07T14:49:10`. And the run chip read `#1 4`, which is *fourteen*
+before it is anything else -- a whole run does not need its count
+said, so a bare chip means the whole job and `2/43` means part of
+one.
+
+None of those three would have failed a test. They failed a look.
+
+### And the usual lesson, twice more
+
+A test's stand-in `Sheet` was missing two fields a real one always
+has, and sailed straight past code that read them. Made faithful
+rather than making the code tolerant of fakes.
+
+Then a mutation survived because the fixture had
+`scan_page == run_page` -- the exact conflation last week's renames
+were for, reappearing in a test written days later. And two of the
+four mutations on the picture pointer were weaker than their own
+labels: one dropped `LIMIT 1` and called itself a join, when a scalar
+subquery takes the first row anyway; the other dropped the student
+from one of two subqueries while the test asserted on the other.
+**A mutation that survives is a question about the mutation, not
+only about the suite.**
+
+### What the drill-in has now
+
+Per paper, for one student and one skill: the run and its number,
+the date, the version, the seed, whether the run's index was rebuilt
+or the run delisted, what the scanner called it, what he decided --
+and now where the picture is. Papers printed and never scanned are in
+the list, because `history` is driven off `printed`.
+
+`/api/scan/sheet` takes a stored name rather than a path, which is
+what lets Progress ask at all: it has a name out of the record and no
+business knowing where files live. Escaping the folder is impossible
+now rather than checked.
