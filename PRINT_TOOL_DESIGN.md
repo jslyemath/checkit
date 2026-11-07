@@ -3524,6 +3524,134 @@ and what he could react to instead:
   labels are never seen.
 
 
+## 17. The Progress tab (2026-11-05)
+
+Read before changing anything on that tab. What is here was settled
+after driving it on a 24-student, 29-skill course built for the
+purpose -- the only course with real data has real names in it, and
+no demo course on the machine had a single attempt recorded.
+
+### What was found
+
+**The record behind it is sound.** Audited against the live MAT 106
+file: no attempt without a run, no printed row without a run, no run
+number used twice, `meta.last_run_no` and the highest `run_no` agree,
+and no run marked ungraded while holding marks. `write_run` keys on
+the output folder, so building into one twice is a single event.
+`save_attempts` upserts on (run, student, skill), refuses an unknown
+outcome, marks the run graded in the same transaction, and reports a
+pair missing from `printed` rather than dropping the decision.
+
+**The grid has no sorting at all.** `makeSorter` -- the stacked
+machinery the Roster and both Scans tables share -- is not wired to
+it; `renderProgress` builds its head and body by hand. No section
+bands either, and no name-order swap, so Progress and the Roster can
+show names in two different orders at once.
+
+**Six of the seven cell states draw no glyph.** Only `passed` has
+one, a tick. The rest are told apart by CSS: a 13px outlined box, a
+dashed one for "never sat", an amber border and background for
+"stuck", a 5px corner dot for a query. Two consequences worth fixing:
+"never printed" and "printed, not passed" differ only by whether that
+box is drawn at all; and **the number beside a tick means two
+different things** -- `2` is "passed on the second attempt", `2/2` is
+"two of the two passes needed", same place, same styling.
+
+**The name column and the header already stick** while the grid
+scrolls, both measured. Nothing to do there.
+
+### Decided: columns stay as they are, for now
+
+At 29 skills the grid is mostly blank -- in the demo, 596 of 696 cells
+are `none`. The obvious answers are hiding skills nobody has been
+printed, or a skill picker in the toolbar.
+
+**Neither, yet.** Which skills are live is moving out of the Update
+form tab to somewhere of its own, and the grid's columns will come
+from that when it does. Building a second way to choose them now
+would be the thing this codebase keeps doing: two mechanisms for one
+decision, and the one nobody looks at drifts.
+
+### Decided: the cell vocabulary (2026-11-07)
+
+Seven states drawn as outlined boxes became five marks, agreed cell
+by cell. **No box, plain or dashed, anywhere.** The two glyphs that
+are not a tick come from the app's existing icon set -- `fail` and
+`query`, the same ones the drill-in's mark track uses -- so a cell and
+the control that sets it show the same shape.
+
+**A sitting is an attempt that is not an absence.** "Did not sit" is
+still recorded and still shown in the drill-in and the tooltip, and is
+invisible to everything else: it changes no glyph, no highlight and no
+sort. A cell whose only attempts were absences is a blank cell.
+
+The glyph, first match wins:
+
+| | |
+|---|---|
+| no sittings | nothing at all |
+| `passes >= threshold` | a tick, and no number |
+| `passes > 0` | the fraction `passes/threshold`, and no glyph |
+| the most recent sitting was a query | `?` |
+| otherwise | `✗` |
+
+**A tick never carries a number.** `✓2` meaning "passed at the second
+go" and `✓2/2` meaning "two of the two passes needed" were the same
+shape in the same place saying different things. With counts gone from
+the tick, a fraction is the only number on the grid and can only mean
+one thing. How many goes it took is in the drill-in.
+
+**A query only replaces what there was nothing else to say.** It takes
+the place of the `✗`, never of a fraction and never of a tick: a cell
+part way through has a number worth more than the fact that the last
+paper is in question, and a skill already passed is settled. The amber
+background is what carries an open question in those two cases.
+
+The background, at most one:
+
+| | |
+|---|---|
+| green | passed, and passed in one of the last **N** graded runs |
+| amber | not fully passed, and some sitting was a query |
+| red | no passes at all, and **R** sittings or more |
+
+**Amber beats red** where both apply. A query means the cell is not
+decided yet, and "this student is stuck" is a judgement the query may
+overturn. One line to flip if that reads wrong in use.
+
+Green cannot collide with either: it needs a pass, and both the others
+need the skill unpassed.
+
+**N and R are the person's, not the course's.** Kept in
+`localStorage` beside `filedNames`, for the reason already written
+against the old "light up what just came back" switch: how the grid is
+lit is a preference of whoever is reading it, and two people looking
+at one course should not fight over it. Nothing is written to the
+record, so the tab stays read-only and needs no save bar.
+
+`N = 0` is off, which is what the switch it replaces did by default.
+
+**The toolbar is the legend and the legend is the control.** A tick
+box, a sentence explaining it, and a muted note saying "the last 2
+grading sets" were three things saying one thing -- and `#progress-key`
+was an empty span that nothing ever filled. One strip now: each mark
+beside its own short label, with the two numbers editable where they
+are read.
+
+### Decided: the grid stays about results
+
+`record.progress()` reads `FROM attempt`, so a student-and-skill that
+was printed and never graded has no cell and reads exactly like a
+skill never offered. On the live record that is **456 of 542 pairs**.
+
+The data is there -- `printed` holds it, and `history()` already uses
+it, which is why the drill-in knows and the grid does not.
+
+**It stays out of the grid.** The grid is about results; the drill-in
+is where a paper printed and never marked is visible. Making it a
+cell state would put a mark on 84% of the grid, and a mark on 84% of
+anything is a background.
+
 ## 16. What the Scans tab shows after a read (2026-11-02)
 
 **Written down because it was lost.** This was agreed from three

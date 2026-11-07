@@ -16761,3 +16761,154 @@ the clash was fixed.
 
 Also found: mat-106 is one commit ahead of its remote. `2590eca`, the
 2026-10-25 theme update, was committed and never pushed.
+
+
+## The Progress tab: sorting it had none of, and five marks (2026-11-05/07)
+
+Three asks -- the table, the symbols, the drill-in -- plus "is the
+record behind it sound". The third is still to come.
+
+**There was nothing to look at.** No demo course on this machine had a
+single attempt recorded, so Progress showed its empty state in all of
+them, and the only course with real data has real names in it. So
+`Progress Demo`: 24 pretend students named for what their row
+demonstrates, the real 29-skill bank, four runs, written straight into
+the record rather than built with pdflatex. Compiling 24 x 29 papers to
+look at a grid would be an hour for nothing. It has every cell state
+in it on purpose, and it is what everything below was checked against.
+
+**The record is sound; the query was the gap.** Audited against the
+live MAT 106 file: no orphan attempt, no orphan printed row, no run
+number used twice, `meta.last_run_no` and the highest `run_no` agree,
+no run marked ungraded while holding marks. `save_attempts` upserts on
+(run, student, skill), refuses an unknown outcome, marks the run
+graded in the same transaction, and reports a pair missing from
+`printed` rather than dropping the decision.
+
+But `progress()` reads `FROM attempt` only, and on that file **456 of
+542 student-and-skill pairs were printed and never graded** -- 84%,
+with no cell at all, indistinguishable from a skill never offered. The
+data is in `printed`, and `history()` already uses it, which is why
+the drill-in knows and the grid does not. **He ruled it stays out of
+the grid**: the grid is about results, and a mark on 84% of it is a
+background, not a signal.
+
+**Columns stay as they are too.** At 29 skills the grid is mostly
+blank -- 596 of 696 cells in the demo. The obvious fixes are hiding
+unprinted skills or a picker. Neither: which skills are live is moving
+out of the Update form tab to somewhere of its own, and the columns
+will come from that. A second way to choose them now is this
+codebase's recurring mistake with the paint still wet.
+
+### The table had no sorting at all
+
+`renderProgress` built its head and body by hand while the Roster and
+both Scans tables shared one sorter -- which is the arrangement
+`makeSorter` was extracted to end. It declares columns like they do
+now, and clicking a skill brings the people who need it to the top.
+
+`sectionRuns` and `sectionBand` had the same weld `makeSorter` used to
+have: `sectionBand` hard-coded `COLUMNS.length` and called
+`renderRoster` by name. They take a span and a redraw. Shut bands are
+prefixed per table -- without that, folding 820 away on Progress folds
+it on the Roster, which is a surprise and not a shared preference.
+
+The name-order swap needed `_split_for_sort` on the progress students:
+the same call `_review_rows` already makes, not a second splitter.
+Without it the two tabs could show one student two ways at once.
+
+Two things turned out already done and were left alone: the name
+column and the header both already stick, measured through a 700px
+scroll. The name column is now pinned at 190px -- the ceiling it
+already had -- because `left: 0` needs no measurement but a *second*
+sticky column needs to know where the first ends.
+
+### Six of seven states drew no glyph
+
+Only `passed` had one. The rest were an outlined box varied by colour
+and dash, plus a 5px corner dot for a query. Two things were invisible:
+"never printed" against "printed, not passed" was outline-or-not, and
+`✓2` ("passed at the second go") against `✓2/2` ("two of the two
+needed") was the same shape in the same place meaning different
+things.
+
+The replacement is in `PRINT_TOOL_DESIGN.md` 17, agreed cell by cell.
+Five marks, no box anywhere, and the two non-tick glyphs are the
+app's own `fail` and `query` -- the same ones the drill-in's mark
+track draws, so a cell and the control that sets it agree.
+
+Three decisions worth keeping the reasons for:
+
+* **A sitting is an attempt that is not an absence.** Did-not-sit is
+  recorded and reaches the grid nowhere. That needed `last_sat` in
+  `record.progress` -- the latest outcome that was not an absence --
+  because the glyph turns on it and `last` answers it wrongly for
+  somebody who missed the newest paper.
+* **A query replaces the cross and nothing else.** Not a fraction: a
+  cell part way through has a number worth more than the fact that
+  the last paper is in question. Not a tick: a passed skill is
+  settled. The amber carries the question in both cases.
+* **Amber beats red.** A query means the cell is not decided, and
+  "this one is stuck" is a judgement the query may overturn.
+
+**There was no red in the stylesheet at all.** Amber was carrying both
+"look at this" and "this is going wrong". `--bad` and `--bad-soft` in
+both themes, same lightness family so it does not shout over the other
+two.
+
+**The two thresholds are the reader's**, in `localStorage` beside
+`filedNames`, for the reason already written against the switch they
+replace. Which meant the server could no longer decide what "recent"
+means: `grading_sets` sends every graded run newest-first and the
+browser takes as many as were asked for.
+
+**The toolbar is the legend and the legend is the control.** What it
+replaced: a tick box, a sentence explaining the tick box, a note
+saying "the last 2 grading sets", and `#progress-key` -- an empty span
+nothing had ever filled. Four things for one idea. The two numbers are
+edited where they are read, styled down to the text around them until
+touched.
+
+### Then: whatever is in a cell is the cell's colour
+
+His correction, and it is better than what shipped an hour earlier.
+The cross was muted grey, which made "nobody has passed this" look
+like "nothing here" -- the one pairing the eye most needs separated.
+It is red now, always, the way the tick is always green.
+
+And the exception states the general rule: a highlighted cell colours
+its contents. So the colour goes on the `td` and the contents inherit
+-- a glyph already drew in `currentColor`, the fraction does now --
+instead of a rule per combination that has to be kept in step. The
+tones sit after the marks at equal specificity so a highlight wins on
+source order, and *that ordering is asserted*, because it is the kind
+of thing a tidy-up silently breaks.
+
+Only amber ever actually disagrees with what it lights; green lights a
+tick and red lights a cross, both already that colour. All three are
+written the same way anyway, so it stays true if the pairings change.
+
+The legend was colouring its marks by `:nth-child(1)`, `(3)` and
+`(4)` -- a claim about the order of the strip rather than about what
+each mark is. It wears the grid's own class names now.
+
+### On the testing
+
+`cellState` had **never been executed by the suite**. It sits outside
+the block the markup tests lift, and `node --check` parses app.js
+without running a line of it -- the same hole the Scans counting was
+in until a mutation put a wrong filter back and nothing noticed. It is
+inside a marked pure region now, with 21 tests over it and 5 more over
+the colour rule in CSS text.
+
+Twenty-two mutations across the three rounds, all caught, but not
+first time:
+
+* A `padStart(4, "0")` in the sort key was dead -- counting down from
+  1000 already fixes the width -- and removing it broke no test. Taken
+  out rather than kept as untested cleverness.
+* One surviving mutation was a no-op I had written (`|| false`), not a
+  gap in the tests. Worth saying: a mutation that survives is a
+  question about the mutation as well as about the suite.
+* The project's own `--glyph-size` guard caught both new CSS rules
+  setting a glyph width without it, which is exactly what it is for.
