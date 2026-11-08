@@ -2480,6 +2480,16 @@ numerals in particular soften a dense grid at no cost to legibility.
 **The gutter is for settings-shaped sections only.** Not a layout for
 the whole app. See 13.5.
 
+**Glyphs are judged at their rendered size, by rasterising and
+magnifying** -- not by looking at a screenshot, which the pane
+downscales. The recipe is in `checkit-printit/tools/mockups/README.md`.
+The first thing it overturned was the Settings gear: the comment in
+`app.js` claimed a toothed outline could not survive 21px, which was
+an assumption written as a finding. Five survive. The constraint that
+is real is the white left in a valley, and it is bought by moving the
+root circle out rather than by cutting teeth. See `CODEBASE_NOTES.md`,
+"The Settings gear, and a claim nobody had tested".
+
 ### 13.4 Writing, which is where the character is
 
 §12.16 already governs control labels: a verb and its object, nothing

@@ -17327,3 +17327,85 @@ never ran and the fix looked broken through three rounds of
 checking. The code was right the second time; the tab was asleep.
 Front the tab before testing anything that waits on a frame.
 
+
+## The Settings gear, and a claim nobody had tested (2026-11-08)
+
+The instructor opened a pass over the app's glyphs and started with
+the gear on the Settings tab: he did not like the thin teeth and
+wanted a real gear, pointing at a stock icon of one.
+
+What was there was two concentric circles with eight short radial
+sticks between them. The comment above it said why:
+
+> Eight teeth as short radial strokes plus two circles, because a
+> toothed outline drawn as one path is unreadable at 21px.
+
+**That had never been tested.** It reads as a finding and it was an
+assumption, which is the "do not declare something impossible
+without checking" failure in `CLAUDE.md` wearing a comment as a
+disguise. Five toothed outlines were generated and looked at. All
+five read as gears. The sticks version is the one that does not --
+at 21px it reads as a sun.
+
+### The number that actually decides it
+
+Not the tooth count, which is where the guess went. It is how much
+white survives in a *valley*, the gap between two teeth.
+
+`.glyph` carries `stroke-width: calc(24 * 1.5 / var(--glyph-size))`,
+so at the rail's 21px the stroke is 1.714 user units wide and bleeds
+0.857 either side of its centreline. A valley arc narrower than
+1.714 therefore has no white in it at all, and eight teeth close up
+into a plain circle.
+
+A valley arc is `root_radius * angle`. The first four candidates put
+the root circle at 7.0-7.7 and left 0.51, 0.17, 1.09 and 0.12 of
+white -- which is a blob, and is presumably what somebody saw once
+and wrote the comment about. The fix is to push the **root circle
+out**, not to cut teeth: moving it from 7.5 to 8.1 buys 0.9 of white
+and costs nothing but tooth depth, and depth turns out to be the
+cheap thing. A 2.4-deep tooth still reads as a tooth. A valley that
+has closed up reads as nothing.
+
+### What was built
+
+`a8`: eight teeth, outer radius 10.5, root 8.1, hub 3.6, the tooth
+23 degrees wide at the root narrowing to 18 at the tip. Arcs across
+the tips and the valleys rather than chords, because a gear with
+flat valleys reads as a star. Ink reaches 11.36 of the 12 the
+`viewBox` allows. One path plus one circle, replacing two circles
+and a path of eight strokes.
+
+The path is generated, not drawn: the geometry is written out in the
+comment above it in `app.js` so it can be recomputed. One wrinkle
+worth keeping -- each tooth's segment does **not** begin with an `L`
+back to the valley point, because the previous valley arc already
+landed there, and a zero-length segment under `stroke-linecap:
+round` is drawn as a dot. Which is a real technique in this codebase
+(`M18.4 12h0.01` is how a dot inside a glyph is made) and therefore
+a real way to get eight unwanted dots.
+
+### How a glyph gets judged, which was the harder problem
+
+**A screenshot does not settle it.** The browser pane downscales
+whatever viewport is emulated, and this toolset's `zoom` crops a
+screenshot rather than magnifying it -- the tool said so. Both hand
+back a blur, and a blur argues for whichever answer you already had.
+
+What settled it: rasterise the glyph at the size the screen will
+really draw it -- 21 CSS px times a 1.5 device pixel ratio, so 32
+real pixels -- into a canvas, then blow *that* up with
+`imageSmoothingEnabled = false`. The result is the actual pixels,
+magnified, and the five gears were obviously gears. The recipe is in
+`tools/mockups/README.md` under "Judging a glyph at its real size",
+because it applies to every remaining glyph in the pass.
+
+Two details that bite: `stroke-width` has to be written into the
+standalone SVG by hand, since `.glyph` is a class in the page's
+stylesheet and a data-URL SVG is its own document; and so does the
+stroke colour, since `currentColor` has nothing to inherit from
+there either.
+
+The five candidates are kept in `tools/mockups/gear.js`, which draws
+them at 13, 18, 21, 32 and 64 and again in a rail row beside the
+word Settings.
