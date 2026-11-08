@@ -17409,3 +17409,83 @@ there either.
 The five candidates are kept in `tools/mockups/gear.js`, which draws
 them at 13, 18, 21, 32 and 64 and again in a rail row beside the
 word Settings.
+
+
+## The door, and the size nobody had checked (2026-11-08)
+
+Second glyph of the pass. `drop` and `restore` -- the control that
+takes a student off the printing list, and the one that puts them
+back. He said it did not read, and pointed at a stock icon: a door
+frame, a leaf hinged at the right and swung toward the viewer, an
+arrow going in through the opening. With a single-stroke arrow, not
+that picture's outlined block one.
+
+### What was wrong with the old one
+
+Measurable, and nothing to do with taste. It was a rounded rectangle
+from x=9 to x=21 with a knob dot, and an arrow whose head ran from
+x=7.4 to **x=10.4**. The panel's left edge is at x=9. The arrowhead
+was drawn 1.4 units *inside* the wall before the 2-unit stroke was
+counted at all, so the two merged into one shape. That is why it
+read as a box with a stub rather than as anything going anywhere.
+The knob had the same problem against the right edge.
+
+### The size that binds is 13, not 18
+
+The Roster draws these at `.iconbtn`, which is 18px. **The Runs tab
+draws them at `.iconbtn.tiny`, which is 13**, and at 13 the stroke is
+24 * 1.5 / 13 = 2.77 units wide in a 24-unit box.
+
+Four candidates had already been judged at 18 and one chosen before
+that was noticed. Checking it changed the answer: the chosen one
+crowded badly at 13 and a different arrangement of the same parts
+did not. Had this shipped on the strength of the Roster alone it
+would be the "a fix applied to one path is not applied to the
+others" failure again, in a third form -- not a second copy of the
+code this time, but a second *size* of the same copy.
+
+### Why the reference cannot be drawn whole
+
+The picture he pointed at stacks five horizontal things up the
+middle of the box: the leaf's top edge, the lintel, the arrow, the
+threshold, the leaf's bottom edge. Five strokes at 2.77 is 13.9
+units of ink in a box 24 tall, leaving 10 for the four gaps between
+them -- 2.5 each, which is less than one stroke, so there is no
+white anywhere. It was drawn anyway, as `faithful` in the mockup,
+and it is a blob. The prediction and the picture are both kept:
+a prediction nobody looks at is a prediction nobody learns from.
+
+### What was built
+
+The frame and the leaf **share the top and bottom lines**, which is
+what a door only slightly open actually looks like, and that takes
+five layers down to three. Then:
+
+* **the opening is on the left and has no stubs across it.** An
+  earlier version kept the reference's little corner returns; they
+  sit 3.0 from the arrow's lane, which is 0.2 of white at 13px, and
+  they closed up on it.
+* **the leaf leans 3.2 units over its height.** Upright it reads as
+  a divider in a box. The lean is the only thing in the glyph
+  saying "door", and it survives 13px -- which was checked, not
+  assumed.
+* **the arrow's tip stops at x=11.0**, 3.6 short of where the leaf
+  crosses its lane. At 12.4 the head dissolved into the leaf at
+  13px and the arrow lost its point.
+
+`restore` is **the same door with the arrow reversed in its own
+lane**, not the whole glyph mirrored. A mirrored frame puts the
+doorway on the other side of the box, which says the room moved
+rather than the person. The first draft of the mockup got this
+wrong and it was obvious the moment the pair were drawn together,
+which is why the mockup draws both.
+
+The knob went with the panel. It was a zero-length segment rather
+than a circle -- `M18.4 12h0.01` under `stroke-linecap: round` is
+exactly one stroke-width across and scales with everything else,
+where a stroked `r=0.6` circle thinned away. **That was the last
+user of the technique in the set**, so printit's `CLAUDE.md` now
+says so rather than pointing at a knob that is gone.
+
+Seven candidates are kept in `tools/mockups/door.js`, drawn at both
+13 and 18 and again as a pair of real buttons.

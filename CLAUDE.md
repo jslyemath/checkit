@@ -115,7 +115,7 @@ A template that documents its own syntax will have that documentation parsed as 
 | | job | read it |
 |---|---|---|
 | `CLAUDE.md` (one per repo) | the **map**: what exists, which Python, the footguns | automatically, every session |
-| `PRINT_TOOL_DESIGN.md` | the **plan** for printit: decisions, rationale, what is next | on request |
+| `PRINT_TOOL_DESIGN.md` | the **plan** for printit: decisions, rationale, what is next. **Section 15 is the to-do list** -- the whole of it, not one tab's worth | on request, and before asking "what is left" |
 | `CODEBASE_NOTES.md` | the **history**: what changed and why, dated | `grep -n "^## " CODEBASE_NOTES.md` |
 
 **A change with reasoning behind it gets a dated `##` section in
