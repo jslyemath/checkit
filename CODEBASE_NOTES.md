@@ -17489,3 +17489,77 @@ says so rather than pointing at a knob that is gone.
 
 Seven candidates are kept in `tools/mockups/door.js`, drawn at both
 13 and 18 and again as a pair of real buttons.
+
+
+## The door again, and the clock's arrowhead (2026-11-08)
+
+He rejected the door drawn earlier the same day and named two
+things. Both were right, and neither was taste.
+
+### "The frame of the door isn't suggested around the arrow"
+
+Every candidate in the first round drew the frame as a rectangle
+with its left side simply missing. That is a box with a gap, and an
+arrow arriving at a gap has not gone through a doorway -- there is
+nothing beside it saying "doorway".
+
+What a door frame looks like beside someone walking through it is
+the **corner returns**: a short upright and a short horizontal at
+the head of the opening, and the same at the foot. Two small marks
+each. They cost almost nothing and they sit *above and below* the
+arrow's lane rather than in it, so the 13px budget is untouched.
+
+The first round had actually tried them, in the candidate called
+`ajar`, and then dropped them because at 3.0 units from the arrow
+they left 0.2 of white at 13px. The fix was to move them further
+out, not to delete them. Deleting them removed the thing he was
+asking for.
+
+### "The top and bottom of its parallelogram should be slanted, not its side"
+
+The leaf was a single leaning line. A line is not a panel, so it
+reads as a divider in a box, and the lean was on the wrong edge
+besides. A leaning *side* is a door falling over. A slanted head
+and foot, with the sides upright, is a door turned toward you --
+which is the whole point of drawing the leaf at all.
+
+It is a closed quadrilateral now: free edge at x=14.6 from y=5.2 to
+18.8, hinge edge at x=21 from 2.4 to 21.6. Both sides vertical,
+both the top and the bottom slanted, and the hinge the taller of
+the two, as in the icon he pointed at.
+
+That last part is worth a note, because it is perspective
+*backwards*. A door swinging toward you brings its free edge
+nearer, and nearer things are bigger, so the free edge should be
+the taller one. The reference draws it the other way, and so does
+this, because it is the picture he asked for. The other way round
+is kept in the mockup as `free taller`; it reads perfectly well and
+is a one-line swap if he ever prefers it.
+
+A true parallelogram -- both sides the same height, the leaf
+sheared -- was drawn too, since "parallelogram" is the word he
+used. It reads as a door tilted rather than turned, and looks like
+it is floating. Kept as `parallelogram`.
+
+### The clock on Runs
+
+`M6.2 3.2v2.9H3.3`. That is a stub down and a stub left meeting at
+a **square corner** -- an L sitting beside the dial, not a point on
+the end of the arc. It also had nothing to do with the arc it was
+supposed to finish: the arc ended at (6.2, 5.9), the corner's
+vertex sat at (6.2, 6.1), near it by hand-tuning rather than by
+construction, and aimed nowhere in particular. An L beside a gap is
+what he meant by the top looking weird.
+
+Both wings are now placed off the **tangent at the arc's own end
+point**, 34 degrees either side, so the head points the way the arc
+travels by construction. The arc runs anticlockwise -- backwards,
+which is the idea -- from 178 degrees round to 262, leaving the gap
+in the upper left where the head lives.
+
+Three gap widths were drawn and magnified at 21px. The widest won:
+in the two narrower ones the head came close enough to the far end
+of the arc to read as a join. Only the rail draws this glyph, at
+21px, so unlike the door there was one size to satisfy -- which was
+checked with a grep before any of it was drawn, the habit the door
+earned that morning.
