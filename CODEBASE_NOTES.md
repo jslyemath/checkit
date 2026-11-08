@@ -17563,3 +17563,68 @@ of the arc to read as a join. Only the rail draws this glyph, at
 21px, so unlike the door there was one size to satisfy -- which was
 checked with a grep before any of it was drawn, the habit the door
 earned that morning.
+
+
+## A trapezoid is not a parallelogram (2026-11-08)
+
+Third correction on the same glyph, and like the first two it is
+geometry rather than taste.
+
+The leaf had its hinge edge 19.2 long and its free edge 13.6, so
+the top and bottom were not parallel. He said so in one line:
+"That bottom of the door should be parallel to the top of the
+door."
+
+**Why the taper was tempting, and why it is wrong here.** A door
+swinging toward the viewer brings its free edge nearer, and nearer
+things are bigger, so true perspective really would taper it. But
+nothing else in this glyph set has perspective in it, and the icon
+he pointed at does not either -- measured off the picture, its two
+sides are within about two per cent of each other, which is
+drawing slop on a shear, not a taper. A door turned toward you
+drawn without a vanishing point is a **parallelogram**: both sides
+the same length, top and bottom parallel.
+
+Built: both sides 18.0, both edges sheared 2.2 up to the right.
+Free edge x=14.6 from y=4.0 to 22.0, hinge edge x=21 from 1.8 to
+19.8. Checked by arithmetic rather than by eye -- the two edge
+vectors come out (6.4, -2.2) and (6.4, -2.2), and the sides 18.0
+and 18.0 -- because "looks parallel" is exactly the judgement that
+had already been wrong once.
+
+The trapezoid is kept in the mockup as `returns`, and a version
+sheared the other way as `sheared down`.
+
+### The Runs clock is imbalanced, which is a different fault
+
+Fixing the arrowhead earlier in the day did not fix the glyph: he
+called it "still incredibly imbalanced and awkward". That is not
+about the head. The gap ran from 9 o'clock round to nearly 12 --
+**a quarter of the circle missing from one side** -- while the
+hands pointed down and to the right. Every heavy thing sat on one
+diagonal and nothing on the other. A correctly drawn arrowhead on
+a lopsided dial is still a lopsided dial.
+
+Six options are drawn in `tools/mockups/clock.js` and shown to
+him; nothing is built yet. They move the weight rather than redraw
+the head:
+
+* **as built** -- the quarter-circle gap, for comparison.
+* **gap at the top** -- 40 degrees straddling 12 o'clock, so the
+  bite is symmetric about the upright and the head sits just right
+  of centre. This is the one that answers the complaint directly.
+* **small notch** -- same place as today, 40 degrees instead of
+  84.
+* **plain clock** -- no arrow at all. Balanced, and the quietest
+  thing that could go in the rail; it says *time* and leaves
+  *past* to the word beside it.
+* **plain, hands up** -- a closed dial with the hands at ten to
+  twelve, spreading the ink.
+* **a page** -- a different idea: a run is a printed job. Noted as
+  risky, because it sits close to the clipboard on Update form and
+  the printer on Print job.
+
+One thing confirmed before drawing any of them, by grep: the rail
+is the only caller, at 21px. That check is the habit the door's
+13px miss earned a few hours earlier, and this time it was done
+first.
