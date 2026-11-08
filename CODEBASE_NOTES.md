@@ -17147,3 +17147,118 @@ the list, because `history` is driven off `printed`.
 what lets Progress ask at all: it has a name out of the record and no
 business knowing where files live. Escaping the folder is impossible
 now rather than checked.
+
+## The drill-in becomes a panel, and the track stops belonging to a table (2026-11-08)
+
+The Progress drill-in was a modal: `<dialog id="cell" class="ask
+cellbox">`, 620px, one student's history of one skill. It is now
+`<aside id="cellpanel" class="flyout">`, 400px against the right
+edge, with the grid still visible behind it and the cell it came
+from still lit.
+
+**Why a panel.** After a scan the job is a column, not a cell. A
+dialog meant closing and reopening for every student in it. The
+panel keeps the grid where it is, lights the originating cell, and
+carries a footer that steps to the student above or below --
+`cellNeighbour` walks the rendered table rather than re-sorting the
+roster, so collapsed section bands are stepped over for free and
+there is no second copy of the sort order to get wrong.
+
+**What came out, and why.** The seed, the version letter, the
+attempt number and the scanner's reading. The reasoning is in
+PRINT_TOOL_DESIGN.md section 17; the short version is that a 400px
+panel has room for the page, the date, the run and the mark, and
+each of the four was either answering a question nobody asks here or
+repeating what the layout already said.
+
+**The track stopped belonging to a table.** The one-pill-with-the-
+verdict-filled-in control was written for the Scans tab and keyed on
+`table.matched .review-picks`. The drill-in draws the same control
+for the same reason -- you read the column, not the row -- so the
+rules now key on `.review-picks.track` and whoever draws it adds the
+class. `matchedMarkCell` adds it; `cellTrack` adds `track tight`,
+one size down.
+
+This is the "is there a second copy" rule applied before the second
+copy existed rather than after. Verified by removing the class in
+the live Scans tab and watching the control collapse from 34x26
+borderless stops in a pill to 32x22 bordered buttons -- so the class
+is load-bearing, and a future caller that forgets it fails visibly
+rather than silently inheriting the right look from an ancestor.
+
+**One rule carried over rather than re-invented.** `matchedMarkCell`
+drops "did not sit it" for a paper that came back, because a sheet
+that came back was sat whatever is on it. `cellTrack` does the same,
+so a scanned attempt offers three marks and one that never arrived
+offers four. The tracks are therefore different widths down the
+timeline, which reads as "this one has an option the others do not"
+rather than as ragged.
+
+**A thumbnail is not a look.** `api_scan_sheet` rendered one page at
+`scale=110/72` for looking at. The panel draws one page per attempt,
+so a student who has sat a skill four times would have cost four
+full-page renders at once. It now takes `thumb`, which renders at
+`scale=14/72` -- about 120px across a letter page, twice the 54px it
+is drawn at -- at JPEG quality 55. Measured in the running app: the
+thumbnail comes back 119x154 and is drawn at 54x76.
+
+The test for it compares the actual byte counts rather than
+asserting something in the abstract, because bytes are the point of
+the flag. Watched it fail first: with the branch removed it reports
+the two renders are the same size.
+
+**Verified in the running app, not only in tests.** ID Test is the
+only course whose record has attempts linked to a scanned page --
+`scan` and `scan_page` are empty in Progress Demo and Scan Demo,
+which have grids and attempts but nothing scanned -- so the
+thumbnail path could only be exercised there. Checked: the picture
+loads, clicking it opens the whole page at 935x1210 with the right
+file and page, stepping to the next student keeps the panel open and
+exactly one cell lit, and setting a mark saves, redraws the grid,
+re-finds the cell by position and keeps it lit. The mark was changed
+and changed back, so the record ends where it started.
+
+**Then the panel stopped floating.** It was built fixed to the right
+edge, over the grid, and that defeated its own purpose. The reason
+for a panel rather than a dialog is that the originating cell stays
+lit; an overlay hides the right-hand columns, which is where a good
+share of the cells are. Measured in the running app on Progress
+Demo, 24 students by 29 skills at 1400px: the cell clicked sat at
+x 1015 with the panel starting at x 1000, so the lit cell was
+underneath it.
+
+The fix needed no new machinery. `body` is already a flex row and
+`main` is already `flex: 1 1 auto; min-width: 0`, so making the
+panel a third flex item beside them was the whole change -- the
+grid narrows by itself. `main` carries `max-width: 1100px`, which
+means above roughly 1690px of window the panel is free: measured at
+1700px, `main` stayed 1100px with the panel open. Below 900px the
+panel goes back to `position: fixed`, because 400px of panel would
+leave a grid too narrow to be the thing being worked against.
+
+Verified by hit test rather than by arithmetic. Comparing bounding
+rectangles was wrong twice: a cell scrolled out of a clipping
+scroller still reports coordinates past the scroller's edge, so a
+naive overlap count claimed 192 cells were covered when the scroller
+ended at 984 and the panel began at 1000 and nothing could be
+covered at all. `document.elementFromPoint` at the lit cell's centre
+is the honest question, and it now returns the cell.
+
+**Push has its own way of losing the cell.** Narrowing the grid can
+scroll the lit cell past the right edge -- out of sight by scrolling
+instead of by covering. `keepCellInView` scrolls it back, with
+`block: "nearest", inline: "nearest"` so a cell already on screen
+does not move.
+
+It needs two animation frames, not one. Revealing the panel narrows
+the grid and the browser then clamps the scroller's own `scrollLeft`
+to the new range, and that clamp lands after the first frame, undoing
+a scroll made on it. One frame left the cell at x 1015 in a scroller
+ending at 984; the same call by hand a moment later moved it to 934.
+
+A test-harness trap worth recording: a Browser pane tab that is not
+the fronted tab suspends `requestAnimationFrame`, so the callback
+never ran and the fix looked broken through three rounds of
+checking. The code was right the second time; the tab was asleep.
+Front the tab before testing anything that waits on a frame.
+
