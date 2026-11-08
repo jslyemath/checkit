@@ -17628,3 +17628,71 @@ One thing confirmed before drawing any of them, by grep: the rail
 is the only caller, at 21px. That check is the habit the door's
 13px miss earned a few hours earlier, and this time it was done
 first.
+
+
+## Paper and a circular arrow, and a knockout (2026-11-08)
+
+Of the six clocks he was shown, the one he picked up was the page:
+"Paper is an interesting idea. Show me a few options with a redo
+symbol and a paper or stack of papers." Nine more are drawn in
+`tools/mockups/clock.js`; nothing is built yet.
+
+### The arithmetic said a badge would not fit, and it was wrong
+
+Two objects in a 24-unit box with a 1.714-unit stroke at 21px. A
+circular arrow small enough to sit beside a page wants a radius of
+about 4.6, so nine across; put its centre at (17.2, 17.0) and the
+page's bottom-right corner lands **inside** it. Shrink either one
+until they clear and the badge becomes mush.
+
+What makes it work is a **knockout**: the page outline is simply
+not drawn where the badge sits. Its bottom edge stops at x=11 and
+its right edge at y=9.6, and the gap reads as the page passing
+behind the badge. An overlap that would have merged becomes a gap
+drawn on purpose.
+
+That is obvious in hindsight and is how every badged icon in every
+set is made, and it was not visible in the measurements at all --
+the measurements only answer "do these two outlines collide", and
+the answer to that was yes the whole time. Worth remembering the
+next time the arithmetic says something cannot be drawn: it can
+only rule out drawing it *whole*.
+
+### What was drawn
+
+* **page with the arrow inside it** -- the biggest, clearest arrow
+  of the set, and also the browser reload icon, which is a strong
+  prior reading to fight.
+* **stack with the arrow inside the front sheet** -- the second
+  sheet is what says *runs* rather than *a run*.
+* **arrow round the page** -- at 21px the page inside the ring has
+  no room for anything on it and is a rounded rectangle.
+* **arrow over a stack** -- drawn and failed. The sheets under the
+  arc read as a bowl and the arc's ends land on nothing. Kept, so
+  nobody tries it again.
+* **page plus badge** and **stack plus badge** -- the knockout.
+  Paper and arrow stay two ideas side by side rather than one
+  inside the other.
+
+### Which way the arrow turns
+
+Anticlockwise is history, and these runs already happened.
+Clockwise is re-run, which the tab also supports -- it can start a
+new run from an old one's settings. Both are defensible, so the
+three that work are drawn both ways.
+
+**Turning one round is not a sweep-flag change.** The head has to
+stay on the end of *travel*, so the two edges of the gap swap
+roles as start and end. Flipping only the flag draws the
+40-degree gap instead of the 320-degree arc, which is what the
+first attempt did -- and it is the kind of error that renders as
+"a small stub where the arrow should be" rather than as an
+exception, so it has to be looked at.
+
+### Still open
+
+Which of them, and which direction. Also noted and not yet
+settled: a page or a stack sits near the clipboard on Update form
+and the printer on Print job. The badge is what keeps it distinct,
+which is an argument for the badged forms over the ones with the
+arrow inside.
