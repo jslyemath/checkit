@@ -17251,11 +17251,19 @@ instead of by covering. `keepCellInView` scrolls it back, with
 does not move.
 
 **Then it got narrower, and the header stopped talking.** The panel
-was 400px because the mockup compared it against a 620px dialog;
-nothing in it needs that. Measured: a step 188, the footer 148, the
-track 117 at four stops, and the whole thing shrink-wraps to 295.
-It is 320 now, with the skill's title the only part allowed to be
-cut and a tooltip so a cut one is recoverable.
+was 400px because the mockup compared it against a 620px dialog.
+It went to 320, then to 240, and the two wrong numbers were wrong
+the same way: both were read off the strip.
+
+The strip holds the skill's title. A long title wants 434 and the
+title has an ellipsis, so the strip will ask for whatever width it
+is offered -- it can never be the measurement. The width has to
+come from what cannot give way, and that is the mark track at 117
+for four stops: 117 plus the page at 58, the gap at 12 and the
+padding at 32 is 219, so 240. Checked across fourteen students for
+anything spilling past the panel or clipped inside it: none, with
+the widest date at 99 and the widest name at 93. The title and the
+name both ellipsize with tooltips.
 
 The strip's verdict was words -- "1/2 passed", "no passes yet". It
 now draws `cellFace(state)`, the same function the grid cell uses,
@@ -17296,6 +17304,16 @@ rewrite also anchored on `\}`, which the previous match eats, so
 every rule after the first was invisible and every lookup returned
 nothing -- a selector and a body both simply contain no braces,
 which is enough to split on.
+
+**The verdict chip got an outline.** `currentColor`, so it is the
+mark's own colour without a colour being named again: green round a
+tick, red round a cross, amber round a query, and the highlight's
+colour where there is one. It takes the slug's pill shape and
+padding too, so the pair read as two chips rather than a chip and a
+loose glyph, and the strip centres its three items instead of
+sitting them on a baseline -- a glyph in a box has no baseline
+worth sharing, and it sat low beside the slug. An empty verdict
+drops its border and padding rather than drawing an empty outline.
 
 It needs two animation frames, not one. Revealing the panel narrows
 the grid and the browser then clamps the scroller's own `scrollLeft`
