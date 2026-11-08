@@ -3522,10 +3522,15 @@ The instructor opened a pass over the app's glyphs. Done so far:
   sticks; it is a real toothed gear. See `CODEBASE_NOTES.md`, "The
   Settings gear, and a claim nobody had tested", and the method note
   in 13.3.
-* ~~**the door** -- `drop` and `restore`.~~ **Done.** A doorway
-  open on the left with the leaf leaning in it. The arrowhead used
-  to be drawn inside the panel's wall. See `CODEBASE_NOTES.md`, "The
-  door, and the size nobody had checked".
+* ~~**the door** -- `drop` and `restore`.~~ **Done, on the second
+  try.** Corner returns for the frame so the arrow goes through a
+  doorway rather than at a box, and the leaf a closed quadrilateral
+  with slanted top and bottom rather than a leaning line. See
+  `CODEBASE_NOTES.md`, "The door, and the size nobody had checked" and
+  "The door again, and the clock's arrowhead".
+* ~~**the Runs clock.**~~ **Done.** Its arrowhead was a right-angle
+  corner aimed nowhere; both wings now come off the tangent at the
+  arc's own end point.
 
 #### Closed since 2026-11-05
 
