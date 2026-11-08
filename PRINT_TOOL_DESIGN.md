@@ -3459,19 +3459,87 @@ before the first run of next term.
 | 6 | **Brightspace export** (14.6) | needs Progress, and one round-trip with a real export file. `F5-E` should be published first -- see 14.8 | small |
 | 7 | Drive folders and student emails | explicitly a stretch; the rest has to work first | -- |
 
-### What is left, as of 2026-11-05
+### What is left, as of 2026-11-08
 
-The three tabs the term needs are built and have been used on real
-paper. What remains is one feature and a list of things that are only
-known to work on one machine.
+**This is the list.** It is kept here, in one place, because the
+previous version of it covered the feature and the calibrations only
+and everything else had to be reassembled by reading six separate
+"Still open" sections. When something here is done, strike it through
+here -- not only in the section it came from.
 
-**The feature:** Brightspace export (item 6). It needs the roster's
-LMS ids imported once (14.9) and `F5-E` published in the bank (14.8),
-and then one round trip against a real export file.
+#### Real work, in rough order
 
-**The calibrations**, each of which is a number fitted to a single
-stack off a single copier, and each of which will be wrong on a
-different one:
+| | what | where it is written up | blocked on |
+|---|---|---|---|
+| 1 | **Brightspace export** | 14.6 | two prerequisites, below |
+| 1a | import the roster's LMS ids, once | 14.9 | the instructor's CSV: LMS id in one column, an email or SID in another |
+| 1b | publish `F5-E` as a real `<outcome>` in mat-106's `bank.xml` | 14.8 | nothing. Today the slug appears only inside `<associates>`, which **nothing anywhere reads**, so it generates and publishes nothing |
+| 2 | **the Settings tab's boilerplate editor** | 12.6, stage 8h | nothing. A form can be created or attached already; this is the other half |
+| 3 | **a section filter on Progress** | 17 | nothing |
+| 4 | **can Scans place a page with no footer code** | 14.8 | a decision. Every paper printed before 14.5 shipped is such a paper |
+| 5 | **where the thresholds are stored** | 14.8 | a decision: a new course file, or a table in one that exists |
+| 6 | **does a run number need its course** | 14.12 | a decision. Unique within a course today, and Scans is course-scoped |
+| 7 | **mat-106's published `docs/assets/*.sty` are two revisions behind** | -- | nothing. Wants `generate -i --image-seeds 400 --remote https://jslyemath.github.io/mat-106-checkit` and a deploy |
+| 8 | **which figure route for self-contained assessments** | 11.2 | a decision. The recommendation on file is to publish the `.tikz` |
+| 9 | **what a hand-authored bank's `bank.xml` looks like** | 11.4 | MAT 206's rebuild, which is not scheduled |
+
+#### Waiting on the world, not on work
+
+* **Nobody but its author has driven the Scans tab.** The save path,
+  the re-match and the clash warning have tests and have been run
+  against real pages, but not by somebody who did not write them.
+* **The four calibration numbers**, below. Each is fitted to one
+  stack off one copier.
+
+#### Look and feel, parked deliberately
+
+Each of these is the instructor's call, and each was parked for a
+reason rather than forgotten. 13.8 and the Roster list in this
+section have the reasons.
+
+* **Section bands vanish under any sort that is not by section**, so
+  the 820/830 split goes invisible. The trade of the design, not yet
+  ruled on.
+* **Section header treatment.** Six tried across two rounds, six
+  rejected. To be judged against a whole tab on screen.
+* **Row height and padding.** `--t-base` is still 15px; the 36-40px
+  row target is untested against 45 students.
+* **The rail folds to icons below 900px**, so at a narrow window the
+  labels are never seen. The right threshold is unknown until it is
+  used at a real window size.
+* **A thin top strip, or none.** Nothing replaced the top bar.
+* **One student always reads in natural order**, because their
+  surname is two words and the splitter returns one. Making a split
+  correctable is a roster feature nobody has asked for.
+* **`Last, First` makes the Name column read-only**, because the
+  filed form is derived.
+
+#### The glyph pass (2026-11-08, in progress)
+
+The instructor opened a pass over the app's glyphs. Done so far:
+
+* ~~**the Settings gear.**~~ **Done.** It was two circles and eight
+  sticks; it is a real toothed gear. See `CODEBASE_NOTES.md`, "The
+  Settings gear, and a claim nobody had tested", and the method note
+  in 13.3.
+* ~~**the door** -- `drop` and `restore`.~~ **Done.** A doorway
+  open on the left with the leaf leaning in it. The arrowhead used
+  to be drawn inside the panel's wall. See `CODEBASE_NOTES.md`, "The
+  door, and the size nobody had checked".
+
+#### Closed since 2026-11-05
+
+* ~~**Progress has no sorting.**~~ Wired, and verified on
+  2026-11-08 with a real pointer click: stacked keys, section bands
+  under a section sort, and the Roster's own name-order swap. See 17.
+* ~~**Six of the seven cell states draw no glyph.**~~ Replaced by
+  the cell vocabulary, 17.
+* ~~**The drill-in.**~~ Built as a panel, 17.
+
+#### The calibrations
+
+Each of these is a number fitted to a single stack off a single
+copier, and each will be wrong on a different one:
 
 * `INK_FLOOR` (0.005) -- below this a page with no code is called
   blank rather than unreadable. Still the guess it always was, made
@@ -3557,6 +3625,20 @@ machinery the Roster and both Scans tables share -- is not wired to
 it; `renderProgress` builds its head and body by hand. No section
 bands either, and no name-order swap, so Progress and the Roster can
 show names in two different orders at once.
+
+> **Closed.** `progressSort` is a `makeSorter` over
+> `progressColumns`, which now holds the name column (with the
+> Roster's `swapby` control in its heading), the section column and
+> one column per skill, each sorting worst-first by `cellSortKey`.
+> Checked on 2026-11-08 by clicking the Section heading **with a
+> real pointer**: the headings came back `Sec` with priority 1 and
+> `last name` with priority 2, and two section bands appeared.
+>
+> `element.click()` reported the opposite -- nothing moved -- which
+> is the footgun this repository already has written down: it runs
+> a handler without hit testing or any ancestor's listeners, so it
+> can report either answer regardless of the truth. It was believed
+> for one round here before the real click was tried.
 
 **Six of the seven cell states draw no glyph.** Only `passed` has
 one, a tick. The rest are told apart by CSS: a 13px outlined box, a
