@@ -3528,9 +3528,12 @@ The instructor opened a pass over the app's glyphs. Done so far:
   with slanted top and bottom rather than a leaning line. See
   `CODEBASE_NOTES.md`, "The door, and the size nobody had checked" and
   "The door again, and the clock's arrowhead".
-* ~~**the Runs clock.**~~ **Done.** Its arrowhead was a right-angle
-  corner aimed nowhere; both wings now come off the tangent at the
-  arc's own end point.
+* **the Runs clock.** The arrowhead is fixed -- it was a right-angle
+  corner aimed nowhere, and both wings now come off the tangent at
+  the arc's own end point. **The balance is not.** A quarter of the
+  circle is missing from one side while the hands weigh the other,
+  and he has six options to choose from in
+  `checkit-printit/tools/mockups/clock.js`. Waiting on that choice.
 
 #### Closed since 2026-11-05
 
