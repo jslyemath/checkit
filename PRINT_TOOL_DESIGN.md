@@ -3649,6 +3649,97 @@ seeing how the working changed -- without opening anything. It costs
 the most vertical room per attempt and needs a real page render
 behind it, not a cutout.
 
+### Built: the drill-in is a panel (2026-11-08)
+
+C, with the header of H3. Drawn in `tools/mockups/drillin-c.js`
+before it was built, which is why the sizes below are measured
+rather than guessed.
+
+Four things came out of the panel after it was drawn:
+
+* **the seed.** It is how an exercise is found again, which is a
+  thing to look up when a question is wrong, not a thing to read
+  down a list of four attempts.
+* **the version letter.** It tells one paper from the other versions
+  of a run. Among one student's own papers there is nothing to tell
+  apart.
+* **the attempt number.** `#1`, `#2` counted out loud what the
+  timeline had already said by putting them in order.
+* **the scanner's own reading.** The final mark is the answer; the
+  reading is how it was arrived at, and belongs where a disagreement
+  is being looked into.
+
+What is left per attempt is the page, the date, the run, and the
+mark -- and with the seed and the number gone the mark track comes
+up directly under the run with nothing between.
+
+**The page is the control.** Not the words "see the paper": a
+control standing in for a thing should look like the thing, and a
+phrase where a control belongs is the tic section 13 bans. Clicking
+one opens the whole page in the viewer the Scans tab already uses.
+Where nothing was scanned there is no picture to click, and the
+empty dashed frame says so without a sentence.
+
+**The page has no height of its own.** It is a grid item, so it
+stretches to the row, which means it ends exactly where the track
+ends -- the bottoms line up without a number being chosen. The row
+comes out 76px for a 54px-wide page, a ratio of 0.71, which is about
+what a letter page is, so it keeps looking like a page without being
+told to.
+
+**The track is one size down from the Scans table's**, 28x22 against
+34x26. In the table it is the widest thing in a row of plain text
+and carries the column; in the panel it sits under two short lines
+beside a small page, and at the table's size it was the loudest
+thing there.
+
+**Headers considered.** The awkwardness of the first draft was two
+separate things: the name and section were stacked, making a tall
+row with little in it, and the right-hand half was empty. H1
+(tightened) fixed only the first. H2 put the cell's verdict in the
+empty half as a stat -- shortest, but it made the verdict compete
+with the name for what the panel is about, and the verdict is
+already visible in the cell that was clicked to get here. H3 won:
+the name on its own line, then a tinted strip carrying slug, title
+and verdict. It is the tallest, and the only one where the student
+is plainly the subject and the skill is plainly context. Said with
+the layout, not with a label.
+
+**It takes width rather than floating over.** The first build fixed
+the panel to the right edge, over the grid. That was wrong, and the
+reason it was wrong is the reason the drill-in is a panel at all:
+the cell it came from stays lit so you can work down a column, and
+an overlay hides exactly the right-hand columns. Measured on a 24 by
+29 grid at 1400px: a cell at x 1015 sat under a panel starting at
+1000, and the grid lost about two columns across every visible row
+with no way to reach them but to close the panel.
+
+`body` was already a flex row -- nav rail, then `main` at
+`flex: 1 1 auto; min-width: 0` -- so the panel became a third item
+beside them. No margin on `main`, no JavaScript. `main` is capped at
+`max-width: 1100px`, so above about 1690px of window the panel costs
+the grid nothing at all; below that the grid narrows and keeps every
+column reachable by scrolling sideways, which it already did.
+
+Below 900px there is no width to share, so the panel goes back to
+covering. Material's side sheets and Liferay's sidebar both switch
+at about there, for the same reason.
+
+What the field does is split, but split by purpose rather than
+fashion. Overlay is the default for a temporary, focused, mostly-read
+task -- Material's modal side sheet, Carbon's shell right panel.
+Push is what gets recommended where both halves are worked at once,
+and Workday says the case almost exactly: where the panel edits
+content within the page, keeping it open and resizing the page
+content may be ideal. That is this panel -- it sets a mark, and the
+grid behind it is what shows the mark.
+
+**One thing push brought with it.** Narrowing the grid can scroll
+the lit cell off the right edge -- losing sight of it by scrolling
+rather than by covering, which is the same failure wearing a
+different hat. The panel scrolls it back into view on open, and
+again after the grid is redrawn by a saved mark.
+
 ### Decided: the cell vocabulary (2026-11-07)
 
 Seven states drawn as outlined boxes became five marks, agreed cell
