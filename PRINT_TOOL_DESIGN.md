@@ -3740,6 +3740,27 @@ rather than by covering, which is the same failure wearing a
 different hat. The panel scrolls it back into view on open, and
 again after the grid is redrawn by a saved mark.
 
+**320px, not 400.** The 400 was carried over from the mockup, where
+the panel was being drawn against a 620px dialog to show what the
+narrower shape cost. Nothing in it ever asked for that much: the
+page is 58, the track 117 at its widest, a step comes to 188 and
+the footer to 148. Left to shrink-wrap it settles at about 295. The
+one part that can want more is the skill's title, and it has an
+ellipsis and a tooltip, so it gives way instead of the grid doing.
+
+**The header shows the cell, not a sentence about it.** It said
+"1/2 passed" or "passed" or "no passes yet". It now draws the same
+glyph or the same bare fraction the grid drew, wearing the same
+state and tone classes, so an amber cell is amber in the header and
+a red one red. A cell with nothing recorded shows nothing, which is
+what the grid does too. The words moved to the tooltip, which is
+`describeCell` -- the same sentence the cell itself says when
+pointed at.
+
+That is one declaration per colour, not two: the drill-in's class is
+named beside each `td` in the grid's own rules rather than given a
+copy of the values.
+
 ### Decided: the cell vocabulary (2026-11-07)
 
 Seven states drawn as outlined boxes became five marks, agreed cell

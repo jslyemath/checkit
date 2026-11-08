@@ -17250,6 +17250,53 @@ instead of by covering. `keepCellInView` scrolls it back, with
 `block: "nearest", inline: "nearest"` so a cell already on screen
 does not move.
 
+**Then it got narrower, and the header stopped talking.** The panel
+was 400px because the mockup compared it against a 620px dialog;
+nothing in it needs that. Measured: a step 188, the footer 148, the
+track 117 at four stops, and the whole thing shrink-wraps to 295.
+It is 320 now, with the skill's title the only part allowed to be
+cut and a tooltip so a cut one is recoverable.
+
+The strip's verdict was words -- "1/2 passed", "no passes yet". It
+now draws `cellFace(state)`, the same function the grid cell uses,
+inside an element carrying the same state and tone classes, so it
+takes the same colour and the same highlight. The grid's colour
+rules name `.flyout-verdict` beside each `td` rather than getting a
+second block with the same values in it.
+
+**A stray `*/` ate two rules and said nothing.** Extending a comment
+that had already closed -- another paragraph after its `*/`, then
+closing again -- leaves prose sitting as bare CSS and a second `*/`
+closing nothing. The parser recovers by discarding to the next
+brace and takes the rule underneath with it. No error, no console
+warning: the stylesheet loads and one rule is simply gone.
+
+It happened twice in one sitting, in two different paragraphs, and
+was caught only because the panel came out 245px wide when its rule
+said 320 -- the rule had not been overridden, it had been swallowed.
+`test_no_comment_closes_a_comment_that_was_never_opened` walks both
+stylesheets for it now, and was watched failing on the real one
+before being kept.
+
+Checking it also needed a second pass. Comparing the panel's colour
+against the cell's showed they matched -- but they would also have
+matched if the edit had killed both, so the grid was then checked
+against the tokens themselves, numerically, because `oklch(0.820
+...)` in a token and `oklch(0.82 ...)` computed are the same colour
+and different strings.
+
+**The relaxed test helper.** `TestTheColourOfWhatIsInACell.block`
+found the rule whose selector was exactly the string given. Naming
+`.flyout-verdict` beside each `td` broke three tests that were
+testing the right thing, so the helper now accepts a selector that
+is one of several on a rule. A matcher loosened that way is exactly
+the kind that starts passing for the wrong reason, so a cell colour
+was broken afterwards to watch the tests fail again. Its first
+rewrite also anchored on `\}`, which the previous match eats, so
+every rule after the first was invisible and every lookup returned
+nothing -- a selector and a body both simply contain no braces,
+which is enough to split on.
+
 It needs two animation frames, not one. Revealing the panel narrows
 the grid and the browser then clamps the scroller's own `scrollLeft`
 to the new range, and that clamp lands after the first frame, undoing
