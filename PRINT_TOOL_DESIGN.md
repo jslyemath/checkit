@@ -3471,8 +3471,11 @@ here -- not only in the section it came from.
 
 | | what | where it is written up | blocked on |
 |---|---|---|---|
-| 1 | **Brightspace export** | 14.6 | two prerequisites, below |
+| 1 | **a general gradebook export/import** (was "Brightspace export") | 14.6, and 18 for what is settled | the profile, 1c. No longer blocked on seeing his file: 18 is built |
 | 1a | import the roster's LMS ids, once | 14.9 | the instructor's CSV: LMS id in one column, an email or SID in another |
+| 1c | **the gradebook profile**: the five facts that are Brightspace-specific in 14.6, written as data per course | 18 | one masked round-trip against his real export, which 18 now makes possible |
+| 1d | **read marks in, one way**, to seed a record | 18 | a decision: what a mark with no printed paper behind it looks like on Progress |
+| 1e | **`vault mask-course`**: a masked twin of a whole course folder, `roster.toml` and `record.db` | 18 | nothing. Next, by his sequencing |
 | 1b | publish `F5-E` as a real `<outcome>` in mat-106's `bank.xml` | 14.8 | nothing. Today the slug appears only inside `<associates>`, which **nothing anywhere reads**, so it generates and publishes nothing |
 | 2 | **the Settings tab's boilerplate editor** | 12.6, stage 8h | nothing. A form can be created or attached already; this is the other half |
 | 3 | **a section filter on Progress** | 17 | nothing |
@@ -3482,6 +3485,12 @@ here -- not only in the section it came from.
 | 7 | **mat-106's published `docs/assets/*.sty` are two revisions behind** | -- | nothing. Wants `generate -i --image-seeds 400 --remote https://jslyemath.github.io/mat-106-checkit` and a deploy |
 | 8 | **which figure route for self-contained assessments** | 11.2 | a decision. The recommendation on file is to publish the `.tikz` |
 | 9 | **what a hand-authored bank's `bank.xml` looks like** | 11.4 | MAT 206's rebuild, which is not scheduled |
+
+#### Done since 11-08
+
+* **Masking, so a real file can be shared at all.** `checkit-printit
+  vault`, written up in 18. It is also what unblocks item 1: a
+  round-trip cannot be written against a file nobody may look at.
 
 #### Waiting on the world, not on work
 
@@ -4300,3 +4309,163 @@ thirty-six are kept as a fixture in `tests/data/real_digits.npz`.
 * **A spare still has to be matched by hand** unless its writer filled
   the grid in, which is the same situation as before for anybody who
   leaves it blank.
+
+
+## 18. Sharing a file without sharing the students (2026-11-08)
+
+The instructor's requirement, in his words: *"I need you to come up
+with a way, such as some sort of script, that will mask the student
+data before you see it, then unmask it before I use it."* Not a
+preference -- real student data must not reach an assistant at all.
+
+That is also the thing standing in front of the gradebook work, since
+§14.6 settled that export means round-tripping **his own exported
+file** and nobody can write that round-trip against a file they are not
+allowed to look at. So this came first, and it unblocks rather than
+delays.
+
+### Built: `checkit-printit vault`
+
+One fake person per real person, in a vault outside every repository,
+substituted wherever the real one appears. `vault mask` writes the
+twin, `vault unmask` turns whatever comes back into the real thing,
+`vault columns` shows what would happen without writing, `vault check`
+scans any file, `vault show` lists who is in there.
+
+### Four things the obvious version gets wrong
+
+**It must map people, not strings.** A class list says `Clifford,
+Matthew C.`, a seating chart says `Matt Clifford`, and a grades export
+says only `#1234567890`. One person. A string-to-string table makes
+them three pseudonyms, and every cross-file join -- which is most of
+what goes wrong -- stops being reproducible in the twins. So a row is
+resolved to a *person* on the id order `roster.py` already uses, and
+the fake person is then rendered into whatever shape the cell wanted.
+
+Matching is **exact**, unlike `classlist.merge`, which pairs a surname
+with an initial because a human typed one spelling and meant the other.
+A wrong guess here merges two real students into one pseudonym and the
+twin then silently disagrees with the file it came from. A row matching
+two different people is **refused**, because that means two files
+disagree about who somebody is and quietly picking a winner would bake
+it in where it could never be seen.
+
+**It must preserve shape, because the shape is where the bugs are.** A
+two-word surname masks to a two-word surname; a 9-digit id to 9 digits;
+a `#`-prefixed 10-digit id keeps the `#`; a student on two email
+domains keeps two *different* fake domains. One open bug in the Roster
+list is a student whose surname is two words and whose splitter returns
+one. Masking that to one word would delete the bug from the twin, and
+the twin would then prove it fixed.
+
+**It must fail closed.** A column that is recognised is masked; a
+column positively shown to be harmless is kept; **anything else is
+blanked** -- header and column kept, cells emptied. Blanking rather
+than dropping keeps the file's shape, which is what makes a twin usable
+for working out a round-trip. `--keep` promotes a column once a human
+has looked at it, and there is no option that promotes one silently.
+
+How a column is shown harmless, in order, and the order is the point:
+a known label; anything holding an `@`; **anything holding a run of
+five or more digits**, which is blanked as a possible id; all values
+numeric, which is a points column; at most twelve distinct values none
+longer than 24 characters, which is a grade vocabulary. Low cardinality
+is the test that separates a category from prose. The digit rule runs
+*before* the numeric rule, which is the whole reason a 9-digit student
+number in an unlabelled column does not sail through as "just a
+number".
+
+**It must check its own output.** After writing, the twin is read back
+and searched for every real string the vault knows; if one survives the
+twin is **deleted**. A masker believed to be correct is not the
+standard. This earned its place immediately: a column headed `Advisor`
+holding surnames is few enough and short enough to read as a category
+by the cardinality rule, the classifier keeps it, and only the scan
+catches it. That is a test in the suite.
+
+The failure message carries counts and column numbers, never the values
+-- the point of the exercise is that they do not travel, and a terminal
+is somewhere they would.
+
+### Decided: where the vault lives, and why it is a sibling
+
+`~/CheckItPrintIt/vaults/<course>.json`, beside `courses/` and never
+inside it. Structural, not a rule: masking a whole course folder --
+`roster.toml` and `record.db`, when that is built -- physically cannot
+walk into the vault. A rule saying "skip the vault" is one more rule to
+get wrong.
+
+Named after the **course**, not the file, so every file from one course
+shares one set of pseudonyms. Two vaults would give one student two
+fake identities, which is the failure the whole module is shaped
+around.
+
+### Decided: no recovery key
+
+The vault is the only way back. The alternative is a key that
+reconstructs the mapping, and that key is a secret somebody would have
+to be trusted with -- which is the thing being avoided. So: back it up,
+and the CLI says so on every mask.
+
+### Two deliberate holes
+
+* **A one-letter value does not unmask.** A middle initial is masked to
+  `X`, always. There are twenty-six letters and more students than
+  that, so a per-person mapping cannot be injective, and substituting a
+  lone letter in text would rewrite every standalone `T` in a sentence.
+  The first version did map them per person and restored `R` where the
+  file said `T`. A hole that is written down beats a reversal that is
+  sometimes wrong. What survives is the *presence* and shape of an
+  initial, which is what the name-splitting bugs need.
+* **A blanked column cannot be restored.** It never left the machine.
+
+Everything else round-trips exactly. Measured on three invented
+exports: the LMS class list came back **identical**, 24 rows by 6
+columns; the registrar's list differed only in its 17 middle initials;
+the 55-column grades export differed only in the 5 cells of its
+blanked `Instructor comment` column -- which, in the sample, held a
+student's first name, and was blanked by the cardinality rule with no
+help from any label.
+
+### How the gradebook work now goes
+
+1. He runs `vault columns` on his real export and reads the table.
+2. He runs `vault mask` and sends the twin.
+3. The round-trip is built against the twin.
+4. He runs it on the real file. Nothing of his ever moved.
+
+### Decided, 2026-11-08: three answers, and the order
+
+The general gradebook system is the other half of the request: *"The
+grades import/export needs to work for a variety of LMSs, not just
+mine."* Three questions were put to him, and all three are answered.
+
+**Import means marks as well, one way.** Not only the LMS-id import of
+§14.9. A gradebook can be read to seed printit's record -- for a skill
+passed outside printit, or for a term that began before printit did --
+and it stays one-way. Nothing reconciles in both directions, because
+two systems that both claim authority over a mark need a rule for which
+wins, and he did not ask for that rule. **What still needs deciding is
+what a mark with no scanned paper behind it looks like in Progress**,
+since every mark there currently traces to a printed page and a run.
+
+**Masking extends to a whole course folder, and that is next.**
+`roster.toml` and `record.db`, not only the files handed over -- which
+is what makes the live 106 state safe to debug rather than just the
+CSVs chosen for a question. The vault core already supports it; it
+needs a TOML adapter and a SQLite one. Taken before the gradebook,
+which is his sequencing, not a technical constraint.
+
+**The column-to-skill pairing is a CLI command first.** A `gradebook
+map`, shaped like `form map`: ids not positions, nothing guessed, the
+answer written to the profile. The GUI reads that profile afterwards.
+Fastest to build and to test against fifty columns, and it keeps the
+profile as the single truth rather than something a screen holds.
+
+### What §19 therefore has to settle
+
+* The **profile**: the five facts that are Brightspace-specific in
+  §14.6 -- the id column, the skill-column pattern, the two mark
+  strings, whether blank means "not attempted", and which rows and
+  columns are untouchable -- written as data per course.
+* **What a seeded mark looks like** where Progress expects a paper.
