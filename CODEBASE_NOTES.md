@@ -18150,3 +18150,127 @@ clipped verbless clauses. It read as a changelog about the work rather
 than a person explaining it. The memory note on plain language has been
 updated to name that specific register, since the previous version only
 warned about compressed technical shorthand.
+
+
+## The gradebook profile, and three more tests that checked nothing (2026-11-09)
+
+Built `gradebook.py` and `gradebook map`, which work out which column
+of an LMS export is which. The design is in `PRINT_TOOL_DESIGN.md` 18;
+this is what went wrong and what the real file taught.
+
+### Two bugs the real file found immediately
+
+**The CLI died on the console.** `gradebook map` prints the gradebook's
+own mark values, which begin with an emoji, and a cp1252 Windows
+console cannot encode one: `UnicodeEncodeError`, half way through the
+report, after the matching had printed and before anything was saved.
+Fixed once in `main()` by reconfiguring stdout and stderr with
+`errors="backslashreplace"`, which keeps the emoji where the console
+can show them and degrades to an escape where it cannot.
+
+Worth noting it is not the gradebook's bug alone: `vault show` and
+`vault check` print student names, and one accented letter would have
+killed them the same way. Fixing it at each `echo` would have been the
+"a fix applied to one path is not applied to the others" failure
+waiting to happen.
+
+**The profile's ignore list was one 2,000-character line.** Thirty
+column names in a single TOML array. Nobody checks a line like that, so
+it is one per line now, with a test on the widest line.
+
+### Three vacuous tests, all found by the harness
+
+The pattern in all three is the same and worth naming: **the test
+asserted something that was true for a second reason**, so breaking the
+thing it was supposed to check changed nothing.
+
+* `test_a_slug_that_is_a_prefix_of_a_column_word_is_not_matched` used
+  the header `Skill W12` against the slug `W1`. The rule being guarded
+  is "the header *starts with* the slug", which `Skill W12` never
+  reaches. Breaking its guard left the suite green. `W12 Grade ...`
+  reaches it; both forms are now parametrised.
+* `test_too_many_distinct_values_is_refused` used twenty values none of
+  which contained "pass", so `guess_marks` refused twice over: once for
+  the count, once for being unable to identify a pass. Removing the
+  count check changed nothing. It now puts exactly one `Pass` among
+  twenty, so the count is the only thing between a sensible refusal and
+  a confident wrong answer.
+* `test_the_looser_rules_also_avoid_the_collision` did not exist at
+  first. The `W1`/`W1-E` collision was tested only through the real
+  file's headers, where the exact first-word rule places every skill
+  and the two fallback rules therefore never run. Nothing was testing
+  the fallbacks at all.
+
+That last one is the general version of the lesson: **a test written
+against the one real file only exercises the paths that file takes.**
+The fixture was not too small this time, it was too *typical*.
+
+### And one guard that cannot be watched failing
+
+`test_a_profile_carries_no_student_data` guards against a mistake
+nothing currently makes, so no source breakage can make it fail. It was
+checked by hand instead, by injecting a masked id into a profile: the
+guard fired, and it fired on its *second* assertion rather than its
+first. `vault.leaks` did not fire, correctly -- the injected value is a
+pseudonym, not a real value. A pseudonym is not a leak of real data but
+is still student-linked, and the profile is the one file in this
+feature meant to travel freely. Both halves are needed and they check
+different things; the docstring now says which.
+
+### What the real export settled
+
+60 columns, 20 rows, masked. 29 of 29 skills matched once `FCP` was
+paired with its spelled-out column. The mark strings read out of the
+file as `U+1F3C6 Pass` and `U+1F4AD Not Yet`, with **no space after
+either emoji** -- an invented fixture had a space in the second one,
+and only the real file showed it.
+
+A blank cell is not counted: the Core Skills denominator equals the
+number of filled cells in all 20 rows, found automatically by
+`blank_evidence` rather than configured, and the numerator beside it
+correctly rejected as evidence. Writing a non-pass into a blank would
+therefore raise a student's denominator and lower their grade, which
+makes "leave blanks alone" the cautious direction and the default
+where a file does not settle it.
+
+### And the project's own checks caught two more
+
+`tools/audit.py` found `MatchReport.describe` declaring a `width=`
+parameter it never used -- and `headers` too, which the audit does not
+look for. Both are used now, to name the columns an ambiguous slug
+could have meant, because a list of column numbers is not enough to
+choose between them and choosing is what the reader does next.
+
+`tools/docs.py` found the new `gradebook` group missing from the
+platform repo's map. That is the **second time today** the same check
+caught the same class of mistake: a CLI group added to printit and not
+named in `checkit/CLAUDE.md`. It is worth saying that the check works
+rather than only that the omission happened.
+
+### The LMS id is the remaining blocker, and needs no new code
+
+Counted on the live rosters, fields only and no names: MAT 106 has 45
+students, every one with a `sid` and an `email`, and **not one with an
+`alt_id`**. So the export cannot match anybody yet, exactly as 14.9
+predicted.
+
+But `roster import` already does it. `OrgDefinedId` is in the synonym
+table as `alt_id`, and `classlist.merge` matches an incoming row on any
+identifier a student answers to, an email among them. Checked before
+building a second importer rather than after -- the "is there a second
+copy" question asked in the useful direction for once.
+
+The trap is `--covers`: a Brightspace class list has no section column,
+a file naming no section is taken to cover everybody, and every student
+it does not mention is marked dropped -- which empties their seat and
+stops their paper printing. `test_lms_ids.py` pins both that scoping
+protects the other section and that omitting it drops them, so the
+danger lives in the suite and not in somebody's memory.
+
+### The retired enrolment, again
+
+The retired `-DoNotUse` enrolment shares its base id with a live row
+**and holds six real marks and its own subtotals**. It is a record with
+history, not an empty husk, which is a stronger reason to never write
+to it than being a duplicate -- and it means the export has to match on
+the whole id rather than on its digits.
