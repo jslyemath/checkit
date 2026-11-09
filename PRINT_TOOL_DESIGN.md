@@ -3528,12 +3528,12 @@ The instructor opened a pass over the app's glyphs. Done so far:
   with slanted top and bottom rather than a leaning line. See
   `CODEBASE_NOTES.md`, "The door, and the size nobody had checked" and
   "The door again, and the clock's arrowhead".
-* **the Runs clock.** The arrowhead is fixed -- it was a right-angle
-  corner aimed nowhere, and both wings now come off the tangent at
-  the arc's own end point. **The balance is not.** A quarter of the
-  circle is missing from one side while the hands weigh the other,
-  and he has six options to choose from in
-  `checkit-printit/tools/mockups/clock.js`. Waiting on that choice.
+* ~~**the Runs glyph.**~~ **Done, and it is no longer a clock.** Two
+  dials failed -- a square-corner arrowhead, then a dial with a
+  quarter missing from one side -- and he chose paper instead. It is
+  a page with a sheet behind it and a clockwise re-run arrow. Every
+  gap in it is measured; see `CODEBASE_NOTES.md`, "Why the arrowhead
+  kept merging into its own arc" and "Runs is a stack of papers".
 
 #### Closed since 2026-11-05
 

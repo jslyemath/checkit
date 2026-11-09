@@ -17772,3 +17772,46 @@ believed.
 The harness lives in `tools/mockups/clock.js`: sample every stroke
 into points, then ask how close two parts that should not touch
 actually get. Every remaining glyph in the pass should use it.
+
+
+## Runs is a stack of papers, not a clock (2026-11-08)
+
+Built: option 18, "big page". A page with a second sheet behind it
+and a clockwise arrow in the bottom-right corner.
+
+**Clockwise, not anticlockwise.** Anticlockwise is history and
+these runs did already happen, but the tab's other job is starting
+a new run from an old one's settings, and he chose re-run. One
+boolean in the mockup if that is ever revisited.
+
+Why a clock stopped being the answer at all: two attempts failed
+for different reasons -- a square-corner arrowhead aimed nowhere,
+then a dial with a quarter of its circle missing on one side while
+the hands weighed the other -- and when six were drawn, the one he
+reached for was the page.
+
+The glyph that shipped:
+
+* **page** `M8.71 18H3.7...V10.99`, knocked out at the bottom-right
+* **sheet behind** offset 3.6 up and right
+* **arrow** r=5.8 centred (17, 17), gap 290-340 degrees, head 3.4
+  long with wings at -70 and +45
+
+Every number in it was measured rather than placed. The arithmetic
+behind the head and the knockout is in "Why the arrowhead kept
+merging into its own arc", above; the short version is that the
+badge is 5.8 because nothing smaller can carry an arrowhead at
+21px, and the page's edges stop where they do because the stop is
+solved on a circle of radius 5.8 + 2.55.
+
+Re-measured after building, by sampling the browser's own rendered
+path geometry rather than trusting the maths that produced it: page
+to badge 2.55, sheet behind to page and to badge both above 3, ink
+box (2, 1) to (22.8, 22.8), which leaves 1.14 of margin at the
+tightest corner once the half-stroke is counted.
+
+**One caveat that was flagged and is now visible:** a page and a
+stack sit near the clipboard on Update form and the printer on
+Print job. On the rail they read apart, because the arrow is half
+this glyph and neither of the others has one. Worth another look if
+a fourth paper-shaped tab ever appears.
