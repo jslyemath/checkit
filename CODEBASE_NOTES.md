@@ -18274,3 +18274,109 @@ The retired `-DoNotUse` enrolment shares its base id with a live row
 history, not an empty husk, which is a stronger reason to never write
 to it than being a duplicate -- and it means the export has to match on
 the whole id rather than on its digits.
+
+
+## The export was already written, by him (2026-11-09)
+
+He said, in one line, that there are two sections and so two files.
+Looking in the folder to see what those files were shaped like turned
+up `apply_to_brightspace.py` and a `README.txt` describing it: **his
+own Brightspace writer, in production since October.**
+
+The export I had built did not know it existed, and disagreed with it
+in five places. Every disagreement was in the direction of writing more
+than he wanted.
+
+* **A non-pass went into any attempted-and-not-passed cell.** His rule:
+  only for skills named on the command line, and only into an *empty*
+  cell. The reason is the one already measured -- the subtotals count
+  filled cells, so entering a non-pass raises the denominator -- and it
+  means a non-pass is entered deliberately for the skills in play that
+  round. Mine would have raised denominators he never asked to raise,
+  for every skill with a record.
+* **Replacing a pass was behind a flag.** He had told me his rule in
+  his own words: never. A default can be overridden by whoever reads
+  the help next; a rule that takes no argument cannot. The flag is
+  gone, and there is a test asserting the signature has no `allow` in
+  it, with his sentence as the reason.
+* **An unrecognised cell value was overwritten.** His script stops.
+  Overwriting a value the tool does not understand is guessing at what
+  it means.
+* **A student on two rows was refused.** His script picks the row with
+  more grades and refuses only a tie, which is the more useful answer
+  and the one his course already relies on.
+* **One file at a time.** The check that matters most across sections
+  -- that a student appears in exactly one export -- cannot be made by
+  a tool holding one file. And running it per file buries each run
+  under the other section's twenty-odd students reported as missing.
+
+### And his writer is better than mine was
+
+`write_updated` copies untouched lines **byte for byte** and splices
+only the changed ones. Mine re-serialised everything through
+`csv.writer`, which normalises quoting: a cell the LMS had quoted
+unnecessarily would come back bare, and the file uploaded would not be
+the file downloaded. I had even written that caveat down in
+`mask.write_csv` and then used it for the export anyway, which is the
+worse failure -- a known limitation applied where it mattered.
+
+`splice` now does what his does, including refusing to edit a line
+containing a quote character, because splitting such a line on commas
+is wrong. A line nobody edits is never parsed, so it may hold anything.
+
+Verified at the byte level rather than through a CSV reader, because
+the claim is about bytes and a reader would hide exactly the quoting
+change splicing exists to prevent: 22 lines in and out, the header
+identical, line endings unchanged, **11 lines byte-for-byte
+identical**, 16 cells changed and every one inside a skill column.
+
+### What it still does not do
+
+His script builds a **second, independent plan** and compares the two.
+`verify_export` plus the re-read of the written file is the cheaper
+half: it catches a write that strayed from a correct plan, not a plan
+that was wrong in the first place. That is the right thing to add if
+this is ever run unattended.
+
+### The lesson, stated plainly
+
+**Look for the existing tool before building one.** "Is there a second
+copy?" is written in printit's `CLAUDE.md` as a debugging question --
+when a change to shared behaviour does not show up, ask whether there
+are two copies. This is the same question asked in the other direction
+and it is the more valuable one: before writing something, ask whether
+it is already written. The answer here was yes, in his Downloads
+folder, with a README, and it had five rules I got wrong.
+
+Nothing about the way the work was done would have found this. The
+tests passed, the harness caught sixty breakages, the file was verified
+cell by cell. All of it was checking the wrong specification.
+
+### A note on the sequencing
+
+It was found by one line from him -- "there are two sections, so I have
+two files" -- which was about file counts and not about rules at all.
+Asking "what do your files look like?" earlier would have found it
+days ago. The design notes record a decision from 10-22 that **the file
+is the specification**; the same is true of the tool already operating
+on it.
+
+### Matching on the id, not the address (2026-11-09)
+
+His reason is specific rather than general: an email that reaches
+Brightspace from another institution is often stale, so the LMS
+address can disagree with the roster's for a student who is perfectly
+well enrolled -- and matching on it reports them as missing while their
+paper sits on the desk.
+
+`osw_id` is now in `classlist.SYNONYMS["sid"]`, next to the
+vendor-specific `banner id` that was already there. Without it the
+column was unrecognised: an unlabelled 9-digit column reads as
+"possibly an id", so the masker blanked it (safe, useless) and the
+importer ignored it.
+
+**It closes the LMS-id item outright.** All 45 MAT 106 students already
+have a `sid`, so matching the gradebook on `OSW_ID` needs no import at
+all. There is a test for the exact failure he described: a student
+whose Brightspace address came from elsewhere, found by id and missed
+by address, with both halves asserted.
