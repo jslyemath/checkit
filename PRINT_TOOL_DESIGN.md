@@ -3475,7 +3475,7 @@ here -- not only in the section it came from.
 | 1a | import the roster's LMS ids, once | 14.9 | the instructor's CSV: LMS id in one column, an email or SID in another |
 | 1c | **the gradebook profile**: the five facts that are Brightspace-specific in 14.6, written as data per course | 18 | one masked round-trip against his real export, which 18 now makes possible |
 | 1d | **read marks in, one way**, to seed a record | 18 | a decision: what a mark with no printed paper behind it looks like on Progress |
-| 1e | **`vault mask-course`**: a masked twin of a whole course folder, `roster.toml` and `record.db` | 18 | nothing. Next, by his sequencing |
+| ~~1e~~ | ~~**`vault mask-course`**~~ **Done.** A twin of a whole course folder, checked twice, `secrets/` and `scans/` never copied | 18 | -- |
 | 1b | publish `F5-E` as a real `<outcome>` in mat-106's `bank.xml` | 14.8 | nothing. Today the slug appears only inside `<associates>`, which **nothing anywhere reads**, so it generates and publishes nothing |
 | 2 | **the Settings tab's boilerplate editor** | 12.6, stage 8h | nothing. A form can be created or attached already; this is the other half |
 | 3 | **a section filter on Progress** | 17 | nothing |
@@ -4433,6 +4433,99 @@ help from any label.
 2. He runs `vault mask` and sends the twin.
 3. The round-trip is built against the twin.
 4. He runs it on the real file. Nothing of his ever moved.
+
+### Built, 2026-11-08: a whole course folder
+
+`vault mask-course`, plus `vault learn` and `vault mask-text`. The
+strategy **inverts** from the file masker, and for a good reason:
+`mask.py` has to work out which columns of an unfamiliar file are a
+person, whereas a course folder contains `roster.toml`, which is an
+authoritative structured list of everybody in it.
+
+So: learn the people properly from the roster through `roster.load`;
+substitute those known values through every other file; then check
+everything written, twice. A seating chart, a room, an availability
+list and the record database all name the same people, and none of them
+has to be understood in order to be masked.
+
+**The record database is masked schema-agnostically** -- every text
+column of every table goes through the same substitution, rather than a
+list naming `printed.name`, `printed.sid`, `attempt.sid` and
+`scan_page.sid`. A column holding a slug matches nothing; a column
+added next term is covered without anybody remembering. The named list
+is the thing that goes stale silently.
+
+**`secrets/` and `scans/` are never copied, and it is not an option.**
+Credentials cannot be masked. Scans are images of handwriting with
+names written on them, and no text substitution touches an image.
+
+**The second check is the point.** Substitution can only replace what
+the roster taught, so every written file is sniffed for anything that
+still looks personal: an address whose domain is not one of the vault's
+fakes (a hard failure), and a run of nine or more digits that is not a
+known pseudonym (a failure `--allow-digits` overrides, since a seed or
+a hash can look like that and only he can tell). On any failure **the
+whole output directory is removed** -- a half-masked course folder is
+worse than none, because it looks like a twin.
+
+Measured against an invented 45-student course at the real one's scale,
+two sections and two print runs: 45 students learned, 650
+substitutions across five files, `secrets/` and `scans/` absent, and
+`roster.toml`, `seating.toml` and `room.json` each unmasking **byte for
+byte** back to the original. Checked a second time by a script that
+reads the original roster with `tomllib` and searches the twin for all
+276 of its distinct strings, so the verification does not go through
+the vault whose correctness is in question.
+
+### What his real export turned out to hold (2026-11-08)
+
+He ran `vault columns` on the live MAT 106 gradebook. 60 columns, and
+the structure is worth writing down because the profile has to be
+written against it.
+
+**Only one column identifies a student**: `OrgDefinedId`. No name
+column, no email column, no username -- which confirms what 14.6
+recorded from the 10-22 export and means masking this file changes
+exactly one column out of sixty. It also means the twin cannot be tied
+to a student by itself; the class list has to be masked into the same
+vault for the ids to join up.
+
+**The skills, as the gradebook names them:**
+
+* **22 core**: `R1`, `R2`, `W1`-`W7`, `N1`-`N4`, `F1`-`F5`, `D1`-`D4`
+* **7 explanation**, with an `-E` suffix: `W1-E`, `W4-E`, `N1-E`,
+  `F2-E`, `F3-E`, `F5-E`, `D1-E`
+* **8 videos**, `V1`-`V8`, which are not printit's business
+* **`Fundamentals Checkpoint`** and **`My Base Project`**, spelled out
+  with no slug, which are the two that will need pairing by hand
+
+So the skill code is the **first whitespace-separated word** of the
+header, and everything after it is `Grade Symbol <Selectbox
+MaxPoints:1 Category:...>`. That is what the profile's column rule can
+key on.
+
+**`F5-E` is in the gradebook**, which is the other half of the item
+already on the list: the slug is in mat-106's `<associates>` and not
+published as a real `<outcome>`, so the bank generates nothing for it
+while Brightspace has a column waiting.
+
+### Two things the real file broke that the invented ones did not
+
+**A points column was blanked.** Brightspace writes points to five
+decimal places, so `Participation Attendance and Homework` holds
+`10.00000`. The rule that treats a run of five or more digits as
+possibly a student id fired on the five zeros *after the decimal
+point*, and emptied an ordinary grade column. The test now looks only
+at the part before the point, because a student id is a whole number.
+Every invented fixture had used `1`, `0.5` and `2.25`, none of which
+has a long run anywhere.
+
+**The report was unreadable at his terminal width.** The header column
+was a fixed 46 characters and his column names run to seventy, so every
+row wrapped and the console redrew the halves on top of each other --
+whole rows repeating down the screen. He could not tell the report from
+the corruption, and said so. It now measures the terminal and sizes the
+header field to fit.
 
 ### Decided, 2026-11-08: three answers, and the order
 
