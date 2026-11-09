@@ -3471,11 +3471,12 @@ here -- not only in the section it came from.
 
 | | what | where it is written up | blocked on |
 |---|---|---|---|
-| 1 | **a general gradebook export/import** (was "Brightspace export") | 14.6, and 18 for what is settled | **the export is built and driven end to end against the real file's structure.** It cannot run until 1a is done, because no roster carries an LMS id yet |
-| ~~1a~~ | ~~import the roster's LMS ids~~ **No new code needed.** `roster import` already reads `OrgDefinedId` and matches on email | 14.9, 18 | him running it, with `--covers`: a Brightspace class list has no section column, and without a scope every student it omits is marked dropped |
+| 1 | **a general gradebook export/import** (was "Brightspace export") | 14.6, and 18 for what is settled | **the export is built, rewritten against his own `apply_to_brightspace.py`, and verified at the byte level.** Nothing blocking: it matches on `OSW_ID`, which every student has. Wants one real round-trip |
+| ~~1a~~ | ~~import the roster's LMS ids~~ **Not needed at all.** The gradebook carries `OSW_ID`, so the match is on the student id every student already has | 14.9, 18 | -- |
+| 1h | **a second independent plan**, as his script has | 18 | nothing, and only worth it if the export is ever run unattended. `verify_export` catches a stray write, not a wrong plan |
 | ~~1c~~ | ~~**the gradebook profile**~~ **Done.** The five facts as `gradebook.toml`, derived by `gradebook map`; 29 of 29 skills matched on the real export | 18 | -- |
-| 1f | **does printit always win over an existing pass?** | 18 | a decision. The export holds back a cell that already says passed, because that pass may have come from outside printit. One flag either way |
-| 1g | **are the subtotal columns recalculated on upload?** | 18 | checking, on the first real round-trip. The export leaves them stale on the assumption that Brightspace recomputes them |
+| ~~1f~~ | ~~does printit always win over an existing pass?~~ **No.** "We should never replace a pass with anything lower." The flag is gone, not defaulted off | 18 | -- |
+| ~~1g~~ | ~~are the subtotal columns recalculated on upload?~~ **Yes, Brightspace handles it.** The export leaves them alone | 18 | -- |
 | 1d | **read marks in, one way**, to seed a record | 18 | a decision: what a mark with no printed paper behind it looks like on Progress |
 | ~~1e~~ | ~~**`vault mask-course`**~~ **Done.** A twin of a whole course folder, checked twice, `secrets/` and `scans/` never copied | 18 | -- |
 | 1b | publish `F5-E` as a real `<outcome>` in mat-106's `bank.xml` | 14.8 | nothing. Today the slug appears only inside `<associates>`, which **nothing anywhere reads**, so it generates and publishes nothing |
@@ -4650,6 +4651,71 @@ and 20 rows:
 * **One retired enrolment**, `-DoNotUse`, sharing its base id with a
   live row -- and it holds six real marks and its own subtotals, so it
   is a record with history and not an empty husk.
+
+### Rewritten against his own script (2026-11-09)
+
+He mentioned, in passing, that there are two sections and so two
+files. Looking at the folder to see what shape they were in turned up
+`apply_to_brightspace.py` -- **his own Brightspace writer, in
+production since October** -- and its `README.txt`.
+
+The export had been built without knowing it existed, and it disagreed
+with it in five places, every one in the direction of writing more than
+he wanted:
+
+1. **A non-pass was written for any attempted-and-not-passed skill.**
+   His rule: only for skills named on the command line, and only into
+   an empty cell. Writing one raises the denominator, so it is a
+   deliberate act for the skills in play.
+2. **Replacing a pass was a flag.** His rule, confirmed in his own
+   words: never. So the flag is gone -- a default can be overridden and
+   a rule that takes no argument cannot -- and a test asserts the flag
+   does not exist.
+3. **A cell holding something unrecognised was overwritten.** His rule:
+   stop. Overwriting a value the tool does not understand is guessing.
+4. **A student on two rows was refused.** His rule: the row with more
+   grades wins, and only a tie is refused.
+5. **One file at a time.** A course exports one per section, and the
+   check that a student appears in exactly one of them cannot be made
+   by a tool holding one file.
+
+And one thing his script does that is simply better: **untouched lines
+are copied byte for byte.** It splices the changed lines rather than
+re-serialising, because a CSV writer normalises quoting -- so a cell
+the LMS quoted unnecessarily would come back bare and the uploaded file
+would no longer be the downloaded one. `splice` now does the same, and
+refuses a line with a quote character rather than splitting it on
+commas.
+
+Two further checks adopted from it: a cell that has changed since the
+plan was made stops the export, and a student in the file for the wrong
+section is noted (the section being guessed from a three-digit group in
+the file name, so a wrong guess is a false note and never a wrong
+write).
+
+**What his script does that this still does not** is build a second,
+independent plan and compare the two. `verify_export` and the re-read
+of the written file are the cheaper half of the same idea -- they catch
+a write that strayed from a correct plan, not a plan that was wrong.
+Worth doing if this is ever trusted unattended.
+
+### Decided, 2026-11-09: match on the student id, not an email
+
+His reason, and it is specific rather than general: **an email that
+reaches Brightspace from another institution is often stale**, so the
+address in the LMS can disagree with the roster's for a student who is
+perfectly well enrolled. Matching on the address reports them as
+missing while their paper is on the desk.
+
+So `OSW_ID` -- Oswego's own 9-digit id, which he has included in the
+export -- is the column, and `osw_id` is now in
+`classlist.SYNONYMS["sid"]` beside the vendor-specific `banner id`.
+Without it the column was unrecognised, which meant the masker blanked
+it and the importer ignored it: safe but useless.
+
+**This closes 1a entirely.** The export matches the gradebook to a
+student on the student id, which every one of the 45 MAT 106 students
+already has, so no LMS id has to be imported at all.
 
 ### Decided, 2026-11-08: three answers, and the order
 
