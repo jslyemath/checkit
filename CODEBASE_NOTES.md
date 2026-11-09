@@ -17932,3 +17932,221 @@ not a path under `~/CheckItPrintIt`. Marks come through unmasked
 because a twin without them cannot be used to debug a gradebook; a pass
 pattern in a class of twenty-two is close to unique but is not
 *linkable* to a person by anyone without the vault.
+
+
+## A course folder, and five ways masking went wrong (2026-11-08)
+
+`vault mask-course`, `vault learn` and `vault mask-text`. The design is
+in `PRINT_TOOL_DESIGN.md` 18; this is what was actually wrong, found in
+this order, because none of it would survive a commit message.
+
+The strategy inverts from the file masker. `mask.py` must work out which
+columns of an unfamiliar file are a person. A course folder contains
+`roster.toml`, which is an authoritative structured list of everybody in
+it -- so learn the people properly from that, substitute those known
+values through every other file, and then check what was written twice.
+
+### 1. Two spellings of one student shared one pseudonym
+
+A roster carries `name = "Chidi Okonkwo"` and `preferred = "Chi
+Okonkwo"`. Both rendered to the same fake name, because the fake given
+name does not depend on which real spelling was asked for. Unmasking
+then had to guess, and put the roster spelling where the file said the
+preferred one.
+
+The fix is not a special case for preferred names: `mask` now asks
+`_candidates` for possible pseudonyms best-first and takes the first one
+not already standing in for something else of that student's, so
+**the real-to-fake map is injective per person by construction**. A
+second spelling of a given name is nearly always a shortening, so the
+candidates after the base name are shortenings of it -- which keeps the
+Chi/Chidi relationship visible in the twin, and that relationship is
+exactly what `classlist.merge`'s surname-plus-initial rule is about.
+
+### 2. A failed twin was left on disk under a message saying it was gone
+
+`with sqlite3.connect(...)` **does not close the connection** -- it
+commits or rolls back the transaction. The masked `record.db` stayed
+open, Windows kept the file locked, and the clean-up that removes a twin
+which failed its checks could not delete it. And the clean-up was
+`shutil.rmtree(path, ignore_errors=True)`, so it returned quietly.
+
+The result: a half-masked course folder sitting on disk while the tool
+reported it destroyed. Both halves are fixed -- connections closed in a
+`finally`, and a removal that fails now says so loudly, alongside the
+original failure and with the path to delete by hand.
+
+`ignore_errors=True` is the whole pattern this file keeps recording:
+something that turns an outcome into something the tool *says* rather
+than something that happened.
+
+### 3. Line endings were translated, so a twin could not be diffed
+
+Reading with universal newlines turns a CRLF file into LF, and the write
+emitted LF. So the twin differed from the original on **every single
+line**, a diff between them was worthless, and an unmasked file did not
+match what it came from. Which is most of what a twin is for.
+
+`newline=""` on both sides. The test that existed could not see this,
+because it compared strings that had themselves been read back through
+universal newlines; the new one compares bytes and is parametrised over
+both endings.
+
+### 4. The one that merged two students
+
+Masking replaced one real value at a time, each pass over the whole
+text. That rescans text that has already been replaced.
+
+At 45 invented students it happened: student p20's fake given name was
+`Rosalind`, and student p42's **real** given name was also `Rosalind`.
+The pass for p20 wrote `Thaddeus` -> `Rosalind`, and then the pass for
+p42 found that `Rosalind` and rewrote it into p42's pseudonym. Two
+people merged into one in the twin. Unmasking returned p42's real name
+where the file had said p20, with nothing anywhere indicating a problem.
+
+Found by diffing an unmasked twin against the original byte for byte and
+chasing a single wrong character on line 199. Not by a test -- the
+tests at that point all passed, because the fixtures were too small for
+the fake pool and the real names to collide. **A fixture small enough to
+be convenient hides what you are measuring**, which is already written
+down in printit's `CLAUDE.md` for a different feature.
+
+Three fixes, in order of importance:
+
+* **One pass.** A single regex alternation of every real value, longest
+  first, with a function as the replacement. Each character of the input
+  is consumed once and the output is never rescanned, so the failure is
+  impossible rather than unlikely. It is also one pass instead of 360.
+* **`Vault.avoid`.** Every real name in the roster is collected
+  *before* any pseudonym is invented, and the pool skips them. The fake
+  pool is historical scientists and a real roster will contain Grace,
+  Mary, John, Thomas, Julia and Paul soon enough -- this is the common
+  case, not a corner.
+* **The output scan no longer counts a pseudonym as a leak.** If a name
+  is one student's real one and another's fake one, finding it in a twin
+  is not evidence and treating it as a leak would delete a correct twin.
+  A real narrowing of the check, so it is written down: the full name,
+  the ids and the address are longer values and are all still looked
+  for.
+
+### 5. Two flaky tests, both found by the breakage harness
+
+The harness breaks the masker twenty-nine ways and checks that the test
+named for each one fails. It found two tests that were not reliable,
+neither of which the ordinary suite showed:
+
+* `test_an_id_keeps_its_length_and_punctuation` asserted a masked id
+  does not begin `#1234567` -- not a property the code guarantees, since
+  a prefix every row shares is kept deliberately and the next two digits
+  then coincide about one time in a hundred per row. A few percent of
+  runs failed. Replaced with the property that is actually promised: no
+  masked id equals any real id.
+* `test_a_pseudonym_is_never_another_students_real_name`, written in
+  this session, forbade six of sixty names and drew six. With `avoid`
+  disabled that passes about **half the time**. The harness reported it
+  green once and caught it on the next run. Now deterministic twice
+  over: forbid the whole pool, and forbid all but six.
+
+The lesson is narrower than "write better tests". It is that **a
+breakage harness has to be run more than once**, because a vacuous test
+and a flaky test look identical in a single run.
+
+### What was measured
+
+An invented 45-student course at the real one's scale -- two sections,
+two print runs, a two-word surname, three preferred names, two students
+with a second email domain. 650 substitutions across five files.
+`secrets/` and `scans/` absent. `roster.toml`, `seating.toml` and
+`room.json` each unmasking byte for byte.
+
+And checked a second time by a script that reads the *original* roster
+with `tomllib` and searches the twin for all 276 of its distinct
+strings. That matters: the tool's own check asks the vault what counts
+as real, which is the same code's opinion. The independent check found
+nothing, and confirmed the twin kept its structure -- all eight skill
+slugs still in `roster.toml` and `record.db`, line counts unchanged.
+
+
+## What the real gradebook broke, and a test that checked nothing (2026-11-08)
+
+The masking tool was finished, tested thirty ways and documented. Then
+he ran it on his actual Brightspace export and two things were wrong
+inside five minutes. Both are the same lesson in different clothes, and
+it is the one already at the top of printit's `CLAUDE.md`: **run it on
+real data.**
+
+### A grade column was emptied
+
+One of the ways a column is judged possibly dangerous is a run of five
+or more digits in a cell, which is what a nine-digit student number
+looks like. Brightspace writes a points column to five decimal places,
+so his `Participation Attendance and Homework` cells say `10.00000`.
+The five zeros *after* the decimal point are a run of five digits, so
+the rule fired and the column was blanked -- an ordinary grade column
+thrown away for looking like an id.
+
+The fix: a student id is a whole number, so the digit-run test now
+looks only at the part of a cell before the decimal point, and only
+trims cells that are numeric all the way through. `10.00000` reads as
+`10`; `806000111` is untouched and still caught; `806000111.0` is still
+caught, because the part before the point is still nine digits.
+
+**Why no fixture found it.** Every invented points column used `0`,
+`1`, `0.5`, `4`, `2.25`. None of those has five digits anywhere, and I
+wrote them by picking plausible-looking grades rather than by copying
+what the exporter emits. This is the "a fake built from your own
+vocabulary cannot fail like the boundary" entry in printit's
+`CLAUDE.md`, met again.
+
+### The report was unreadable, and he had to say so
+
+The column table used a fixed 46-character field for the header. His
+headers run to about seventy -- `V2 Grade Symbol <Selectbox
+MaxPoints:1 Category:Modeling Math Videos Progress>` -- so every line
+wrapped, and his console redrew the wrapped remnants over each other.
+What he pasted back had whole rows repeating a dozen times. He could
+not tell the report from the corruption, and the first thing he said
+was that he could not tell what was going on.
+
+It now reads the terminal width and sizes the header field to fit,
+with a test that checks the widest line at 80, 100 and 200 columns.
+
+Worth naming plainly: the output had only ever been looked at on 6-
+and 24-column fixtures and a 55-column invented file, in a wide window.
+Nothing about that is a test of whether a person can read it.
+
+### And the test for the fix checked nothing
+
+The breakage harness earns its place again. Having fixed the decimal
+rule, I wrote a test that a real id is still caught, broke the guard on
+purpose -- replacing "trim the fraction only when the whole cell is a
+number" with "throw away everything after the first dot" -- and **the
+suite stayed green.**
+
+Both cases I had written, `806000111` and `806000111.0`, come out
+identical whether the guard is there or not, because stripping after a
+dot does not change either verdict. The guard I had written a sentence
+about in the docstring -- that it "can never quietly shorten an id that
+happens to sit next to other text" -- was never exercised.
+
+The case that exercises it is a cell like `ref.806000111`: not a
+number, with an id after a dot. Guard working, the cell is left alone
+and the id is seen. Guard broken, `ref` is all that is left and the
+column passes as harmless. That case is in the test now.
+
+**A claim made in a comment and not tested is a claim nobody has
+checked.** That is the third weak test the harness has found today, and
+the second that was weak in a way an ordinary green run could never
+show.
+
+### A note on how this was reported to him
+
+He also said, in the same message, that I was "speaking cryptically
+to you, not like a human". He was right, and it is the third time he
+has asked for plainer prose. The failure this time was not jargon: it
+was writing in release-notes voice -- bold run-in headers, markdown
+tables, cross-references to section numbers and roadmap item codes, and
+clipped verbless clauses. It read as a changelog about the work rather
+than a person explaining it. The memory note on plain language has been
+updated to name that specific register, since the previous version only
+warned about compressed technical shorthand.
