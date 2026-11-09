@@ -17696,3 +17696,79 @@ settled: a page or a stack sits near the clipboard on Update form
 and the printer on Print job. The badge is what keeps it distinct,
 which is an argument for the badged forms over the ones with the
 arrow inside.
+
+
+## Why the arrowhead kept merging into its own arc (2026-11-08)
+
+He named it exactly: "I think you aren't making it point tangent to
+the circle, so one of the arrowhead wings keeps merging into the
+circle itself." The diagnosis was right and the arithmetic is
+short.
+
+A wing drawn at angle psi off the backward tangent ends at radius
+
+    |W - C| = hypot(r + h*sin(psi), h*cos(psi))
+
+from the badge's centre, psi positive meaning away from it. The
+inner wing therefore finishes `r - |W-C|` **inside** the arc, and
+at r=4.8, h=2.5, psi=34 that is **0.82** -- less than half a
+stroke, so the wing and the arc are one shape. Every circular arrow
+drawn in this app before today scored negative there:
+
+| where | r | head | splay | white at 21px |
+|---|---|---|---|---|
+| the rail clock as shipped | 8.2 | 3.6 | 34 | **-0.38** |
+| the stack badge | 4.8 | 2.5 | 34 | **-0.89** |
+| the page badge | 4.6 | 2.4 | 34 | **-0.93** |
+
+Widening the splay symmetrically does not rescue it; at 60 degrees
+each side it is a shallow bow, not a head. What works is an
+**asymmetric head** -- inner wing about -70 degrees so it dives
+away from the arc, outer about +45 -- and a search over r, h and
+both angles, holding the opening between 75 and 115 degrees so it
+still reads as a head, **found nothing at all below r = 5.8**. A
+stroked circular arrow smaller than that cannot carry an arrowhead
+at 21px. It has to be a corner (which is what Feather and Lucide
+draw, and what this app had before today), a filled triangle, or
+bigger.
+
+So the badge grew, and it is now the larger of the two objects in
+the glyph. That is forced, not a preference.
+
+### Two more measuring errors, both mine
+
+**The knockout was solved on the wrong circle.** Stopping the
+page's edge where its distance *measured along that edge* reaches
+the gap leaves the corner much nearer, because the badge is round.
+It claimed 2.55 and measured 0.05. The stop has to be solved on the
+offset circle of radius `badge + gap`.
+
+**Two rounded corners facing each other pinch far tighter than the
+offset between them.** The back sheet offset 3.0 up and right from
+the front one, with corner radii 1.6 and 1.7, leaves 1.08 between
+the corners, not 3.0. The offset has to be about 4 before it
+clears.
+
+### The check that proved nothing
+
+The first version of the mockup printed the page-to-badge distance
+under each candidate. It reads 2.55 for every layout, including
+hopeless ones -- shove the badge 1.5 units left, stretch the page
+to x=13, it still says 2.55, **because the knockout moves the stop
+point until it does**. A number that cannot come out wrong is not a
+check, and this one was on screen for a round before that was
+noticed. It is the vacuous-test failure from `CLAUDE.md` in a new
+costume: the quantity was real, the measurement was real, and the
+thing it was supposed to catch was logically unable to show up in
+it.
+
+It was replaced by the two that do move -- the gap to the sheet
+behind, which drops to 1.28 when the offset is broken, and how much
+of the page's right and bottom edges survive the knockout, which is
+what actually decides whether it still reads as a page. All three
+breakages were run and watched failing before the replacement was
+believed.
+
+The harness lives in `tools/mockups/clock.js`: sample every stroke
+into points, then ask how close two parts that should not touch
+actually get. Every remaining glyph in the pass should use it.
