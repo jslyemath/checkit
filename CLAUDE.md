@@ -46,7 +46,7 @@ mat-106's venv has checkit installed **editable**, pointing at `Projects/checkit
 - `--thaw SLUG` — regenerate an outcome marked `<frozen/>`
 
 `checkit-printit` has grown a lot: `build`, `init`, `install`, `import`, plus
-`course`, `form`, `gui`, `record`, `roster` and `skills` groups. It also has a
+`course`, `form`, `gui`, `record`, `roster`, `skills` and `vault` groups. It also has a
 local web app (`gui -c <course>`) with eight views — Roster, Update form,
 Print job, Runs, Scans, Progress, Seating, Settings. All eight are built; the
 "not built yet" placeholder is still in the page for the next one. Its own
@@ -61,6 +61,18 @@ printit's venv — which is also where checkit's tests run — now needs
 `pypdfium2` and `zxing-cpp`, and also `numpy` and `pillow`, which reading a
 scan has always used and which were never declared: they were only present
 because matplotlib drags numpy in.
+
+`vault` is the newest group, and the one to reach for before sharing any
+file that carries a name, a student id or an email address. It writes a
+masked twin — one invented person per real person, with the same rows,
+columns and shape of value — and `vault unmask` turns whatever comes
+back into the real thing. The pseudonym table lives in
+`~/CheckItPrintIt/vaults/<course>.json`, a **sibling** of `courses/` so
+that masking a course folder cannot reach it, and it is the only way
+back: there is no recovery key, deliberately. A column the tool does not
+recognise is blanked rather than passed through, and every twin is read
+back and searched for real values before it is handed over. See
+`PRINT_TOOL_DESIGN.md` 18.
 
 On a run printed without names, the student writes their id into a grid in the
 header and printit reads it, matching the nine digits against the roster

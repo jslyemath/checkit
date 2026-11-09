@@ -17815,3 +17815,120 @@ stack sit near the clipboard on Update form and the printer on
 Print job. On the rail they read apart, because the arrow is half
 this glyph and neither of the others has one. Worth another look if
 a fourth paper-shaped tab ever appears.
+
+
+## Masking a file so it can be shared at all (2026-11-08)
+
+He asked for two things, and they turned out to be one chain: a way to
+mask student data before it reaches an assistant and unmask it after,
+and a gradebook export/import that works for any LMS and not only
+Brightspace. The second cannot be built without the first, because
+§14.6 settled that export means round-tripping **his own exported
+file**, and that cannot be written against a file nobody may look at.
+
+Built: `checkit-printit vault`, in `vault.py` (the pseudonyms) and
+`mask.py` (which cells are a person at all). 39 tests. The design and
+the decisions are in `PRINT_TOOL_DESIGN.md` 18; what follows is what
+was actually wrong on the way, since that is what a commit message
+would lose.
+
+### The first version mapped strings, and that is useless
+
+A class list writes a student as `Clifford, Matthew C.`, a chart as
+`Matt Clifford`, a grades export as `#1234567890`. A string-to-string
+table turns one person into three pseudonyms and no cross-file join can
+be reproduced in the twins -- which is most of what goes wrong in this
+tool. So the vault maps **person to person**, resolved on the id order
+`roster.py` already uses, and renders the fake person into the shape
+each cell wanted.
+
+### Three bugs the tests caught, in order
+
+**An id written two ways is one person.** The class list gives a Global
+ID as `1234567890`; the grades export gives the same number as
+`#1234567890`. An exact key made them two students, and the
+cross-file stability test is what failed. Fixed by keying on the
+alphanumeric *core* and re-applying each cell's punctuation when
+rendering, so one person has one fake number worn several ways.
+
+That fix also fixed something nobody had tested for: §14.6 records that
+the `-DoNotUse` row carries **the same base id as a live row**. With
+the first version the two rows got unrelated numbers, so the twin could
+not have been used to get the "never write to that row" rule right --
+the fact that makes them a pair would have been gone. There is a test
+for that now.
+
+**A middle initial unmasked to the wrong letter.** The round-trip test
+failed with `R` where the file said `T`. The cause is not a slip: there
+are twenty-six single letters and more students than that, so a
+per-person mapping of one-character values cannot be injective, and
+substituting a lone letter in prose would rewrite every standalone `T`
+in a sentence. So one-letter values are now masked to `X`, always, and
+do not unmask. A hole that is written down beats a reversal that is
+sometimes wrong -- which is the same judgement as everywhere else in
+this file.
+
+**A username column was blanked rather than masked.** The LMS class
+list carries `OrgDefinedId` *and* `Username`. The first took the
+`alt_id` slot, so the second fell through to the content rules, read as
+free text, and was emptied. Safe, but it threw away a real identifier
+and with it any question about joining on one -- and §14.9 had
+considered exactly that join. Fixed by giving `handle` its own kind,
+built from the fake name rather than randomised so the twin keeps the
+`tbayes0` / `Bayes, Thomas` relationship that a join question turns on.
+
+### Fifteen breakages, and a vacuous test
+
+The rule here is that a passing test proves nothing until it has been
+watched failing, so a harness broke the masker fifteen ways on purpose
+and checked that the test named for each one failed. Fourteen were
+caught. One was not: `the vault is a sibling of courses` stayed green
+when `default_root`'s fallback was broken, because the fixture sets
+`CHECKIT_PRINTIT_HOME` and the test therefore only ever exercised the
+env branch. **Two code paths, one tested** -- the "a fix applied to one
+path is not applied to the others" failure in its usual shape, found
+only because the breakage was tried. Now parametrised over both.
+
+### And a flaky test, found by the same harness
+
+The harness refused to start, reporting the suite was not green --
+after two clean runs of the same suite. `test_an_id_keeps_its_length_
+and_punctuation` asserted a masked id does not begin `#1234567`, which
+the code does not guarantee: a prefix every row shares is kept on
+purpose, and in that fixture five digits are legitimately carried over,
+so the next two coincide about one time in a hundred per row. Six rows,
+so a few percent of runs failed. The vault seeds itself randomly, which
+is right for the tool and means the suite was quietly flaky.
+
+Replaced with the property that is actually guaranteed -- no masked id
+equals any real id -- and then run 25 times to check nothing else
+drifts. Nothing did.
+
+### What was measured rather than assumed
+
+Three invented exports at the real file's scale: an LMS class list, a
+registrar's list, and a 55-column 24-row grades export shaped after
+what §14.6 records. Masked into one vault, in that order: the registrar
+file added 22 students, the class list added **1** -- the instructor
+row, correctly treated as a person -- and the grades export added
+**0**, every `#`-prefixed `OrgDefinedId` matching a bare `Global ID`.
+That is the cross-file join working at scale.
+
+Unmasked and compared column by column:
+
+* the class list, **identical**, 24 rows by 6 columns
+* the registrar's list, differing only in its 17 middle initials
+* the grades export, differing only in the 5 cells of its blanked
+  `Instructor comment` column
+
+That comment column is worth naming: in the sample it held a student's
+first name, no label claimed it, and the cardinality rule blanked it.
+It is the column that would have leaked.
+
+### What this does not cover, said plainly
+
+Files and text. Not a screenshot, not a traceback, not a window title,
+not a path under `~/CheckItPrintIt`. Marks come through unmasked
+because a twin without them cannot be used to debug a gradebook; a pass
+pattern in a class of twenty-two is close to unique but is not
+*linkable* to a person by anyone without the vault.
