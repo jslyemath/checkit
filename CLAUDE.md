@@ -46,7 +46,8 @@ mat-106's venv has checkit installed **editable**, pointing at `Projects/checkit
 - `--thaw SLUG` — regenerate an outcome marked `<frozen/>`
 
 `checkit-printit` has grown a lot: `build`, `init`, `install`, `import`, plus
-`course`, `form`, `gui`, `record`, `roster`, `skills` and `vault` groups. It also has a
+`course`, `form`, `gradebook`, `gui`, `record`, `roster`, `skills` and
+`vault` groups. It also has a
 local web app (`gui -c <course>`) with eight views — Roster, Update form,
 Print job, Runs, Scans, Progress, Seating, Settings. All eight are built; the
 "not built yet" placeholder is still in the page for the next one. Its own
@@ -73,6 +74,16 @@ back: there is no recovery key, deliberately. A column the tool does not
 recognise is blanked rather than passed through, and every twin is read
 back and searched for real values before it is handed over. See
 `PRINT_TOOL_DESIGN.md` 18.
+
+`gradebook` is the LMS round-trip. `gradebook map` works out which
+column of an exported gradebook holds which skill, which strings mean
+a pass and a non-pass, and whether a blank cell counts -- saving the
+answers as `gradebook.toml` beside the course's other state. None of
+that is student data, so the mapping can be worked out against a masked
+twin. `gradebook export` then takes the file the instructor exported,
+fills in the cells there is a recorded result for, and changes nothing
+else: same columns, same rows, same line endings. It writes nothing
+without `-o`, and it will not replace an existing pass unless told to.
 
 On a run printed without names, the student writes their id into a grid in the
 header and printit reads it, matching the nine digits against the roster

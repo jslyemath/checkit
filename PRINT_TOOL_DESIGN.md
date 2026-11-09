@@ -3471,9 +3471,11 @@ here -- not only in the section it came from.
 
 | | what | where it is written up | blocked on |
 |---|---|---|---|
-| 1 | **a general gradebook export/import** (was "Brightspace export") | 14.6, and 18 for what is settled | the profile, 1c. No longer blocked on seeing his file: 18 is built |
-| 1a | import the roster's LMS ids, once | 14.9 | the instructor's CSV: LMS id in one column, an email or SID in another |
-| 1c | **the gradebook profile**: the five facts that are Brightspace-specific in 14.6, written as data per course | 18 | one masked round-trip against his real export, which 18 now makes possible |
+| 1 | **a general gradebook export/import** (was "Brightspace export") | 14.6, and 18 for what is settled | **the export is built and driven end to end against the real file's structure.** It cannot run until 1a is done, because no roster carries an LMS id yet |
+| ~~1a~~ | ~~import the roster's LMS ids~~ **No new code needed.** `roster import` already reads `OrgDefinedId` and matches on email | 14.9, 18 | him running it, with `--covers`: a Brightspace class list has no section column, and without a scope every student it omits is marked dropped |
+| ~~1c~~ | ~~**the gradebook profile**~~ **Done.** The five facts as `gradebook.toml`, derived by `gradebook map`; 29 of 29 skills matched on the real export | 18 | -- |
+| 1f | **does printit always win over an existing pass?** | 18 | a decision. The export holds back a cell that already says passed, because that pass may have come from outside printit. One flag either way |
+| 1g | **are the subtotal columns recalculated on upload?** | 18 | checking, on the first real round-trip. The export leaves them stale on the assumption that Brightspace recomputes them |
 | 1d | **read marks in, one way**, to seed a record | 18 | a decision: what a mark with no printed paper behind it looks like on Progress |
 | ~~1e~~ | ~~**`vault mask-course`**~~ **Done.** A twin of a whole course folder, checked twice, `secrets/` and `scans/` never copied | 18 | -- |
 | 1b | publish `F5-E` as a real `<outcome>` in mat-106's `bank.xml` | 14.8 | nothing. Today the slug appears only inside `<associates>`, which **nothing anywhere reads**, so it generates and publishes nothing |
@@ -4526,6 +4528,128 @@ row wrapped and the console redrew the halves on top of each other --
 whole rows repeating down the screen. He could not tell the report from
 the corruption, and said so. It now measures the terminal and sizes the
 header field to fit.
+
+### Built: the gradebook profile and `gradebook map` (2026-11-09)
+
+The five facts, as a readable file per course, and a command that works
+out as many of them as it can from the file in front of it.
+
+**What is in it, and what is deliberately not.** Which column holds the
+student and which roster field it joins to; the two mark strings;
+whether a blank cell counts; the slugs that needed pairing by hand; the
+rows and columns never to write to. **Not** the file's byte-order-mark
+or line endings -- those are read off whatever file is handed over on
+the day, by `mask.sniff`, because storing them would give them a chance
+to go stale.
+
+**The profile carries no student data**, which is a property worth
+naming because it is what makes the whole arrangement work: the profile
+derived from a masked twin is identical to the one derived from the
+real export, so the mapping can be worked out by somebody who may not
+see the file. There is a test asserting it against a vault, checking
+for pseudonyms as well as real values.
+
+**Matching needed almost no configuration.** The rule that works is
+"the skill's code is the first word of the header", which places 28 of
+the 29 published slugs on the real export. Two looser rules follow for
+anything it misses, and all three refuse to resolve an ambiguity:
+a slug matching more than one free column is reported and left. `FCP`
+is the only hand pairing, and only hand pairings are saved -- the rest
+is re-matched every run so a renamed column is noticed.
+
+The `W1` against `W1-E` collision is handled by a hyphen guard in the
+looser rules' patterns rather than by the pass ordering, and there is a
+test with headers like `Skill W1 ...` that actually reaches those
+rules. The first version of that test did not, because the exact rule
+placed everything on the real file and the fallbacks never ran.
+
+**The mark strings are read from the file.** `guess_marks` takes the
+distinct values in the matched columns, refuses if there are more than
+six of them, and picks the pass by looking for `pass` in it. If that
+does not settle it, both come back and the instructor is asked. On the
+real export it found `U+1F3C6 Pass` and `U+1F4AD Not Yet` -- with no
+space after either emoji, which an invented fixture had got wrong.
+
+**Whether a blank counts is proved, not configured.** `blank_evidence`
+groups the matched columns by the `Category:` the exporter writes into
+the header, then looks for a numeric column equal to the number of
+*filled* cells in a group across every row. On the real export that is
+column 36, the Core Skills denominator, and it holds for all 20 rows. A
+column equal to the *passes* is rejected: that is a numerator. With no
+evidence the cautious answer stands, because filling a blank is the
+destructive direction.
+
+**The retired enrolment is found by grouping ids that differ only by a
+trailing marker**, and reported rather than acted on -- and only the
+*marker* is suggested as an ignore rule, never the id, so nothing
+student-shaped reaches the profile.
+
+### Built: `gradebook export` (2026-11-09)
+
+Not "generate a CSV": take the file the instructor exported, fill in
+the cells there is a recorded result for, change nothing else, hand it
+back -- same columns, same rows, same untouched values, and the same
+line endings and byte-order-mark, which is what `mask.sniff` was built
+for.
+
+**The three rules**, and the third is the one that matters: ever passed
+takes the profile's pass value; attempted and not passed takes its
+non-pass value; **never attempted, or only ever absent, is left exactly
+as found**. An absence is not an attempt at the skill, and where the
+subtotals count filled cells, writing a non-pass into that blank raises
+the student's denominator for a paper they never sat. A query counts as
+an attempt that did not pass, which is his own rule.
+
+**Two guards.** Nothing is written without `-o`, so the dry run is the
+default. And a cell that already says passed is **not** replaced unless
+`--allow-downgrades` is given: a pass in the gradebook may have come
+from outside printit, and destroying it is the one irreversible thing
+this does. Those cells are counted apart and listed individually.
+
+**Ambiguity is refused, never resolved.** A row whose id matches two
+roster entries, or a second row for a student already matched on an
+earlier row, stops the export rather than picking one. The second is
+exactly the `-DoNotUse` case with its ignore rule missing.
+
+Measured against the masked twin of the real export, with an invented
+roster built around its pseudonyms and 57 invented decisions: 19 of 20
+rows matched, 1 skipped by the ignore rule, 16 cells to fill, 19
+already right, 508 left alone for want of a result, and 8 downgrades
+held back. The written file was then compared cell by cell against the
+input: **16 cells changed, in the 6 columns the report named, and
+nothing else** across 21 rows and 60 columns.
+
+### Decided, 2026-11-09: no new command for the LMS ids
+
+Checked before building one. `roster import` already reads
+`OrgDefinedId` as `alt_id`, and `classlist.merge` already matches an
+incoming row on any identifier a student answers to, including an
+email address -- which all 45 MAT 106 students have and none of whose
+`alt_id` is set. So the prerequisite is a `roster import` away.
+
+**With `--covers`.** A Brightspace class list carries no section
+column, and a file naming no section is taken to cover everybody, so
+importing one section's list marks the other section dropped and their
+papers stop printing. The option exists; it has to be passed, because
+the file cannot say. `test_lms_ids.py` pins both the protection and the
+danger.
+
+### What the real export settled (2026-11-09)
+
+Run against the masked twin of the live MAT 106 gradebook, 60 columns
+and 20 rows:
+
+* **29 of 29 skills matched** once `FCP` was paired with column 9.
+* **30 columns belong to nothing in the bank** and are listed as never
+  to write to -- the formula totals, the final and midterm grades, the
+  eight videos, PAHW, Tokens, the subtotal pairs, `My Base Project`,
+  the grading-scheme reminder, the end-of-line indicator, and `F5-E`,
+  whose column exists while the bank does not publish the skill.
+* **A blank is not counted**, shown by the denominator column in all 20
+  rows.
+* **One retired enrolment**, `-DoNotUse`, sharing its base id with a
+  live row -- and it holds six real marks and its own subtotals, so it
+  is a record with history and not an empty husk.
 
 ### Decided, 2026-11-08: three answers, and the order
 
