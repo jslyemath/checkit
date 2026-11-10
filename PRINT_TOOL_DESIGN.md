@@ -4699,6 +4699,55 @@ of the written file are the cheaper half of the same idea -- they catch
 a write that strayed from a correct plan, not a plan that was wrong.
 Worth doing if this is ever trusted unattended.
 
+### The first run on the real files (2026-11-09)
+
+He gave the two paths rather than keep copying output back, having
+checked that the commands would not open the files. He was nearly
+right: `gradebook map` prints only structure, but the export's report
+had two lines that identified a student by id. Those were fixed first,
+and the fix was watched failing, before anything was run.
+
+**Both files, 62 columns each, identical headers.** `OSW_ID` is column
+61, `Fundamentals Checkpoint` column 10, and there is **no `Last Name`
+column** -- which his own script requires, so these were exported with
+different options than it expects.
+
+**The result is the quiet one: nothing to do.** 43 students, 86 graded
+(student, skill) pairs, and with every skill named for non-passes --
+the most it could possibly write -- **0 cells to write, 61 already
+right**. Brightspace is already current with everything printit has
+recorded.
+
+Two things the run surfaced that are worth keeping:
+
+* **One real disagreement**: the 830 file, row 12, skill `N3`.
+  Brightspace says passed, the record does not. Not written, per his
+  rule, and reported so he can look at it.
+* **The `-DoNotUse` row was skipped** -- but only after a bug was
+  fixed. See below.
+
+### Two bugs only the real files could find (2026-11-09)
+
+**The ignore marker is on the wrong column.** Brightspace appends
+`-DoNotUse` to `OrgDefinedId`; he matches on `OSW_ID`. The rule was
+checked against the student column alone, so the moment the match moved
+to the other id it **silently stopped firing**. Both rows then looked
+clean, became a duplicate pair, and were separated by their grade
+counts -- which picks the live row here only because the retired one
+holds fewer marks. `ignored_by` now scans every cell and says which
+column it matched in.
+
+**The section inference read the course code.** `(?<!\d)(\d{3})(?!\d)`
+takes `106` out of `MAT106-820`, so all 42 rows looked misfiled: 42
+near-identical notes, burying everything else. Now `[-_](\d{3})(?!\d)`,
+the general form of the `MAT\d+-(\d{3})` his script anchors on, and the
+note is one line per file.
+
+Neither could have been found on the masked twin: the first needs the
+marker and the matched id to be in different columns, which only
+happened once he said to match on `OSW_ID`, and the second needs a real
+file name.
+
 ### Decided, 2026-11-09: match on the student id, not an email
 
 His reason, and it is specific rather than general: **an email that
