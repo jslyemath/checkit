@@ -18380,3 +18380,97 @@ have a `sid`, so matching the gradebook on `OSW_ID` needs no import at
 all. There is a test for the exact failure he described: a student
 whose Brightspace address came from elsewhere, found by id and missed
 by address, with both halves asserted.
+
+
+## The first run on his real exports (2026-11-09)
+
+He gave the two paths and said that since the commands only paste them
+into a prompt rather than open the files, it should be safe to run them
+-- he was tired of copying output back.
+
+He was nearly right, and the gap mattered. `gradebook map` prints
+column names, mark strings, row numbers and counts, and nothing else.
+But the export's report had **two lines that identified a student by id
+or name**: a section-mismatch note and the "appears in two files"
+refusal. Both were plausible on his files.
+
+The answer was not to run it carefully and hope neither fired. It was
+to make the output incapable of carrying a name -- rows and column
+numbers only, which is the rule every other report in this work
+follows -- then break that fix on purpose, watch the test catch it, and
+only then run. So the whole first run against real data produced
+nothing but structure, counts and row numbers.
+
+### What the files hold
+
+62 columns each, identical headers between sections. `OSW_ID` is column
+61, `Fundamentals Checkpoint` column 10. **There is no `Last Name`
+column**, which `apply_to_brightspace.py` requires -- so these were
+exported with different options than that script expects, and it would
+refuse them.
+
+### The result: nothing to do
+
+43 students, 86 graded (student, skill) pairs in printit's record. With
+*every* skill named for non-passes -- the most the export could
+possibly write -- **0 cells to write and 61 already right.** Brightspace
+is current with everything printit knows.
+
+One real disagreement surfaced: the 830 file, row 12, skill `N3`, where
+Brightspace holds a pass the record does not agree with. Left alone per
+his rule, and reported by location so he can look it up himself.
+
+### Two bugs the masked twin could not have found
+
+**The ignore marker was looked for in the wrong column.** Brightspace
+appends `-DoNotUse` to the `OrgDefinedId`; he matches students on
+`OSW_ID`. The rule was checked against the student column only, so when
+he said to match on `OSW_ID` the rule **silently stopped firing**. Both
+rows looked clean, became a duplicate pair, and were separated by their
+grade counts instead -- which picks the live row here because the
+retired one holds fewer marks. Working by luck is not working.
+
+It is now looked for in every cell, with the column reported, so a
+match in an unexpected place is visible rather than merely effective.
+There is a test for the arrangement that caused it -- marker on one id
+column, match on another -- and a test asserting that *without* the
+rule the pair is refused rather than quietly resolved, so the rule is
+shown to be doing real work.
+
+**The section inference read the course code.** `(?<!\d)(\d{3})(?!\d)`
+takes `106` out of `MAT106-820_GradesExport_...`. Every one of the 42
+rows was then reported as misfiled, in 42 near-identical lines that
+buried the actual report -- the same unreadability as the thirty-item
+array on one line, and the same lesson. His script anchors on
+`MAT\d+-(\d{3})`; the general form is three digits after a hyphen or an
+underscore.
+
+Neither was reachable on the twin. The first needs the marker and the
+matched id in different columns, which only arose once he chose
+`OSW_ID`. The second needs a real file name, and the twin was called
+`grades-masked.csv`.
+
+### The ninth weak test, and the one that found it
+
+The harness reported a partial: breaking the two-files refusal so that
+it names the student was caught by the test written for that refusal,
+but **not** by `test_no_line_holds_an_id`, whose docstring claimed to
+drive "every branch that reports anything". It drove a single file, and
+that branch needs two.
+
+Rewriting it as four separate scenarios -- separate because some
+branches end a student's turn, so no single arrangement of rows reaches
+them all -- raised the obvious next question, and the answer was to
+assert that the scenarios really do produce all four kinds of report
+line.
+
+**That assertion failed immediately.** None of the scenarios reached
+the kept-pass branch, which needs three conditions at once: the cell
+holding a pass, the record saying not passed, and the skill named for
+non-passes. A test claiming complete coverage would have shipped with a
+quarter of it missing.
+
+That makes nine tests this session that passed for a reason other than
+the one they were written for. Eight were found by breaking the code;
+the ninth was found by a test asserting its own coverage, which is the
+cheaper instrument and worth reaching for more often.
