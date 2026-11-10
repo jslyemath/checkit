@@ -18474,3 +18474,115 @@ That makes nine tests this session that passed for a reason other than
 the one they were written for. Eight were found by breaking the code;
 the ninth was found by a test asserting its own coverage, which is the
 cheaper instrument and worth reaching for more often.
+
+
+## F2-E printed its own answer on the student copy (2026-11-09)
+
+He built the morning's run, looked at the PDF, and found F2-E's worked
+explanation printed on the papers he was about to hand out. Every one of
+them: 45 of 45 F2-E pages in that build carried it.
+
+The cause is one line at the end of
+`mat-106-checkit/outcomes/F2-E/textemplate.tex`:
+
+    \VAR{p1_soln_text}
+
+outside every `anstoggle` conditional. The two figure branches above it
+are guarded correctly -- a number-line question shows the problem
+picture to the student and the answer picture on the key, and an
+area-model question shows the student nothing, because drawing it is
+the task. Then the prose underneath them was printed unconditionally.
+
+The intent was never in doubt. The web surface,
+`outcomes/F2-E/template.xml`, already has `{{p1_soln_text}}` inside
+`<outtro>`, which is the answer section by construction -- so the
+website has always been right and only the LaTeX was wrong. That is
+also why no `generate` and no deploy were needed to fix it: printit
+renders `textemplate.tex` with Jinja at build time, so editing the
+template is enough, and re-generating would have re-rolled seeds on a
+live skill for no reason.
+
+The fix uses the bank's own idiom rather than a fresh conditional:
+
+    \begin{ansenv}
+        \VAR{p1_soln_text}
+    \end{ansenv}
+
+`ansenv` is defined in `printit.sty` and is what D1, D1-E, D2 and D4
+already use for a block of answer prose. It swallows the body with
+`comment` on the student copy and colours it `scCOLOR` on the key, so
+F2-E's explanation now looks like every other answer block in the bank
+instead of like plain text that happens to be hidden.
+
+**Verified on the artifact, from the page index rather than by eye.**
+`main.pages` says which page is a student copy and which is a key, so
+the check reads the text of every F2-E page and asks both halves of the
+question: the explanation must be gone from the student copies *and*
+still present on the key. A guard that hid it everywhere would have
+broken the key and passed a one-sided test. Before: 45 of 45 pages.
+After: 0 of 41 student pages, 4 of 4 key pages.
+
+### The rebuild was a replay, not a fresh draw
+
+The run was already in the record as run 6, with a page index saying who
+held which paper. `build --replay` pins every version from the folder's
+own `manifest.toml` and draws nothing, so the same students got the same
+exercises and only the template changed. Three things were checked
+afterwards rather than assumed: `main.pages` came out byte-identical, so
+no student's paper changed; `next_run_no` returned 6 again for a folder
+it had seen, so no duplicate run appeared; and the attempt count stayed
+at 276, so none of the grading was touched.
+
+`manifest.check` hashes each outcome's `generator.py`, not its
+`textemplate.tex`. Editing the template therefore does not refuse a
+replay, which is right -- the seeds still mean the same exercises -- and
+is worth knowing before assuming a template fix forces a fresh draw.
+
+### Sweeping for the same bug elsewhere, and two checks that proved nothing
+
+F2-E was found by eye, so the same shape was looked for in all 29
+outcomes, using the web template as the oracle: anything a
+`template.xml` puts in `<outtro>` is answer-only, so the same variable
+appearing unguarded in `textemplate.tex` is the same bug. 57 candidates
+came back and all 57 are false positives, for two reasons worth writing
+down. Problem data legitimately reappears in the outtro, because the
+outtro restates the question. And three macros are themselves the
+guard: `\ans{X}` tests `anstoggle` directly, `\fillinblank[len]{X}`
+wraps its argument in `\ans`, and `\tfleft[True|False]{...}` boxes the
+named side only on the key. So F2-E was the only outcome printing an
+answer with nothing in front of it.
+
+Two verification passes in that sweep reported success while comparing
+nothing, both the same way, and both would have read as a clean bill of
+health:
+
+- `Index.pages` is a dict keyed by page number, so `list(index.pages)`
+  yields integers, not page records. Every comparison then hit a
+  `continue` on a missing attribute, and the summary printed "skills
+  where the student copy has words the key lacks: none" after examining
+  zero pages.
+- `Page.vseed` is a **string**. Keying page lookups on `int(seed)` from
+  the rendered filename matched nothing -- and because the versions that
+  *had* guarded answers were the only ones that reached that lookup,
+  they were the only ones dropped. The report still printed a full-
+  looking table of 29 rows saying "no guarded answer in this template",
+  with N1 and W4, the two skills the check existed for, silently absent.
+
+Both now assert that something was actually compared, and the second
+prints a line for any version it could not check. The habit that caught
+them is the one already in `CLAUDE.md`: a test that passes proves
+nothing until you have watched it fail. The F2-E net was run against a
+copy of the file with the fix undone, confirmed to flag `p1_soln_text`,
+and only then trusted when it flagged nothing.
+
+A third pass was abandoned rather than fixed. Comparing the whole word
+set of a key page against its student pages looked like a cheap way to
+cover all 16 skills at once, but its two signals turned out to be page
+furniture -- the section field differs between a key and a handout -- and
+"the key adds no words" is the correct, innocent answer for a skill
+whose key difference is a box drawn round TRUE. It was replaced by
+reading each version's actual answer strings out of the rendered
+template and looking for those, which is what finally cleared N1 and W4:
+of W4's ten answers, ten appear on its key and the only two that appear
+on the student copy are "distributive" and "zero product", which are in
+W4's own printed skill description.
