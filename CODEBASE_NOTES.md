@@ -18586,3 +18586,166 @@ template and looking for those, which is what finally cleared N1 and W4:
 of W4's ten answers, ten appear on its key and the only two that appear
 on the student copy are "distributive" and "zero product", which are in
 W4's own printed skill description.
+
+
+## A re-scan raised the whole job, and three things called duplicate (2026-11-10)
+
+He changed a few "?" marks to ticks, fed those papers back through the
+copier, and the Scans tab brought up the entire eighty-six-paper job
+they came from as missing -- then flagged much of it as duplicate
+entries for one student's skill. Two independent bugs that fired
+together and looked like one.
+
+### The cascade
+
+`Batch.missing` walks `self.runs`, which is every run touched by any
+placed sheet, and lists every student page of each one that is not in
+the pile. One stray sheet from 26 October therefore put run 1 into the
+list and produced eighty-five absentee rows for papers graded three
+weeks earlier and sitting in a drawer.
+
+His rule, and it is the right one: the only things worth bringing to
+the review table are papers that were actually scanned, and absentees
+of a job that has a *first-time* scan coming through. A job merely
+being re-scanned has no absentees worth asking about.
+
+`gui._Pile` is where that lives. It is one object built once per batch,
+because `_batch_json`, `_review_rows` and the job cards all need the
+same answer and a second copy of the rule is how the two halves of
+this tab came to disagree before. A run is first-time when something
+in the pile is a paper the record has no result for; inside such a run,
+a paper that already has a result is not asked about either, because
+confirming "absent" for a paper already marked absent is asking him to
+agree with something nobody doubts.
+
+**What was filtered is still counted.** `held_back` reports the
+absentees that were dropped, and the job card says "7 already settled"
+as a plain fact rather than a chip. A filter whose number quietly
+becomes zero is how a real shortage would hide, and that is a worse
+failure than the noise being fixed.
+
+### The clash flag, which was wrong on its own
+
+`markClashes` keyed on `(sid, skill)` and counted anything appearing
+twice as a conflict. Its comment claimed this could only arise from a
+re-match, "by pointing one paper at somebody who already has one",
+and that was true while the review table held one job at a time. It is
+not true now: a student who sat N3 in October and again in November has
+two papers for one skill, which is what a re-take *is*.
+
+So fixing the cascade would not have fixed the duplicate misfires --
+they only appeared together because the cascade is what put two jobs in
+the table at once. The key now carries the run, and what it detects is
+two papers *from the same job* claiming one student for one skill,
+which is the thing only a re-match can produce.
+
+### Neither path had any tests
+
+`_review_rows` and `_batch_json` had none at all, and `markClashes` sat
+540 lines below app.js's `/* --- end pure --- */` marker, so the file's
+own node harness could not reach it. That is how the clash key stayed
+wrong while 1,487 tests passed. `markClashes` has been moved inside the
+marker -- it takes rows and sets a flag on them, which is exactly what
+that block is for -- and `tests/test_rescan.py` covers the filter.
+
+Fifteen tests, then eleven deliberate breakages, and the harness earned
+its keep twice:
+
+* **Two breakages passed.** Both were about the run-level check, and
+  the fixture could not see it: with every paper of the old job
+  recorded, the per-paper filter removes all of them on its own, so
+  "the job does not come up" passed with the run-level check deleted.
+  The fixture now leaves one paper of the old job ungraded -- handed
+  out, never scanned, never marked -- and that page is recorded
+  nowhere, so only the run-level check can keep it out.
+* **Eight breakages did not apply at all**, and the first run reported
+  "3 of 11 caught" as though the other eight were notes rather than
+  failures. Every source file here is CRLF and the patterns were
+  written with `\n`. A pattern that fails to match reads as "skipped",
+  which is indistinguishable from "fine" at a glance; the harness now
+  converts line endings from what the file actually uses and counts a
+  pattern that will not apply as a failure.
+
+The same CRLF trap cost three separate attempts in one session -- once
+in a patch script that stopped on its own asserts, once in the harness,
+and once in a replacement that would have written bare LF into a file
+of 6,628 CRLF lines. It is already in `CLAUDE.md` as "never heredoc a
+script"; the general form is that **every pattern matched against a
+file in this project has to come from the file's own bytes.**
+
+### The section band was never pinned, and said it was
+
+He asked for the section header to stay at the left while the table is
+scrolled sideways, the way the Name column does. The CSS carried a note
+saying it had been tried and reverted -- "a sticky cell leaves a fixed
+table layout the same way" -- which is true of the cell and was the
+wrong conclusion. The cell can stay where it is; what has to stick is
+the label inside it.
+
+That was built, it computed `position: sticky; left: 0`, and it did not
+work: scrolled 600px, the label moved the full 600 while the Name
+column held its place. Reading the computed styles said it was fine.
+
+The cause is three lines away in the same file, under `table`: a
+clipping ancestor between a sticky element and the scrollport *becomes*
+the scrollport. `th, td { overflow: hidden }` applies to the band's
+cell, that cell never scrolls, and so the sticky label was offset by
+nothing. `tr.secband td { overflow: visible }` fixes it -- safe on this
+cell and nowhere else, because it spans the whole row and holds one
+short label, so there is nothing to spill. Measured afterwards rather
+than looked at: scrolled 600px, the label sits at x=73, which is the
+Name column's own left edge, in both tables.
+
+Worth keeping: **a style that computes is not a style that applies.**
+The check that found this was to measure the element's screen position
+before and after a scroll, not to read `getComputedStyle`.
+
+### Smaller things he asked for, and one he reversed
+
+The review table has an **Assessment** column, between Sec and Skill:
+the run number is what the footer code carries and what the record
+keys on, and it is not what he calls the thing. The **Runs** tab is
+**Prior assessments** for the same reason; the id stays `runs`, because
+it is in the URL fragment and in every test.
+
+A re-scanned paper now carries a mark in that column, and its job card
+a count of them. The chip keeps the shape of the missing and unmatched
+chips and loses their warning colour -- a re-scan is not a problem, it
+is the explanation for the other numbers being small. The glyph is the
+existing `record` one, reused on purpose: a new circular arrow is not
+something to eyeball at 18px, because the measured finding behind that
+glyph is that a stroked circular arrow needs r >= 5.8 to carry an
+arrowhead *at 21px*, and a chip draws at 18. It wants his eye in the
+glyph pass.
+
+**Progress opened on the wrong sort, and its comment described a third
+thing.** The comment said "surname, then section: the same default the
+Roster opens on" and the list under it held one key. The Roster opens
+on section *then* surname, and with `sort_last` alone the sections
+interleaved -- so the grid came up with no section bands at all, bands
+being drawn from runs of rows that share a section. It uses the
+Roster's own `DEFAULT_SORT` now.
+
+Names are filed by default, which they were not. The argument for off
+was that the surname split is a guess and showing a wrong one is worse
+than sorting a row oddly; the guard that makes it safe was written at
+the same time and is still there, so `displayName` shows the stored
+name whenever the parts do not add up to the whole of it. Off by
+default only meant a class list came up in a form nobody reads a class
+list in. Confirmed on his real roster: 40 of 41 Progress rows now read
+filed, and the one that does not is the compound surname -- the guard
+firing, correctly, on live data.
+
+**And the name order is per table now, which reverses a decision.** It
+was one `localStorage` key read by the Roster, Progress *and* the Scans
+review table, on the argument that a name reads one way for one person.
+In use that is wrong: these are three tables read for three different
+jobs, and setting the Roster to `First Last` to check an enrolment
+should not reformat Progress behind you. Two things came out with it.
+`setFiledNames` redrew the Roster and Progress but never the matched
+table, so that one silently kept the old form until something else
+redrew it. And the switch itself existed in three copies -- two inline
+and one function -- so splitting the preference would have fixed one of
+them; there is one `nameFormatSwitch` now, told which table it is on.
+Verified by reading both at once: Progress filed, Roster not, which
+was impossible before.

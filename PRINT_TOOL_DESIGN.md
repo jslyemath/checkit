@@ -3481,7 +3481,11 @@ here -- not only in the section it came from.
 | ~~1e~~ | ~~**`vault mask-course`**~~ **Done.** A twin of a whole course folder, checked twice, `secrets/` and `scans/` never copied | 18 | -- |
 | 1b | publish `F5-E` as a real `<outcome>` in mat-106's `bank.xml` | 14.8 | nothing. Today the slug appears only inside `<associates>`, which **nothing anywhere reads**, so it generates and publishes nothing |
 | 2 | **the Settings tab's boilerplate editor** | 12.6, stage 8h | nothing. A form can be created or attached already; this is the other half |
-| 3 | **a section filter on Progress** | 17 | nothing |
+| ~~3~~ | ~~**a section filter on Progress**~~ **Not a thing he asked for.** An old misreading of the table sorting, which is built. Struck rather than deleted so it is not re-derived | 17 | -- |
+| 3a | ~~**Progress opens on the wrong sort**~~ **Done 2026-11-10.** Section, then surname, filed names | -- | -- |
+| 3b | ~~**the section band does not pin to the left**~~ **Done 2026-11-10.** In both tables; the cause was `overflow: hidden` on the cell, not the sticky itself | -- | -- |
+| 3c | ~~**the two tables' name order was one preference**~~ **Done 2026-11-10.** Per table, all three of them | -- | -- |
+| 3d | **the re-scan glyph** | -- | his eye. The chip reuses the `record` glyph; a circular arrow of its own needs the measured harness, because r >= 5.8 was solved at 21px and a chip draws at 18 |
 | 4 | **can Scans place a page with no footer code** | 14.8 | a decision. Every paper printed before 14.5 shipped is such a paper |
 | 5 | **where the thresholds are stored** | 14.8 | a decision: a new course file, or a table in one that exists |
 | 6 | **does a run number need its course** | 14.12 | a decision. Unique within a course today, and Scans is course-scoped |
