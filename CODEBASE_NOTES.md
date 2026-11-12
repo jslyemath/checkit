@@ -18749,3 +18749,218 @@ and one function -- so splitting the preference would have fixed one of
 them; there is one `nameFormatSwitch` now, told which table it is on.
 Verified by reading both at once: Progress filed, Roster not, which
 was impossible before.
+
+---
+
+## The export became a feature, and the panel was built twice (2026-11-11)
+
+`gradebook export` worked on his own Brightspace file and was not a
+feature anyone else could use. Three things were in the way, and all
+three only show up on somebody else's file.
+
+### The splice that could not survive a quoted row
+
+The writer rebuilt each line by splitting on commas and joining them
+back. That is fine until a cell contains one. Canvas exports a
+"Student" column as `Last, First`, so every row of a Canvas gradebook
+is a row this would have cut in the wrong place and written back
+wrong. `gradebook.fields_of` now returns `[(value, start, end)]` --
+the value *and its span in the source bytes* -- and the writer
+replaces only the span of the cell it is changing and copies every
+other byte through untouched. Quoting, spacing, line endings and the
+columns it does not understand all survive because they are never
+re-encoded. `as_field` is the one place a value is quoted on the way
+back, and only when it has to be.
+
+### Thresholds that the plan ignored
+
+A skill needing two passes was honoured by the record and not by the
+export, so a student with one pass of a two-pass skill was written as
+having met it. `plan_export` takes the thresholds now and reports a
+`short` count per slug, which is the number that would otherwise have
+been silently rounded up to "passed".
+
+### The id columns, in three copies
+
+`alt_id`, `handle`, `sid`, `email` -- the order to try when matching a
+gradebook row to a student -- was written out three times. One
+`ID_FIELDS` now. The usual "a fix applied to one path is not applied
+to the others"; it had not bitten yet, which is the only reason it was
+still there.
+
+### LMS Export, in the Progress tab
+
+The panel went under the Progress grid, because the progress *is* the
+gradebook and what this does is export it. Thresholds went to
+Settings, where the other per-course settings live. An uploaded
+gradebook is held in memory and never written to disk: it is the one
+file in this tool that arrives full of other people's names and has no
+reason to persist.
+
+The first version of the panel was wrong in five ways he listed, and
+every one of them came from building parallel parts instead of using
+the app's own. `var(--r-1)` and `var(--r-2)` do not exist -- the scale
+is `--r-xs/sm/md/lg` -- so every corner resolved to square in an app
+of rounded ones; that was a bug, not a difference of taste. The form
+was a new `.lmsfacts`/`.lmsfield` pair beside the existing `.fields`,
+which is why the layout read as foreign. Every field had a visible
+hint under it, which was both the chattiness and, because a hint sat
+between one field and the *next* field's label, the reason the groups
+did not read as groups -- `.fields` puts the explanation in a `title`
+and the answer was already there. And the type was 12px throughout
+because `.fields` sets its labels to 12px and its inputs take
+`font: inherit`, so the value you read and type inherited the
+caption's size; 13px label over 15px value, scoped to the panel.
+
+The layout was rebuilt from three principles rather than from taste:
+top-aligned labels, which eye-tracking has completing fastest because
+label and field fall in one fixation; each field as wide as what it
+holds, where a one-character pass mark had the same width as a
+sixty-character column header; and grouping what answers one question,
+with more space between groups than inside one, which is what stopped
+the wrap splitting `Pass is` from `Non-pass is`.
+
+---
+
+## Six boxes thrown away, and a `?` that was only a place (2026-11-12)
+
+Five things he reported after reading the 2026-11-12 stack. Two of
+them turned out to be the same bug seen from different ends, which is
+the part worth keeping.
+
+### "Assessment" was only the name
+
+The review table named the job and not the day. Two assessments share
+a title whenever the same skill set is reprinted a fortnight later, so
+the title alone cannot say which sitting a paper is from. There is a
+`Date` column now, carrying the run's ISO date from the record and
+showing it `m/d`. The sort runs on the ISO string underneath, because
+`11/9` sorts after `11/12` as text and the year the view drops is
+exactly what makes the comparison work.
+
+### The threshold that was fitted to one stack
+
+`EDGE_HIT` is how much of a candidate rectangle's outline has to be
+drawn for it to be the grading box. It was 0.55, then 0.50, and both
+numbers were chosen by looking at the boxes of one stack -- the 62
+pages of 2026-10-26, whose worst real box scored 0.520. The comment
+beside it said "0.50 sits in a gap", and on that stack it did.
+
+107 pages of 2026-11-12 went under it. Six boxes scored 0.454 to
+0.489, were discarded, and came back as `nobox` with no reading at
+all; three of those six have a plain blue tick drawn in them, which is
+why he asked what had happened to pages that looked as clear as any
+other. The gate was never in a gap. It was sitting *inside* the
+population it was sorting, and one stack's worth of boxes is not
+enough evidence to know which.
+
+So the other side was measured too -- the name crop of all 107 pages,
+cut to the size of a box crop, which is a line of print and
+handwriting and certainly holds no box:
+
+    real boxes        0.454 .. 0.741   (all 107 found, every one at
+                                        55-58px -- the matcher was
+                                        locating the box correctly
+                                        on every page it rejected)
+    no box at all     0.000 .. 0.264
+
+`EDGE_HIT` is 0.38, in the middle of that gap. A faint box is now
+found and its quality score docks the confidence of whatever is
+concluded from it, which is the right place for the doubt. On the
+stack: three `nobox` became `ticked` and three became `empty`,
+agreeing in every case with what the crop plainly shows, and nothing
+else changed.
+
+### The bad name crops were the same bug
+
+He reported three pages whose name cut-outs were wrong -- one missed
+the name entirely. All three were `nobox` pages, and that is not a
+coincidence. `_pinned` uses the found box to pin the scale and turn
+over a 1300-pixel baseline instead of the footer code's 100-pixel
+one; with no box it returns None and every later crop is taken from
+the code's own estimate, whose error is multiplied thirteenfold on its
+way across the page. The name is three times further from the code
+than the box, so it drifts three times as far.
+
+Measured as geometry rather than looked at, because the crops carry
+real names: where the ink sits inside the picture, as margins. Before,
+the worst of the three had 100 ink pixels jammed against the bottom
+edge with 91% of the crop empty above them. After, all three sit at
+about 0.20 from the top and 0.29 from the bottom -- the same figures
+as every other page. Across the stack, five crops had the name badly
+placed vertically and now none do, and not one crop's ink touches the
+top, bottom or right edge. (75 touch the *left*, which is the printed
+`Name:` running off the edge and is what `NAME_PAD` intends.)
+
+### The dial went to 5 and then fell to 0
+
+He asked why. Two separate reasons, and one of them was a defect.
+
+The scale is not continuous, by construction. `ticked` and `empty` are
+scored on how far the ink is past the threshold, and real ink is
+seven to seventeen times past it, so they land at 7-10. `beside` is
+capped at `BESIDE_CEILING`, so it lands at 5-7. `heavy` is a flat
+0.35. Nothing produces 1-4 unless a reading sits almost exactly on a
+line, which real ink does not. Four plateaus, not a gradient.
+
+The defect is that `nobox` returned 0.0. Zero is a *reading* -- it
+says the measurement sits exactly between two calls -- and nothing
+was measured. Those rows sorted to the unsure end looking like the
+most doubtful readings in the stack, which is what prompted the
+question. `measure` returns `sure: None` now and the dial shows no
+number, with a tooltip saying the paper is here but no box could be
+found on it. `_least_sure` does the same for a paper scanned twice:
+any copy with no reading makes the row's answer "nothing was read"
+rather than a figure, and `min` over a list holding None is a
+TypeError anyway.
+
+After both fixes the stack reads 3,4,5,6,7,8,9,10 with no zeros and
+nothing unread -- the low end now occupied by the nine question marks,
+spread by how boldly they were drawn.
+
+### A `?` is a place, not an amount
+
+Four of thirteen `beside` calls on this stack were not question marks:
+three were comments he had written in pen above or to the left of an
+empty box, and one was a single speck of blue in a corner.
+
+`beside` was decided on `around` -- pen anywhere in a ring reaching a
+box-width left, above and below and two to the right -- against
+`INK_MIN`, which is the floor for a pen stroke *inside* the box and is
+a speck. It asks how much ink is near the box and never asks where,
+and where it is was the whole difference. Every real question mark on
+this stack sits to the right of the box and level with it; not one of
+the four false ones did.
+
+So `measure` counts the pen again in `Q_BAND` -- out to the right one
+and a half box-widths, from a quarter of a box-height above to a
+little under half below -- and `beside` now needs `BESIDE_MIN` of ink
+there *and* `BESIDE_SHARE` of all the nearby ink to be in it. The
+separation is wide: the nine real question marks put 64% to 100% of
+their ink in the band and measured 0.120 to 0.281; the four false ones
+put 0%, 0%, 0% and 12%. The share test is what does the work, and the
+floor is there for a speck that happens to land in the band.
+
+`_confidence` scores `beside` against `BESIDE_MIN` now rather than
+`INK_MIN`. Left measuring against a floor five times lower, every
+question mark cleared the top of the scale and they all came out at
+the ceiling, which is a dial that has stopped saying anything.
+
+### What was checked
+
+Every one of the four changes had the old behaviour put back under it
+and the new test watched to fail; the first pass of that harness found
+the confidence change had no test at all, and three date tests were
+checked the same way. The stack was then read end to end through the
+GUI itself -- `/api/scan/reopen` over all three PDFs, 114 pages --
+and the result matched the offline probe exactly: 9 `beside` where
+there were 13, 31 `ticked` where there were 28, 67 `empty` where
+there were 60, no `nobox`, and the six pages that had no reading now
+carrying one and a suggested outcome each.
+
+Two things to keep in mind about what this does *not* establish.
+Lowering the gate is safe here because the crop is always cut around
+the mark the index recorded for the box, so a real box is always in
+the picture -- a dense grid of small printed rectangles can still
+match, and an early version of the negative-control test accidentally
+drew one. And `BESIDE_MAX` is still fitted to a single stack.
