@@ -19085,3 +19085,117 @@ and into a log. It names the header now and quotes nothing. Every
 other finding is about a skill column, whose values are the two mark
 strings. The same rule the rest of this module follows, and the audit
 had been written as though stating it were enough.
+
+---
+
+## Brightspace will not read its own export (2026-11-13)
+
+He filled in the gradebook Brightspace handed him, uploaded it back,
+and got "The import file selected cannot be read. Refer to the sample
+import file to see how the import file should appear." Unmodified
+apart from the cells printit wrote.
+
+### It is not a parse error, whatever the wording says
+
+That was worth establishing before changing anything, because "cannot
+be read" points at structure and would have sent this somewhere else
+entirely. His 2026-11-12 export parses perfectly: 21 rows, every one
+61 fields wide, not a single quote character in the file, no embedded
+commas, no duplicate or empty headers, CRLF throughout, no BOM,
+`End-of-Line Indicator` last and `#` all the way down. There is
+nothing in the bytes to object to.
+
+The sample Brightspace links from that same page differs from his file
+in one way that matters: it has no computed columns in it. The export
+carries columns Brightspace works out for itself, and the import
+refuses the whole file over them rather than skipping them. On his
+export that is eleven of sixty-one:
+
+    3  <Formula> items         the three "Total ... Passed" totals
+    6  category subtotals      Numerator and Denominator, three pairs
+    2  calculated final grade  only the *adjusted* one is importable
+
+D2L's own documentation for this is gone. The community article is a
+410 and `documentation.brightspace.com/.../import_export_grades.htm`
+redirects to a landing page, so a subagent sent to read both came back
+with nothing and, rightly, refused to fill the gap from memory. What
+the rule here rests on instead: the file itself, the sample
+Brightspace supplies, and several universities' own help pages saying
+independently to delete exactly these columns before importing.
+
+### The rule is written in terms of what the LMS computes
+
+`importable_columns` reads the *header text*: a `<Formula ...>` or
+`<Calculated ...>` suffix, a `... Subtotal Numerator` or
+`Denominator`, or the calculated final grade pair. Not a list of his
+column names, and not "everything except the skills".
+
+That shape matters for more than tidiness. It makes the trim a no-op
+on a gradebook that has none of them, so a Canvas export goes through
+whole instead of being quietly narrowed by a rule fitted to one LMS.
+Anything content-driven here has to be, because this tool is supposed
+to work for people whose gradebook is nothing like his.
+
+`drop_columns` trims the way `splice` writes: each kept field's own
+text is copied, quoting included, and only the separators are rebuilt.
+A cell the LMS quoted stays quoted, one it left bare stays bare, and
+the BOM and line endings carry through. A short row -- which a
+trailing empty cell produces -- is padded rather than refused.
+
+**Nothing the export wrote to may be dropped**, checked in both the
+CLI and the GUI rather than relied on. The rule is written in terms of
+what the LMS computes, so a skill column cannot match it; that is
+precisely the kind of reasoning that deserves an assertion under it.
+`verify_dropped` is the post-condition: every kept column holds what
+it held, in the right place.
+
+### The audit had to learn to follow the trim
+
+`audit_export` compares columns by number, and the file he uploads now
+has fewer of them than the file he downloaded. Left alone it would
+have reported the header as rewritten and stopped -- on the only file
+that matters, the day after being built to check that file.
+
+`align_columns` accepts a header that is a *subsequence* of the
+exported one and maps the rest. Reordered or renamed is not an
+alignment and still stops, because at that point nothing here can say
+which column is which. Every column number inside `audit_export` is
+still a column of the file **as exported**; `now()` goes through the
+map and `was()` does not, so the two always name the same thing.
+
+A dropped column the LMS *can* read is a finding of its own kind. That
+grade item would simply not be imported, and no other check would
+mention it.
+
+### Names and wording
+
+`_IMPORT`, not `_UPDATED`, when the file has been narrowed -- the name
+is the only thing on the file saying which of the two it is. The GUI
+lists what was removed and why, folded. The CLI prints the same and
+adds that nothing is lost in the LMS, because these are values it
+works out for itself and will work out again, which is the question
+anybody would ask on seeing eleven columns disappear.
+
+One wording fix that came out of the real run: `gradebook audit` on a
+trimmed pair reported "0 lines came through byte for byte; 21 differ",
+which is true, meaningless and alarming. Every line differs by design
+once whole columns have gone. It says so now instead of printing the
+list.
+
+### Verified
+
+On his real export, both sections: 61 columns to 50, 21 rows to 21,
+every row the same width, CRLF intact, `OrgDefinedId` first and
+`End-of-Line Indicator` last as in Brightspace's own sample, no
+formula or subtotal or calculated column left, the adjusted final
+grade kept, all 41 selectbox grade columns kept. 44 cells differ from
+the export per section, every one in a skill column, header row
+untouched. The audit re-run on the trimmed pair compares 1,000 cells,
+reports no findings, and notes the eleven dropped columns as
+information. Six behaviours, six old versions put back underneath
+them, six tests watched to fail.
+
+What is still unconfirmed, and he will find out on the next upload:
+whether those eleven columns are the whole of it. The diagnosis rests
+on documentation written by other people's universities rather than by
+D2L, because D2L's own pages for it no longer exist.
