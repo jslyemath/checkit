@@ -19199,3 +19199,78 @@ What is still unconfirmed, and he will find out on the next upload:
 whether those eleven columns are the whole of it. The diagnosis rests
 on documentation written by other people's universities rather than by
 D2L, because D2L's own pages for it no longer exist.
+
+---
+
+## Two import errors, and the first one was a different column (2026-11-13)
+
+Same day, later. The trim shipped that morning was aimed at the wrong
+error.
+
+He deleted `OSW_ID` from the file by hand, got past "the import file
+selected cannot be read", and landed on a second screen: "One or more
+grade items have just been renamed, created and/or deleted by another
+user. Revisit the grade book and ensure your import file is current."
+
+So there are two refusals in a row, with different causes:
+
+* **"cannot be read"** -- a column that is not a grade item at all.
+  His `OSW_ID`.
+* **"renamed, created and/or deleted"** -- the columns Brightspace
+  computes for itself, which is what the morning's eleven were.
+
+The morning's diagnosis was not wrong about the eleven; it was wrong
+about which error they caused, and it said so with more confidence
+than one error message supported. The note it wrote even ended with
+"whether those eleven are the whole of it is the thing your next
+upload will tell us" -- which it did, immediately, by failing
+differently.
+
+### The discriminator was in the file all along
+
+48 of his 61 columns carry a `<Type MaxPoints:...>` suffix: every
+real grade item. Of the 13 that do not, twelve are Brightspace's own
+fixed fields -- the identifier, the end-of-line marker, the subtotal
+pairs and the final grade pairs. The thirteenth is `OSW_ID`.
+
+That is a clean rule read off the data rather than guessed:
+`_not_a_grade_item` drops an unlabelled column that is not in
+`FIXED_COLUMNS`, **and only when the file labels its grade items at
+all**. The gate is the whole of its safety. A Brightspace export
+labels every grade item, so an unlabelled column is real evidence; a
+Canvas export labels none of them, so the rule never engages and its
+`Student`, `ID` and `SIS Login ID` columns are left alone. One of the
+three watched failures is exactly that: remove the gate and a Canvas
+export loses its identifier columns.
+
+### The trim broke the audit's idea of who a row is
+
+The one worth remembering. His profile joins rows to students on
+`OSW_ID` -- and `OSW_ID` is precisely the column now being removed.
+`audit_export` read the id out of the *written* file, so the moment
+the trim started working, every row resolved to nobody and every
+written cell would have come back as an `unbacked` finding. On the
+only file he will ever upload.
+
+It reads the id from the exported row now. That is where it has
+always been, it is never written to, and the `stray` check already
+asserts its immobility for as long as the column is in the file. The
+`-DoNotUse` ignore rule moved with it for the same reason: whether a
+row is a retired enrolment is a fact about who it is, and the marker
+may sit in a column the trim removed.
+
+The general shape: **a feature that narrows a file breaks anything
+downstream that was reading by position or by a column it no longer
+has.** The audit was written the day before; it was already stale.
+
+### Verified
+
+Both sections: 61 columns to 49, 21 rows to 21, every row the same
+width, CRLF intact, `OrgDefinedId` first and `End-of-Line Indicator`
+last as in Brightspace's own sample, nothing computed left, no
+`OSW_ID`, the adjusted final grade kept, all 41 selectbox grade
+columns kept. 44 cells differ from the export per section, every one
+in a skill column, header untouched. The audit re-run on the trimmed
+pair compares 980 and 1,127 cells, reports no findings, notes the
+twelve dropped columns, and -- the part that would have broken --
+still resolves every student.
