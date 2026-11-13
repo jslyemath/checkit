@@ -18964,3 +18964,124 @@ the mark the index recorded for the box, so a real box is always in
 the picture -- a dense grid of small printed rectangles can still
 match, and an early version of the negative-control test accidentally
 drew one. And `BESIDE_MAX` is still fitted to a single stack.
+
+---
+
+## Outside validation, asked for before the first upload (2026-11-13)
+
+He was about to push grades into Brightspace for the first time and
+asked for two things: a way to put the LMS Export panel down, and
+independent confirmation that nothing would regress -- "such as
+overwriting a 'Pass' with a 'Not Yet'".
+
+### The way back out
+
+The panel had none. A file dropped by mistake, or a job just finished,
+stayed on screen until the whole page was reloaded. `Start over` goes
+in the toolbar beside the primary, which is where Scans keeps the same
+pair, and not beside the drop area: a second button there is what that
+layout exists to be rid of.
+
+Three things it has to clear, and the third is the one that is easy to
+miss. The server's `CARRIED`, so the file is genuinely let go and not
+merely hidden. The page's `gbRead` and the plan. And the file input's
+`value` -- an input keeps its value after a choice and choosing the
+same file again fires no `change` event, so without it, dropping the
+wrong gradebook and then picking the right one from the same dialog
+did nothing at all. The profile is deliberately left alone: it lives
+in `gradebook.toml`, it describes the course rather than the file, and
+throwing the mapping away would be the expensive half of starting
+over.
+
+### Why `verify_export` was not the answer
+
+It already existed and already checked every write. But it checks the
+write against *the plan that produced it*, and a plan that is wrong
+with a write that is faithful to it comes back clean -- the plan is
+both the question and the answer. The threshold bug of 11-11 is
+exactly that shape: `plan_export` wrote a pass for a two-pass skill
+after one pass, and every post-condition check agreed, because they
+were all asking whether the file matched the plan.
+
+`audit_export` asks whether each cell agrees with **the record**. Six
+findings, worst first: `regression` (held a pass, does not now),
+`unbacked` (changed, and the record does not account for it), `stray`
+(changed outside any skill's column), `shape`, `mismapped` (a column
+mapped to a slug its header never names), and `missed`.
+
+`missed` is the inverse check and is the one that earns its place on a
+quiet run. **A file that was never written to at all passes every
+other test here** -- nothing regressed, nothing strayed, nothing is
+unbacked -- so without it a silent no-op reads as a clean export.
+
+### What is independent, stated rather than implied
+
+An audit that quietly shares the bug it is looking for is worse than
+none, so the docstring says which half is which.
+
+Independent: the headline check compares the two files and nothing
+else. No mapping, no roster, no record, no agreement with the planner
+about anything -- if a cell held the pass string and no longer does,
+that is the finding, and nothing about why makes it not one. The shape
+checks and "nothing changed outside a skill's column" are the same.
+
+Shared: joining a row to a student uses the planner's own `_core` and
+`ignored_by`, because writing a second normaliser would invent
+disagreements rather than find them. The column mapping is *checked*
+rather than recomputed -- `names_a_slug` requires the header to start
+with the slug and the next character not to be alphanumeric, so `N3`
+cannot claim `N30`, and a hand-paired column from `profile.pairs` is
+allowed through. Strict where `match` is clever. A second heuristic
+would be a second thing to be wrong.
+
+So: a planner that writes to the wrong cell, overwrites a pass,
+invents a result or silently writes nothing is caught. A roster whose
+ids are wrong the same way in both places is not.
+
+### The byte level
+
+`changed_lines` compares the two files' bytes line by line. The parsed
+comparison cannot see what it sees: a cell whose value is unchanged
+and whose quoting is not reads as identical through `csv.reader`, and
+is a different file as far as the LMS is concerned. It also catches a
+file that arrived CRLF and left LF, which shows up as every line
+differing rather than as nothing.
+
+### The GUI was the half that had never been checked
+
+`gradebook export` has verified its writes twice over since the first
+version -- once on the rows in memory, once by reading the written
+file back. `api_gradebook_write` did neither. That is the wrong way
+round, because the download button is the one he uses and the CLI is
+the one he does not.
+
+It now runs `verify_export`, the byte comparison and `audit_export`
+on every file, and a `regression`, `unbacked`, `stray` or `shape`
+finding withholds the download and names the cell. The softer findings
+come back beside the files with the counts, so the panel says the file
+was checked instead of leaving it to be assumed -- which was the
+position he was in when he asked.
+
+### Verified, and then deliberately broken
+
+On his real export of 2026-11-13, both sections: 88 cells planned,
+2,623 cells compared, no findings, 416 existing passes untouched.
+
+A clean result from an auditor that has only ever seen a good file is
+agreement, not a test. So each of the seven failures was provoked on
+that same file -- a pass overwritten with a non-pass, a pass blanked,
+a pass invented in a blank cell, a cell changed outside any skill
+column, a planned pass left unwritten, a row dropped, an ignored row
+written to -- and every one was caught. Then the GUI path was driven
+with `plan_export` monkeypatched to overwrite an existing pass, and
+the download was withheld: the part that shows the guard is live
+rather than computed and discarded.
+
+**A finding that carried a student's id.** The provocation found a
+defect in the audit itself. `stray` quoted the cell's contents, and a
+stray cell is by definition outside a skill's column -- so the first
+run printed a real `OrgDefinedId` into a report that goes on screen
+and into a log. It names the header now and quotes nothing. Every
+other finding is about a skill column, whose values are the two mark
+strings. The same rule the rest of this module follows, and the audit
+had been written as though stating it were enough.
