@@ -19274,3 +19274,101 @@ in a skill column, header untouched. The audit re-run on the trimmed
 pair compares 980 and 1,127 cells, reports no findings, notes the
 twelve dropped columns, and -- the part that would have broken --
 still resolves every student.
+
+---
+
+## Three refusals, and the principle that ends them (2026-11-16)
+
+Brightspace refused the import three times, for three different
+reasons, and each fix was a correct diagnosis of the error in front
+of it:
+
+1. the formula, subtotal and calculated columns -- it computes them
+2. `OSW_ID` -- not a grade item at all
+3. a `📌` in a Text item's *header* -- importable in principle,
+   refused anyway
+
+The third is where the pattern stops being bad luck. The file was
+being built as **the export minus whatever had been seen to choke
+it**, and that list is not finite. His correction, and it ends the
+sequence: there is no need for extraneous columns, just ship back the
+Brightspace ID and the skill columns.
+
+### Blocklist to allowlist
+
+`import_columns` now carries three things:
+
+    the column the LMS matches rows on
+    the skill columns this run actually wrote into
+    the end-of-line marker, where the format has one
+
+and makes no judgement about whether anything else would have been
+accepted. "What might offend the importer" is open and unknowable;
+"what the importer needs" is three things. The `📌` column is gone
+without the tool ever knowing it was a problem, which is the whole
+value of the shape: it was never a column this export had anything to
+say about.
+
+**The identifier is the LMS's, not ours.** `Profile.student_matches`
+is how printit joins a row to the roster, and on his course that is
+`OSW_ID` -- a column Brightspace has never heard of, and the one he
+had to delete by hand in round two. The import file carries
+`OrgDefinedId`, or `Username` where that is what the gradebook has,
+and a file with neither is refused rather than written and uploaded
+to match nobody. The two identifiers had been conflated since the
+feature was written; nothing noticed until the LMS did.
+
+**Only the skills written.** A mapped skill with nothing new to say
+is left out. Re-importing a value the LMS already holds is a no-op at
+best and at worst sets back a grade changed in the LMS since the
+export -- the one standing risk of this whole feature, now carried by
+thirteen columns instead of forty-eight.
+
+### What the audit had to learn, again
+
+Twice in three days, and the same shape both times: **a change that
+narrows the file breaks anything downstream reading by position or by
+a column that is no longer there.**
+
+A missing column had been a finding. That was right when trimming
+removed only what the LMS could not read -- taking out a readable
+column then meant silently losing a grade item. Under an allowlist
+nearly every column is absent by design, so the finding had to go and
+the coverage pass had to get stronger instead.
+
+It now asks **what the LMS will hold once this file is imported**,
+not what the file says. A column in the file answers for itself; one
+that is absent keeps whatever the export showed, because the import
+will not touch it. Without that, every skill already right in the LMS
+came back as `missed` -- on his run, most of the gradebook. With it,
+a pass the record holds that the export did *not* show and the file
+does not carry is still a finding, which is the real failure that
+rule is there for.
+
+And losing the identifier became a finding of its own. Everything
+else in the audit is about values; that one is about the file
+reaching anybody at all. It fires only when the export had an
+identifier and the cut lost it -- asserted unconditionally at first,
+which made every audit of a gradebook using neither D2L name fail on
+the identifier instead of answering the question it was asked.
+
+### Verified
+
+Both sections of his real export: 61 columns to 15 and 14. No emoji
+in any header. Rows unchanged, every row one width, CRLF intact, `#`
+down the last column, the identifier column and the kept header row
+identical to the export. 44 cells differ per section, every one in a
+skill column. The audit reports no findings on either and no spurious
+`missed` for the forty-odd absent columns. The sabotage check -- the
+planner monkeypatched to overwrite a pass -- still withholds the
+download.
+
+Five behaviours, five old versions put back underneath them, five
+tests watched to fail. Among them the one that matters most here:
+restore the blocklist and the emoji header comes straight back.
+
+One note on the numbers in the audit report. They are much smaller
+than before -- 300 cells compared rather than 1,220 -- and that is
+not a weaker check. The import can only change what is in the file,
+so the cells compared are now exactly the cells at risk, and all of
+them.
