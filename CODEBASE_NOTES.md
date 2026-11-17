@@ -20356,8 +20356,22 @@ printit style, no `\input` or `\includegraphics` left. The page opened
 as `/index.html` (the address bug), the unknown-skill page, W7's answer
 on screen, and no console errors were checked the same way.
 
-**Republish mat-106 -- yes; commit and push -- yes.** Done after this
-section was written; see the commits.
+**Republish mat-106 -- yes; commit and push -- yes.** checkit 774d4a46,
+checkit-printit 5a36bfc, mat-106 b92e995. `generate -i --image-seeds
+400 --remote ...` recompiled all 2,418 figures under 400 once (no keys
+existed yet) with no errors, and **every PNG came out byte for byte
+the same** -- so the "theme two revisions behind" note had not left any
+published picture wrong. `checkit check` clean, W7 included.
+
+**One thing the republish found: R1's site had been stale for five
+weeks.** Diffing the new `derived.json` against the published one
+showed 173 of R1's 350 instructor versions as *different problems*,
+though no seed moved today. R1 was regenerated on 2026-10-12 (mat-106
+1eaac50, "R1 declares the level it has reached") and never deployed,
+so students browsed R1's old versions while printit printed from the
+new seeds. Only R1 differed. A deploy left undone is invisible from
+both ends -- the bank and printit agree with each other, and the site
+looks fine -- so after any `-r`, republish the same day.
 
 **Prose escaping** was not done: he asked what it means. Explained in
 chat; it waits for his decision.
