@@ -103,7 +103,7 @@ class FrozenTestCase(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def run_cli(self, *args):
-        return CliRunner().invoke(main, ["generate", "-a", "50", *args])
+        return CliRunner().invoke(main, ["generate", "-a", "60", *args])
 
     def seeds(self, slug):
         path = os.path.join(self.tmp, "assets", slug, "generated", "seeds.json")
@@ -209,6 +209,34 @@ class ThawingIsDeliberate(FrozenTestCase):
     def test_thaw_is_repeatable(self):
         result = self.run_cli("-r", "--thaw", "FROZEN", "--thaw", "FROZEN")
         self.assertEqual(result.exit_code, 0, result.output)
+
+
+class EveryPathRespectsIt(FrozenTestCase):
+    """RV-14 of the 2026-11-16 review: the check lived only in
+    `Bank.generate_exercises`, so two other ways in regenerated a frozen
+    outcome without a word -- the deprecated Jupyter panel, which calls the
+    outcome directly, and `write_json(regenerate=True)`, which goes through
+    `Outcome.to_dict`. The guard is now on the outcome itself."""
+
+    def test_regenerating_the_outcome_directly(self):
+        before = self.values("FROZEN")
+        self.edit_generators()
+        frozen = next(o for o in Bank(self.tmp).outcomes() if o.slug == "FROZEN")
+        frozen.generate_exercises(regenerate=True, amount=50)
+        self.assertEqual(before, self.values("FROZEN"))
+
+    def test_write_json_with_regenerate(self):
+        before = self.values("FROZEN")
+        self.edit_generators()
+        Bank(self.tmp).write_json(regenerate=True, precompute=False)
+        self.assertEqual(before, self.values("FROZEN"))
+
+    def test_thawed_on_the_outcome_still_regenerates(self):
+        self.edit_generators()
+        frozen = next(o for o in Bank(self.tmp).outcomes() if o.slug == "FROZEN")
+        frozen.generate_exercises(regenerate=True, amount=50, thawed=True)
+        self.assertTrue(all(str(v).startswith("EDITED")
+                            for v in self.values("FROZEN")))
 
 
 class WithoutRegenerate(FrozenTestCase):

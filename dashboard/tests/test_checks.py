@@ -59,6 +59,20 @@ class RawTexInProse(unittest.TestCase):
     def test_clean_prose_is_clean(self):
         self.assertEqual(checks.raw_tex_in_prose(doc(html="<p>plain words</p>")), [])
 
+    def test_a_brace_in_prose_is_found(self):
+        """mat-106's W7 showed students "9{,}456 remainder 734" for weeks:
+        a LaTeX thousands separator in plain text. No backslash, so the
+        command patterns never saw it. A brace in visible text is LaTeX
+        leaking either way -- literal on the web, swallowed in print."""
+        found = checks.raw_tex_in_prose(doc(html="<p>9{,}456 remainder 7</p>"))
+        self.assertEqual([f.detail for f in found], ["'{' renders literally",
+                                                     "'}' renders literally"])
+
+    def test_braces_inside_maths_are_not_findings(self):
+        html = ('<p><span class="math inline-math" data-latex="9{,}456">'
+                + BS + '(9{,}456' + BS + ')</span></p>')
+        self.assertEqual(checks.raw_tex_in_prose(doc(html=html)), [])
+
 
 class EscapedMarkup(unittest.TestCase):
     def test_escaped_element_is_found(self):

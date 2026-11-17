@@ -25,6 +25,7 @@ import sys, json, os, datetime, random
 # them keeps one definition on the Python side; the viewer has the only
 # other copy, and a test asserts the two agree.
 from checkit import PUBLIC_SEEDS, BUNDLE_UNTIL
+from checkit.utils import atomic_write
 
 import sympy
 from sympy import Matrix, Rational, Symbol, latex as _sympy_latex, zeros
@@ -76,7 +77,13 @@ class _Plot:
         self._figure = figure
 
     def save(self, path):
-        self._figure.savefig(path, bbox_inches="tight")
+        import matplotlib.pyplot as plt
+        try:
+            self._figure.savefig(path, bbox_inches="tight")
+        finally:
+            # Closed once saved. pyplot keeps every figure it made open
+            # until told otherwise -- one per seed, a thousand an outcome.
+            plt.close(self._figure)
 
 
 def plot(expr, xrange=(-10, 10), yrange=None, points=400, **kwargs):
@@ -658,6 +665,41 @@ def load_generator(generator_path):
     return namespace["Generator"]
 
 
+def write_figures(figures):
+    """Write every seed's .tikz, once the whole run has succeeded.
+
+    `figures` is {seed folder: {name: source}}. UTF-8, never the locale's
+    (RV-6): a figure is text that pdflatex reads, and cp1252 bytes are not
+    what it is told to expect.
+
+    A file whose content is unchanged is not rewritten, so the figure
+    compiler's freshness check -- and anybody's diff -- sees no change. A
+    .tikz the seed no longer produces is removed, with its PNG: it used to
+    be left behind, a figure for a version that no longer has one.
+    """
+    for seed_path, sources in figures.items():
+        if os.path.isdir(seed_path):
+            for old in os.listdir(seed_path):
+                if old.endswith(".tikz") and old[:-5] not in sources:
+                    os.remove(os.path.join(seed_path, old))
+                    png = os.path.join(seed_path, old[:-5] + ".png")
+                    if os.path.exists(png):
+                        os.remove(png)
+        if not sources:
+            continue
+        os.makedirs(seed_path, exist_ok=True)
+        for name, source in sources.items():
+            path = os.path.join(seed_path, f"{name}.tikz")
+            try:
+                with open(path, encoding="utf-8", newline="") as f:
+                    if f.read() == source.replace("\n", os.linesep):
+                        continue
+            except (OSError, UnicodeDecodeError):
+                pass
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(source)
+
+
 # this script should be called from the root directory of the bank
 # python wrapper.py /path/to/generator.py /path/to/output/seeds.json 1000 random? images?
 if __name__ == "__main__":
@@ -676,6 +718,7 @@ if __name__ == "__main__":
                        if getattr(generator, "variants", None) else None)
 
         seeds = []
+        figures = {}
         for i in range(amount):
             if i > 0 and (i % 50) == 0:
                 print(f"Generating seed {i}")
@@ -690,13 +733,15 @@ if __name__ == "__main__":
             directory = os.path.dirname(seeds_path)
             seed_path = os.path.join(directory, f"{seed_int:04}")
             # TikZ source is cheap text and print needs it for every seed, so it
-            # is written unconditionally -- see wrapper.sage for the full note.
+            # is produced unconditionally -- see wrapper.sage for the full note.
+            #
+            # Held, and written only once every seed has succeeded. Written
+            # as it went, a generator failing at seed 700 left new figures
+            # for 0..699 beside the *old* seeds.json, and print \input's the
+            # .tikz -- so the picture and the numbers on a page disagreed,
+            # silently (RV-11, 2026-11-16).
             tikz = generator.tikz_graphics()
-            if tikz is not None:
-                os.makedirs(seed_path, exist_ok=True)
-                for name, source in tikz.items():
-                    with open(os.path.join(seed_path, f"{name}.tikz"), "w") as f:
-                        f.write(source)
+            figures[seed_path] = dict(tikz) if tikz is not None else {}
             # Rasterizing is the expensive half, so it stays gated.
             if gen_images and i < image_amount:
                 graphics = generator.graphics()
@@ -709,8 +754,7 @@ if __name__ == "__main__":
             "seeds": seeds,
             "generated_on": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         }
-        os.makedirs(os.path.dirname(seeds_path), exist_ok=True)
-        with open(os.path.join(seeds_path), "w") as f:
-            json.dump(data, f)
+        write_figures(figures)
+        atomic_write(seeds_path, json.dumps(data))          # RV-10
     else:
         raise RuntimeError("Three positional arguments are required")

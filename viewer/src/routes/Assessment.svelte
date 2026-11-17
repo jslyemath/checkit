@@ -15,7 +15,7 @@
     import { assessmentOutcomeSlugs, instructorEnabled, assessmentTemplate } from '../stores/instructor';
     import { bank } from '../stores/banks';
     import { getOutcomeFromSlug, pickAssessmentExercises, renderAssessment,
-        ensureDerivedForSlugs, ensureLatexSupport, bankHasTheme,
+        ensureDerivedForSlugs, ensureLatexSupport, ensureFigures, bankHasTheme,
         defaultTemplateFor, newAssessmentVersion } from '../utils';
     import type { Assessment, Outcome } from '../types';
     import Exercise from '../components/Exercise.svelte'
@@ -64,7 +64,12 @@
         try {
             await ensureDerivedForSlugs($bank,$assessmentOutcomeSlugs)
             await ensureLatexSupport($bank)
-            chosen = pickAssessmentExercises($bank,$assessmentOutcomeSlugs,version)
+            const picked = pickAssessmentExercises($bank,$assessmentOutcomeSlugs,version)
+            // The figures these versions draw, fetched before rendering --
+            // see ensureFigures. Assigned to `chosen` only after, because
+            // the reactive render below fires as soon as `chosen` changes.
+            await ensureFigures(picked)
+            chosen = picked
             generatedAssessment = renderAssessment(
                 $bank,chosen,effectiveTemplate,answerKey,version)
         } catch (e) {
@@ -74,9 +79,21 @@
     }
     // Editing the template or ticking the key updates what is on screen, so
     // the preview never disagrees with what the buttons would export.
+    //
+    // In a try: this runs on every keystroke in the template box, and a
+    // half-typed `{{#` makes Mustache throw. Uncaught, inside a reactive
+    // statement, that froze the page mid-edit; now it says what is wrong
+    // and recovers on the next keystroke that fixes it (2026-11-17).
     $: if (chosen.length) {
-        generatedAssessment = renderAssessment(
-            $bank,chosen,effectiveTemplate,answerKey,version)
+        try {
+            generatedAssessment = renderAssessment(
+                $bank,chosen,effectiveTemplate,answerKey,version)
+            generateError = ""
+        } catch (e) {
+            generatedAssessment = undefined
+            generateError = "The template could not be filled in: "
+                + (e instanceof Error ? e.message : String(e))
+        }
     }
 
     const copyToClipboard = (text:string) => () => {
@@ -105,7 +122,7 @@
     const overleafFields = (assessment:Assessment) => {
         const fields: {name:string, value:string}[] = []
         assessment.files.forEach((f)=>{
-            fields.push({name:"snip_uri[]", value:asDataUrl(f.content)})
+            fields.push({name:"snip_uri[]", value:f.dataUrl ?? asDataUrl(f.content)})
             fields.push({name:"snip_name[]", value:f.name})
         })
         fields.push({name:"main_document", value:"main.tex"})

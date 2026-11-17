@@ -73,7 +73,7 @@ export const outcomeToStxDocument = (o:Outcome,seed:number) => {
     if (doc.querySelector('parsererror')) {
         doc = parser.parseFromString(errorStx("XML could not be parsed."), "application/xml")
     }
-    const remote = `${location.protocol}//${location.host}${location.pathname.replace(/\/+$/, "")}`
+    const remote = siteBase()
     doc.querySelectorAll("image, tikz-image").forEach(image => {
         image.setAttribute("remote", remote)
     });
@@ -86,13 +86,19 @@ export const outcomeToStx = (o:Outcome,seed:number) =>
     outcomeToStxDocument(o,seed).documentElement
 
 /**
- * The site's own address, without a trailing slash.
+ * The site's own address -- the folder index.html is served from -- without a
+ * trailing slash. Every URL the viewer builds is built on this.
  *
- * The same expression @remote is built from at generate time, so a bundle URL
- * and an <img src> resolve against the same base.
+ * The one copy. There were three (here, the image base in
+ * outcomeToStxDocument, and the AI payload's link), each taking
+ * location.pathname with its trailing slashes removed -- so a page opened as
+ * `.../index.html` asked for `.../index.html/assets/...` and got a 404 for its
+ * bundles, its theme and its images (2026-11-17).
  */
-const siteBase = () =>
-    `${location.protocol}//${location.host}${location.pathname.replace(/\/+$/, "")}`
+function siteBase():string {
+    const folder = location.pathname.replace(/[^/]*\.html?$/i, "").replace(/\/+$/, "")
+    return `${location.protocol}//${location.host}${folder}`
+}
 
 /**
  * What the bank says it precomputed, or a message explaining how to fix it.
@@ -135,7 +141,6 @@ export const ensureDerived = (outcome:Outcome):Promise<void> => {
         const url = `${siteBase()}/${pre.bundle_path.replace("{slug}", outcome.slug)}`
         inflightBundles[outcome.slug] = fetch(url).then(async (response) => {
             if (!response.ok) {
-                delete inflightBundles[outcome.slug]
                 throw new Error(
                     `Could not fetch precomputed exercises for ${outcome.slug}: ` +
                     `HTTP ${response.status} from ${url}. The bank may have been ` +
@@ -143,6 +148,13 @@ export const ensureDerived = (outcome:Outcome):Promise<void> => {
                 )
             }
             loadedBundles[outcome.slug] = await response.json()
+        }).catch((error) => {
+            // Forgotten on *any* failure, so the next attempt tries again.
+            // Only a bad HTTP status was forgotten before; a dropped
+            // connection or a truncated file left the rejected promise
+            // cached, and every retry failed until the page was reloaded.
+            delete inflightBundles[outcome.slug]
+            throw error
         })
     }
     return inflightBundles[outcome.slug]
@@ -264,9 +276,23 @@ const loadedSupportPackages = (bank:Bank):string =>
  * without these lines every box prints the theme's default. printit generates
  * the same file from the same manifest -- see descriptions_tex in assemble.py.
  */
+/**
+ * Plain text made safe inside a LaTeX argument. printit's `tex_escape` is the
+ * other copy (assemble.py), and the two must agree: both build this same
+ * \setskilldesc line, and before 2026-11-17 neither escaped, so a & or % in a
+ * description broke the document or swallowed the rest of its line.
+ */
+const TEX_SPECIAL:Record<string,string> = {
+    "\\": "\\textbackslash{}", "&": "\\&", "%": "\\%", "$": "\\$", "#": "\\#",
+    "_": "\\_", "{": "\\{", "}": "\\}", "~": "\\textasciitilde{}",
+    "^": "\\textasciicircum{}",
+}
+export const texEscape = (text:string):string =>
+    Array.from(text).map((ch)=>TEX_SPECIAL[ch] ?? ch).join("")
+
 const skillDescriptions = (outcomes:Outcome[]):string =>
     outcomes.map((o)=>{
-        const description = (o.description ?? "").split(/\s+/).join(" ").trim()
+        const description = texEscape((o.description ?? "").split(/\s+/).join(" ").trim())
         // The optional argument is the box color, resolved by the platform
         // from <color_map>. Omitting it leaves every skill in the theme's
         // default, which is not what a bank declaring a color map is asking
@@ -494,6 +520,102 @@ export const parseMath = (html:string) => {
     );
 }
 
+/**
+ * The figures an exercise's LaTeX refers to, and what an assessment needs of
+ * them.
+ *
+ * `\input{...fig.tikz}` is a figure drawn from TikZ source -- the same file
+ * print `\input`s -- and is pasted into the document in place, so it is a
+ * picture in both the copied text and the Overleaf project. A figure has to
+ * be fetched for that, and until 2026-11-17 the site did not even publish the
+ * .tikz files, so any assessment with a figure failed to compile.
+ *
+ * `\includegraphics{...}` is an ordinary image. Upstream CheckIt has the same
+ * gap -- it sends Overleaf the LaTeX alone -- so this is not a fork-made
+ * problem, but it is fixed the same way: the image is fetched and sent to
+ * Overleaf as a file of the project, under a flat name the LaTeX is rewritten
+ * to use. The single copied file cannot carry an image, and says so.
+ */
+const TIKZ_INPUT = /\\input\{([^}]+\.tikz)\}/g
+const GRAPHIC = /\\includegraphics(\[[^\]]*\])?\{([^}]+)\}/g
+
+type Figure = {text?:string, dataUrl?:string}
+const loadedFigures:Record<string,Figure> = {}
+
+const figurePaths = (latex:string):string[] => [
+    ...Array.from(latex.matchAll(TIKZ_INPUT), (m)=>m[1]),
+    ...Array.from(latex.matchAll(GRAPHIC), (m)=>m[2]),
+]
+
+/** Fetch every figure these exercises use, once. Await it before rendering. */
+export const ensureFigures = async (chosen:{outcome:Outcome, seed:number}[]):Promise<void> => {
+    const wanted = new Set<string>()
+    chosen.forEach((e)=>figurePaths(outcomeToLatex(e.outcome, e.seed))
+        .forEach((p)=>wanted.add(p)))
+    await Promise.all(Array.from(wanted).map(async (path)=>{
+        if (loadedFigures[path]) return
+        // A PNG that was drawn from TikZ is used as its TikZ, as print uses
+        // it: mat-106's F2 shows students `<image source="...fig.png">`
+        // while its print template \input's fig.tikz. The source beside the
+        // PNG is tried first; an image with none is a picture in its own
+        // right and travels as a file.
+        if (/\.png$/i.test(path)) {
+            const source = await fetch(`${siteBase()}/${path.replace(/\.png$/i, ".tikz")}`)
+            if (source.ok) {
+                loadedFigures[path] = {text: await source.text()}
+                return
+            }
+        }
+        const url = `${siteBase()}/${path}`
+        const response = await fetch(url)
+        if (!response.ok) {
+            throw new Error(
+                `Could not fetch the figure ${path}: HTTP ${response.status} ` +
+                `from ${url}. A bank published before 2026-11-17 did not carry ` +
+                `its .tikz files; regenerate and republish it with a current ` +
+                `CheckIt.`
+            )
+        }
+        if (path.endsWith(".tikz")) {
+            loadedFigures[path] = {text: await response.text()}
+        } else {
+            const bytes = new Uint8Array(await response.arrayBuffer())
+            let binary = ""
+            bytes.forEach((b)=>{ binary += String.fromCharCode(b) })
+            const type = response.headers.get("content-type") || "application/octet-stream"
+            loadedFigures[path] = {dataUrl: `data:${type.split(";")[0]};base64,${btoa(binary)}`}
+        }
+    }))
+}
+
+/** One exercise's LaTeX with its figures in place, and the image files it
+ *  needs, as {path in the bank: flat file name}. */
+const withFigures = (latex:string, images:Record<string,string>):string =>
+    latex.replace(TIKZ_INPUT, (_, path:string) => {
+        const figure = loadedFigures[path]
+        if (!figure || figure.text === undefined) {
+            throw new Error(`The figure ${path} has not been fetched. Await ` +
+                            `ensureFigures before rendering.`)
+        }
+        return `% ---- ${path}\n${figure.text.trim()}\n`
+    }).replace(GRAPHIC, (_, options:string|undefined, path:string) => {
+        // A PNG drawn from TikZ: the source in place, at its own size, as
+        // print sets it -- see ensureFigures.
+        if (loadedFigures[path]?.text !== undefined) {
+            return `% ---- ${path.replace(/\.png$/i, ".tikz")}\n` +
+                   `${loadedFigures[path].text!.trim()}\n`
+        }
+        if (!loadedFigures[path]?.dataUrl) {
+            throw new Error(`The image ${path} has not been fetched. Await ` +
+                            `ensureFigures before rendering.`)
+        }
+        if (!(path in images)) {
+            const extension = (path.match(/\.[A-Za-z0-9]+$/) || [""])[0]
+            images[path] = `figure-${Object.keys(images).length + 1}${extension}`
+        }
+        return `\\includegraphics${options ?? ""}{${images[path]}}`
+    })
+
 /** The template a bank gets by default: themed when it publishes one. */
 export const defaultTemplateFor = (bank:Bank):string =>
     bankHasTheme(bank) ? themedAssessmentTemplate : assessmentTemplate
@@ -547,11 +669,14 @@ export const renderAssessment = (
     version:number=0,
 ) => {
     const themed = bankHasTheme(bank)
+    // Images the exercises use, {path in the bank: file name in the project},
+    // filled in as the bodies are rendered.
+    const images:Record<string,string> = {}
     // A themed document defines the SpaTeXt commands once in its preamble, so
     // each exercise arrives without its own copy. The generic template has no
     // preamble of its own and relies on them travelling with the exercise.
     const body = (e:{outcome:Outcome,seed:number}) => {
-        const latex = outcomeToLatex(e.outcome, e.seed)
+        const latex = withFigures(outcomeToLatex(e.outcome, e.seed), images)
         return themed ? stripSpatextPreamble(latex) : latex
     }
     const descriptions = skillDescriptions(chosen.map((e)=>e.outcome))
@@ -601,6 +726,20 @@ export const renderAssessment = (
             "name": DESCRIPTIONS_FILENAME,
             "content": `% Generated from the bank. Do not edit -- edit the bank.\n${descriptions}\n`,
         })
+    }
+    // Ordinary images travel as files of the project. The single copied
+    // file cannot carry one, so it says which it needs rather than failing
+    // in Overleaf with a missing-file error.
+    const names = Object.entries(images)
+    names.forEach(([path, name])=>{
+        assessment.files.push({"name": name, "content": "",
+                               "dataUrl": loadedFigures[path].dataUrl})
+    })
+    if (names.length) {
+        assessment.latex =
+            `% This document uses ${names.length} image file(s), which a single\n` +
+            `% copied file cannot carry: ${names.map(([, n])=>n).join(", ")}.\n` +
+            `% "Open in Overleaf" sends them with it.\n` + assessment.latex
     }
     return assessment
 }

@@ -93,7 +93,10 @@
             "id": id,
             "bank": $bank.title,
             "bankSlug": $bank.slug,
-            questionType: true,
+            // The chosen type as a key, as the Canvas context does. It was
+            // the literal key `questionType`, inert only because these two
+            // templates have no per-type sections yet.
+            [questionType]: true,
             "outcomes": selectedOutcomeSlugs.map(s => {
                 let o = $bank.outcomes.find(o => o.slug == s)
                 return {
@@ -118,7 +121,10 @@
             "id": id,
             "bank": $bank.title,
             "bankSlug": $bank.slug,
-            questionType: true,
+            // The chosen type as a key, as the Canvas context does. It was
+            // the literal key `questionType`, inert only because these two
+            // templates have no per-type sections yet.
+            [questionType]: true,
             "outcomes": selectedOutcomeSlugs.map(s => {
                 let o = $bank.outcomes.find(o => o.slug == s)
                 return {
@@ -144,7 +150,7 @@
         id = Date.now()
         working = true
         exportError = ""
-        // LMS export uses seeds 100-999, which are not inlined in bank.json, so
+        // LMS export uses seeds 100-399, which are not inlined in bank.json, so
         // their precomputed HTML has to be fetched before any of the builders
         // below run. One await here keeps them all synchronous.
         try {
@@ -155,28 +161,42 @@
             return
         }
         // hax to update DOM before locking browser for build
+        //
+        // Every failure lands in exportError. The builders throw on purpose
+        // when a precomputed format is missing, and so does KaTeX on a macro
+        // it cannot render -- but inside this setTimeout nothing caught
+        // either, so the spinner turned for ever and the reason went to the
+        // console, where nobody exporting a quiz is looking (2026-11-17).
+        const fail = (e:unknown) => {
+            working = false
+            exportError = e instanceof Error ? e.message : String(e)
+        }
         setTimeout(()=>{
-            if (lms=="canvas") {
-                const zip = new JSZip()
-                zip.file('imsmanifest.xml', toCanvasManifest())
-                selectedOutcomeSlugs.forEach((s)=>zip.file(`${s}.xml`, toCanvasOutcome(s)))
-                zip.generateAsync({ type: 'blob' }).then(function (content) {
+            try {
+                if (lms=="canvas") {
+                    const zip = new JSZip()
+                    zip.file('imsmanifest.xml', toCanvasManifest())
+                    selectedOutcomeSlugs.forEach((s)=>zip.file(`${s}.xml`, toCanvasOutcome(s)))
+                    zip.generateAsync({ type: 'blob' }).then(function (content) {
+                        working=false
+                        FileSaver.saveAs(content, 'canvasBank.zip')
+                    }).catch(fail)
+                } else if (lms=="brightspace") {
+                    const zip = new JSZip()
+                    zip.file('imsmanifest.xml', toBrightspaceManifest())
+                    zip.file('questiondb.xml', toBrightspaceBank())
+                    zip.generateAsync({ type: 'blob' }).then(function (content) {
+                        working=false
+                        FileSaver.saveAs(content, 'brightspaceBank.zip')
+                    }).catch(fail)
+                } else if (lms=="moodle") {
+                    let renderedBank = toMoodle()
+                    let blob = new Blob([renderedBank], {type: "text/plain;charset=utf-8"});
+                    FileSaver.saveAs(blob, 'moodleBank.xml')
                     working=false
-                    FileSaver.saveAs(content, 'canvasBank.zip')
-                })
-            } else if (lms=="brightspace") {
-                const zip = new JSZip()
-                zip.file('imsmanifest.xml', toBrightspaceManifest())
-                zip.file('questiondb.xml', toBrightspaceBank())
-                zip.generateAsync({ type: 'blob' }).then(function (content) {
-                    working=false
-                    FileSaver.saveAs(content, 'brightspaceBank.zip')
-                })
-            } else if (lms=="moodle") {
-                let renderedBank = toMoodle()
-                let blob = new Blob([renderedBank], {type: "text/plain;charset=utf-8"});
-                FileSaver.saveAs(blob, 'moodleBank.xml')
-                working=false
+                }
+            } catch (e) {
+                fail(e)
             }
         },50)
     }

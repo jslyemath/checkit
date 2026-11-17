@@ -71,9 +71,13 @@ back into the real thing. The pseudonym table lives in
 `~/CheckItPrintIt/vaults/<course>.json`, a **sibling** of `courses/` so
 that masking a course folder cannot reach it, and it is the only way
 back: there is no recovery key, deliberately. A column the tool does not
-recognise is blanked rather than passed through, and every twin is read
-back and searched for real values before it is handed over. See
-`PRINT_TOOL_DESIGN.md` 18.
+recognise is blanked when it reads as free text, and every twin is read
+back and searched for real values before it is handed over. **Neither
+is a guarantee yet:** an unrecognised column holding twelve or fewer
+distinct short values is kept only if each value repeats in the file
+and none is somebody's name (RV-3, fixed 2026-11-17), and the
+read-back still cannot find a value the vault was never told -- which
+is why the header synonyms matter. See `PRINT_TOOL_DESIGN.md` 18.
 
 `gradebook` is the LMS round-trip. `gradebook map` works out which
 column of an exported gradebook holds which skill, which strings mean
@@ -102,7 +106,7 @@ installed.
   and the viewer would render one from a hand-typed URL. Both are fixed; the
   fix only reaches a bank on its next `generate` and deploy.
 
-Images are rasterized to 400, because nothing past that can consume one: the viewer shows 50, bundles stop at 400, LMS export runs 100–399, and **print uses no PNGs at all** — it `\input`s the `.tikz`, written for all 1000 seeds.
+Images are rasterized to 400 **only because `--image-seeds 400` is passed by hand** -- the default is every seed. 400 is the right number because nothing past that can consume one: the viewer shows 50, bundles stop at 400, LMS export runs 100–399, and **print uses no PNGs at all** — it `\input`s the `.tikz`, written for all 1000 seeds.
 
 ## One picture, two surfaces
 
@@ -132,6 +136,32 @@ A template that documents its own syntax will have that documentation parsed as 
   to `~/CheckItPrintIt/courses/<name>/` — both deliberately outside every
   repo, because they hold names, student ids and email addresses.
 - Never paste a student name into chat. Mask output that might contain one.
+
+## After the 2026-11-16 review
+
+A different model read both repos; RV-1 to RV-14 were fixed on
+2026-11-17. The review is "The whole codebase, read by a different model
+(2026-11-16)" in `CODEBASE_NOTES.md`, the fixes "Fixing what the review
+found (2026-11-17)" straight after it. What changed that you will meet:
+
+- **Every file is UTF-8 and written whole.** `checkit.utils.atomic_write`
+  here, `checkit_printit.fileio.atomic_write` there -- two copies on
+  purpose. Never `open(path, "w")` for state; never `open()` without
+  `encoding=`.
+- **A PNG is current when its hash matches**, recorded per outcome in
+  `assets/<slug>/generated/figure-keys.json`, not by file time. Editing
+  `tikz_preamble.tex` or `printitfigures.sty` now redoes every figure.
+- **The site publishes `.tikz` for seeds below 400**, and the viewer's
+  assessment builder pastes figures into its LaTeX -- including a PNG
+  drawn from TikZ (F2), which it swaps for its `.tikz`.
+- **A run with marks cannot be deleted or rebuilt.** A trigger in every
+  `record.db` refuses the delete; `build` refuses the rebuild.
+- `checkit check` now runs every generator the Bank declares, through
+  `tikz_graphics`, and flags a bare `{` or `}` in visible prose.
+
+Still open: prose inside `latex.xsl` is not escaped; `wrapper.sage`
+was changed but never run (no Sage here); the review's "from reading"
+list and its duplication table.
 
 ## Three documents, and which one you are supposed to write to
 

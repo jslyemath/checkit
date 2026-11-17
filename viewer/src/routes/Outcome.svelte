@@ -32,7 +32,11 @@
     $: if (seed !== version) {
         push(`/bank/${params.outcomeSlug}/${seed+1}/${$querystring ? "?"+$querystring : ""}`);
     }
-    $: countInAssessment = $assessmentOutcomeSlugs.filter(slug=>slug==outcome.slug).length
+    // `outcome` is undefined for a slug the bank does not have -- a typo, or
+    // an old link to a retired skill -- and reading `.slug` off it threw
+    // inside a reactive statement and blanked the page (2026-11-17).
+    $: countInAssessment = outcome
+        ? $assessmentOutcomeSlugs.filter(slug=>slug==outcome.slug).length : 0
     const addToAssessment = () => {
         $assessmentOutcomeSlugs = [...$assessmentOutcomeSlugs, outcome.slug]
     }
@@ -139,7 +143,13 @@
 </script>
 
 <Bank {params}>
-    
+    {#if !outcome}
+    <div class="alert alert-warning mt-3">
+        This bank has no skill called <code>{params.outcomeSlug}</code>.
+        Choose one from the list above.
+    </div>
+    {:else}
+
     {#if $querystring=="embed"}<h5>{outcomeSlug} — {outcome.title}</h5>{/if}
     <p>
         {outcome.description}
@@ -236,4 +246,5 @@
     <div class='mt-2'>
         <Exercise {outcome} {seed} embedded={$querystring=="embed"}/>
     </div>
+    {/if}
 </Bank>

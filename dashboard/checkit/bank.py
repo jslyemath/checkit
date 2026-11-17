@@ -4,6 +4,7 @@ from pathlib import Path
 from . import static
 from .outcome import Outcome
 from .xml import CHECKIT_NS, optional_text, has_flag
+from .utils import atomic_write
 from . import (PUBLIC_SEEDS, BUNDLE_UNTIL, INLINE_FORMATS, BUNDLE_FORMATS,
                BUNDLE_FILENAME, OWN_LATEX_SUPPORT, VERSION)
 
@@ -97,21 +98,15 @@ class Bank():
         for o in self.outcomes():
             if only is not None and o.slug not in only:
                 continue
-            if o.frozen and regenerate and o.slug not in thaw:
-                # Refusing is the whole point: a frozen outcome is one students
-                # are working through right now, and replacing its seeds.json
-                # changes their homework underneath them. Say so loudly rather
-                # than skipping quietly, so a -r run cannot appear to have done
-                # more than it did.
-                print(
-                    f"SKIPPING {o.slug}: marked <frozen/> in bank.xml. "
-                    f"Its existing seeds are kept. To regenerate it anyway: "
-                    f"--thaw {o.slug}"
-                )
-                o.generate_exercises(regenerate=False,images=images,amount=amount,image_seeds=image_seeds)
-                continue
-            print(f"Generating {amount} exercises for outcome {o.slug}")
-            o.generate_exercises(regenerate=regenerate,images=images,amount=amount,image_seeds=image_seeds)
+            # Refusing a frozen outcome is the whole point -- students are
+            # working through it now, and replacing its seeds.json changes
+            # their homework underneath them -- and it is announced loudly,
+            # by the outcome itself (see Outcome.generate_exercises), so a -r
+            # run cannot appear to have done more than it did.
+            if not (o.frozen and regenerate and o.slug not in thaw):
+                print(f"Generating {amount} exercises for outcome {o.slug}")
+            o.generate_exercises(regenerate=regenerate,images=images,amount=amount,
+                                 image_seeds=image_seeds,thawed=o.slug in thaw)
 
     def build_path(self):
         p = os.path.join(self.abspath(),"assets")
@@ -240,9 +235,14 @@ class Bank():
                 )
         self.copy_latex_support()
         build_path = os.path.join(self.build_path(),f"bank.json")
-        with open(build_path,'w') as f:
-            json.dump(self.to_dict(regenerate=regenerate,remote=remote,
-                                   precompute=precompute),f)
+        # Built in full, then written whole. It used to be dumped into a
+        # file already opened for writing -- emptied before to_dict(), which
+        # runs generators and every XSLT transform, had done anything. Any
+        # exception left a zero-byte bank.json, and a viewer whose "Loading"
+        # never ends (RV-10, 2026-11-16). Same bytes as json.dump wrote.
+        content = json.dumps(self.to_dict(regenerate=regenerate,remote=remote,
+                                          precompute=precompute))
+        atomic_write(build_path, content)
         for o in self.outcomes():
             if precompute:
                 o.write_derived_bundle(remote=remote)
@@ -267,16 +267,34 @@ class Bank():
         # bank's own assets/ rather than from docs/. Publishing them duplicated
         # every exercise's data into the repo a second time -- 23 MB of a
         # 28-outcome bank, changing wholesale on every rebuild.
+        #
+        # figure-keys.json is the figure compiler's own bookkeeping (see
+        # wrapper/tikz.py) and nothing a browser reads.
+        #
+        # A .tikz *is* published for every seed an assessment can draw --
+        # below BUNDLE_UNTIL, the same range as the PNGs -- because the
+        # assessment builder's LaTeX \input's it, exactly as print does.
+        # None was, so an assessment with a figure could not compile
+        # (2026-11-17). Print-only seeds keep theirs unpublished, as they
+        # do their data.
+        def unpublished(folder, names):
+            skip = {"seeds.json", "figure-keys.json"}
+            seed = os.path.basename(folder)
+            if not (seed.isdigit() and int(seed) < BUNDLE_UNTIL):
+                skip |= {n for n in names if n.endswith(".tikz")}
+            return skip & set(names)
         shutil.copytree(
             self.build_path(),
             docs_path / "assets",
             dirs_exist_ok=True,
-            ignore=shutil.ignore_patterns("seeds.json", "*.tikz"),
+            ignore=unpublished,
         )
 
     def generated_on(self):
         try:
-            with open(os.path.join(self.build_path(),f"bank.json"),'r') as f:
+            with open(os.path.join(self.build_path(),f"bank.json"),'r',
+                      encoding="utf-8") as f:
                 return json.load(f)["generated_on"]
-        except:
+        except (OSError, ValueError, KeyError):
+            # Not a bare except: that also swallowed KeyboardInterrupt.
             return "(never generated)"

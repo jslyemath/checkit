@@ -81,6 +81,9 @@ export type Assessment = {
 export type AssessmentFile = {
     name: string
     content: string
+    /** Set for a binary file -- an image -- already encoded as a data: URL,
+     *  which is sent as it is. `content` is then empty. */
+    dataUrl?: string
 }
 /** A LaTeX support file the bank publishes, in the order it must be loaded.
  *  See LATEX_SUPPORT in checkit/__init__.py. Absent on banks generated before

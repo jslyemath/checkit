@@ -3489,9 +3489,45 @@ here -- not only in the section it came from.
 | 4 | **can Scans place a page with no footer code** | 14.8 | a decision. Every paper printed before 14.5 shipped is such a paper |
 | 5 | **where the thresholds are stored** | 14.8 | a decision: a new course file, or a table in one that exists |
 | 6 | **does a run number need its course** | 14.12 | a decision. Unique within a course today, and Scans is course-scoped |
-| 7 | **mat-106's published `docs/assets/*.sty` are two revisions behind** | -- | nothing. Wants `generate -i --image-seeds 400 --remote https://jslyemath.github.io/mat-106-checkit` and a deploy |
-| 8 | **which figure route for self-contained assessments** | 11.2 | a decision. The recommendation on file is to publish the `.tikz` |
+| ~~7~~ | ~~mat-106's published `docs/assets/*.sty` are two revisions behind~~ **Done 2026-11-17.** Republished with `generate -i --image-seeds 400` | -- | -- |
+| ~~8~~ | ~~which figure route for self-contained assessments~~ **Done 2026-11-17.** The `.tikz` is published for seeds below 400 and the viewer pastes it into the LaTeX -- also for a PNG drawn from TikZ, as F2's is. Plain images go to Overleaf as files | 11.2 | -- |
 | 9 | **what a hand-authored bank's `bank.xml` looks like** | 11.4 | MAT 206's rebuild, which is not scheduled |
+
+#### From the full review of 2026-11-16
+
+A different model read both repositories and changed no code. What it
+found is written up, with a recipe for each confirmed defect, in
+`CODEBASE_NOTES.md` under **"The whole codebase, read by a different
+model (2026-11-16)"**. The ids below are that section's. Work on them
+began 2026-11-17 and is recorded in **"Fixing what the review found
+(2026-11-17)"**, straight after it; a row is struck through here when
+it lands.
+
+"Confirmed" means it was run and watched; "certain" means the code can
+do nothing else; "read" means it should be watched failing first.
+
+| | what | repo | how sure | blocked on |
+|---|---|---|---|---|
+| ~~RV-1~~ | ~~building a graded run again deletes its grades~~ **Done 2026-11-17.** Updated in place, a trigger refuses the delete, and the build refuses a graded run | printit | confirmed | -- |
+| ~~RV-2~~ | ~~a class-list import folds a new student into an existing one~~ **Done 2026-11-17.** Conflicting ids, a claimed row, or a shared key disqualify a name match | printit | confirmed | -- |
+| ~~RV-3~~ | ~~a sparse "Preferred Name" column survives masking~~ **Done 2026-11-17.** Recognised and masked; a "category" must repeat; selectboxes kept. Two more masking defects found and fixed on the way (one mask in thirty refused itself; one in twenty did not unmask back) | printit | confirmed | -- |
+| ~~RV-4~~ | ~~a masked `record.db` still holds real values in its bytes~~ **Done 2026-11-17.** Built fresh, checked in its bytes. And `vault mask-course` can now mask his real course at all -- it never could: the scan read letters, not words | printit | confirmed | -- |
+| ~~RV-5~~ | ~~a failed compile returns the previous build's PDF~~ **Done 2026-11-17.** | printit | confirmed | -- |
+| ~~RV-6~~ | ~~templates are read in the Windows code page~~ **Done 2026-11-17.** UTF-8 throughout; mat-106 republished | platform | confirmed | -- |
+| ~~RV-7~~ | ~~about a third of upside-down sheets are cut in the wrong place~~ **Done 2026-11-17.** | printit | confirmed | -- |
+| ~~RV-8~~ | ~~every figure compile rebuilds the whole `Bank`~~ **Done 2026-11-17.** | platform | confirmed | -- |
+| ~~RV-9~~ | ~~the Apps Script is outside the package~~ **Done 2026-11-17.** Not checked by building a wheel (needs setuptools) | printit | confirmed by listing | -- |
+| ~~RV-10~~ | ~~files are emptied before their new contents exist~~ **Done 2026-11-17.** `atomic_write` in both repos | both | certain | -- |
+| ~~RV-11~~ | ~~a figure can disagree with the numbers beside it~~ **Done 2026-11-17.** `wrapper.sage` mirrored but not run | both | certain | -- |
+| ~~RV-12~~ | ~~nothing escapes names and descriptions into LaTeX~~ **Done 2026-11-17.** Prose inside `latex.xsl` is still not escaped -- see the notes | both | certain | a decision, for the `latex.xsl` half |
+| ~~RV-13~~ | ~~a run is refused because of a bank skill it does not print~~ **Done 2026-11-17.** Draws unchanged | printit | certain | -- |
+| ~~RV-14~~ | ~~the smaller certain ones~~ **Done 2026-11-17.** All of them, viewer included and checked in a browser | both | certain | -- |
+| -- | everything "from reading" in that section, and the duplication table (nine TOML quoters, four renderers, the export flow written twice) | both | read | reading that section |
+
+Item 8 above was also a defect, not only a decision: the viewer's
+assessment builder produced a document that could not compile for any
+outcome with a figure. Fixed 2026-11-17 -- see "Fixing what the review
+found" in CODEBASE_NOTES.md.
 
 #### Done since 11-08
 

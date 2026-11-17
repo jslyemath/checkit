@@ -1,5 +1,14 @@
 import concurrent.futures
+import hashlib
+import json
 import os, shutil, subprocess, tempfile
+
+from ..utils import atomic_write
+
+#: Beside each outcome's seed folders: {"0007/fig.tikz": hash} for every
+#: figure whose PNG is known to match what made it. Not published -- see
+#: Bank.build_viewer.
+FIGURE_KEYS = "figure-keys.json"
 
 PREAMBLE = r"""\documentclass[tikz,border=4pt]{standalone}
 \usepackage{pgfplots}
@@ -20,13 +29,26 @@ def compile_tikz_for_outcome(outcome, image_seeds=None):
     consumed by the HTML/viewer surfaces, so `image_seeds` mirrors the
     --image-seeds cap and rasterizes just the first N seeds.
 
-    A figure whose PNG is already at least as new as its .tikz is skipped, so
-    re-running generation (or taking a short preview after a 1000-seed build)
-    doesn't recompile work that is already current.
+    **What "already current" means.** A PNG is current when it was made from
+    this exact .tikz, under this exact preamble and these exact support
+    files -- recorded as a hash per figure in `FIGURE_KEYS`. It used to mean
+    "newer than its .tikz", which missed every change that mattered and
+    caught one that did not (RV-11, 2026-11-16): editing tikz_preamble.tex or
+    printitfigures.sty refreshed no PNG while print, which \\input's the
+    .tikz, changed at once -- and `-r` rewrites every .tikz byte for byte, so
+    every PNG recompiled for nothing. A figure with no recorded key is
+    compiled once, so the first `-i` after this change redoes every figure.
     """
     generated = outcome.build_path()  # assets/<slug>/generated/
     preamble = _load_preamble(outcome.bank.abspath())
-    bank_root = outcome.bank.abspath()
+    # Worked out once per outcome, from the Bank already in hand. It was
+    # worked out once per *figure*, by building a fresh Bank -- bank.xml
+    # parsed and every seeds.json loaded, about a second each on mat-106,
+    # half an hour of pure Python in a full F2 rasterise (RV-8).
+    support = _support_files(outcome.bank)
+    setting = _setting_key(preamble, support)
+    keys_path = os.path.join(generated, FIGURE_KEYS)
+    keys = _load_keys(keys_path)
 
     pending = []
     skipped = 0
@@ -42,10 +64,12 @@ def compile_tikz_for_outcome(outcome, image_seeds=None):
             name = fname[:-5]
             tikz_path = os.path.join(seed_dir, fname)
             png_path = os.path.join(seed_dir, f"{name}.png")
-            if _png_is_current(tikz_path, png_path):
+            rel = f"{entry}/{fname}"
+            key = _figure_key(setting, tikz_path)
+            if os.path.isfile(png_path) and keys.get(rel) == key:
                 skipped += 1
                 continue
-            pending.append((tikz_path, png_path, name))
+            pending.append((tikz_path, png_path, name, rel, key))
 
     # Each figure is an independent pdflatex in its own temp directory, and
     # nearly all of the ~2s it takes is that process starting up and reading
@@ -57,18 +81,32 @@ def compile_tikz_for_outcome(outcome, image_seeds=None):
     compiled = 0
     if pending:
         workers = min(_worker_count(), len(pending))
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = [
-                pool.submit(_compile_one, tikz_path=t, png_path=p, name=n,
-                            preamble=preamble, bank_root=bank_root)
-                for t, p, n in pending
-            ]
-            for future in concurrent.futures.as_completed(futures):
-                # Raising here cancels what has not started. Figures already
-                # written stay on disk and are skipped next run, so a failure
-                # costs only the work in flight.
-                future.result()
-                compiled += 1
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {
+                    pool.submit(_compile_one, tikz_path=t, png_path=p, name=n,
+                                preamble=preamble, support=support): (rel, key)
+                    for t, p, n, rel, key in pending
+                }
+                try:
+                    for future in concurrent.futures.as_completed(futures):
+                        future.result()
+                        rel, key = futures[future]
+                        keys[rel] = key
+                        compiled += 1
+                except BaseException:
+                    # Cancel what has not started, *explicitly*. Leaving the
+                    # `with` block waits for every queued figure, so the
+                    # comment that stood here -- "raising here cancels what
+                    # has not started" -- was false, and after one bad
+                    # figure the other two thousand still compiled before
+                    # the error was seen (RV-14). Figures already written
+                    # keep their keys below, so a failure costs only the
+                    # work that was in flight.
+                    pool.shutdown(wait=False, cancel_futures=True)
+                    raise
+        finally:
+            atomic_write(keys_path, json.dumps(keys, indent=0, sort_keys=True))
 
     if compiled or skipped:
         print(
@@ -110,15 +148,32 @@ def _seed_number(seed_dir):
             "directory name to apply the --image-seeds cap."
         ) from e
 
-def _png_is_current(tikz_path, png_path):
-    """True when png_path exists and is no older than the .tikz it came from.
+def _setting_key(preamble, support):
+    """A hash of everything a figure is drawn under but its own source:
+    the preamble and the contents of every support file it may load."""
+    h = hashlib.sha256(preamble.encode("utf-8"))
+    for source, filename in sorted(support, key=lambda s: s[1]):
+        h.update(b"\0" + filename.encode("utf-8") + b"\0")
+        with open(source, "rb") as f:
+            h.update(f.read())
+    return h.hexdigest()
 
-    A failed compile leaves no PNG behind (see _compile_one), so failures always
-    retry rather than being cached as 'done'.
-    """
-    if not os.path.isfile(png_path):
-        return False
-    return os.path.getmtime(png_path) >= os.path.getmtime(tikz_path)
+
+def _figure_key(setting, tikz_path):
+    """The hash a PNG must have been made under to count as current."""
+    with open(tikz_path, "rb") as f:
+        return hashlib.sha256(setting.encode("ascii") + f.read()).hexdigest()
+
+
+def _load_keys(path):
+    """The recorded keys, or none. A damaged file means recompiling, which
+    is slow and correct; trusting it would be fast and maybe wrong."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            keys = json.load(f)
+        return keys if isinstance(keys, dict) else {}
+    except (OSError, ValueError):
+        return {}
 
 BANK_HELPERS_STY = "bank_helpers.sty"
 
@@ -137,13 +192,13 @@ def _load_preamble(bank_root):
     """
     custom = os.path.join(bank_root, "tikz_preamble.tex")
     if os.path.isfile(custom):
-        with open(custom) as f:
+        with open(custom, encoding="utf-8") as f:     # RV-6
             return f.read()
     if os.path.isfile(os.path.join(bank_root, BANK_HELPERS_STY)):
         return PREAMBLE + "\\usepackage{bank_helpers}\n"
     return PREAMBLE
 
-def _support_files(bank_root):
+def _support_files(bank):
     """Every .sty a figure's preamble may load, as (source, filename).
 
     `bank_helpers.sty`, plus whatever the bank declares under <latex-support>.
@@ -152,25 +207,22 @@ def _support_files(bank_root):
     website and the picture in the printed handout the same picture, rather
     than two drawings kept looking alike by hand.
 
-    Imported here rather than at module scope, because bank.py imports this
-    module.
+    Takes the Bank, not its path. It took the path and built a new Bank from
+    it on every call -- once per figure (RV-8) -- inside an `except
+    Exception` that turned an unreadable manifest into figures quietly
+    drawn without their theme.
     """
-    from ..bank import Bank
-
-    found = []
-    helpers = os.path.join(bank_root, BANK_HELPERS_STY)
+    root = bank.abspath()
+    found, seen = [], set()
+    helpers = os.path.join(root, BANK_HELPERS_STY)
     if os.path.isfile(helpers):
         found.append((helpers, BANK_HELPERS_STY))
-    try:
-        declared = Bank(bank_root).latex_support()
-    except Exception:
-        # A figure build must not fail because the manifest is unreadable;
-        # `checkit generate` has already parsed it and reported anything wrong.
-        return found
-    for entry in declared:
-        source = os.path.join(bank_root, entry["source"])
-        if os.path.isfile(source):
+        seen.add(BANK_HELPERS_STY)
+    for entry in bank.latex_support():
+        source = os.path.join(root, entry["source"])
+        if entry["filename"] not in seen and os.path.isfile(source):
             found.append((source, entry["filename"]))
+            seen.add(entry["filename"])
     return found
 
 
@@ -196,16 +248,17 @@ def _log_errors(log_path, limit=8):
     return errors
 
 
-def _compile_one(tikz_path, png_path, name, preamble, bank_root=None):
+def _compile_one(tikz_path, png_path, name, preamble, support=()):
+    """One figure. `support` is `_support_files(bank)`, worked out once by
+    the caller rather than once per figure."""
     with tempfile.TemporaryDirectory() as tmp:
         shutil.copy(tikz_path, os.path.join(tmp, f"{name}.tikz"))
         # pdflatex runs in the temp directory, so anything the preamble loads
         # has to be there too.
-        if bank_root:
-            for source, filename in _support_files(bank_root):
-                shutil.copy(source, os.path.join(tmp, filename))
+        for source, filename in support:
+            shutil.copy(source, os.path.join(tmp, filename))
         wrapper_tex = os.path.join(tmp, "figure.tex")
-        with open(wrapper_tex, "w") as f:
+        with open(wrapper_tex, "w", encoding="utf-8") as f:       # RV-6
             f.write(preamble)
             f.write("\n\\begin{document}\n")
             f.write(f"\\input{{{name}.tikz}}\n")

@@ -28,21 +28,21 @@ def new(directory):
     example_outcome_dir = os.path.join(directory,'outcomes','EX1')
     os.makedirs(example_outcome_dir, exist_ok=True)
     for filename in ["template.xml","generator.py"]:
-        with open(os.path.join(example_outcome_dir,filename),"w") as f:
+        with open(os.path.join(example_outcome_dir,filename),"w",encoding="utf-8") as f:
             f.write(static.read_resource(filename))
     # copy devcontainer stuff
     devcontainer_dir = os.path.join(directory, ".devcontainer")
     os.makedirs(devcontainer_dir, exist_ok=True)
     for filename in ["setup.sh","devcontainer.json"]:
-        with open(os.path.join(devcontainer_dir,filename),"w") as f:
+        with open(os.path.join(devcontainer_dir,filename),"w",encoding="utf-8") as f:
             f.write(static.read_resource(filename))
     # copy bank manifest, README, and the shared-helpers module every generator
     # in the bank can import (see bank_helpers.py's own docstring)
     for filename in ["bank.xml","README.md","bank_helpers.py","bank_helpers.sty"]:
-        with open(os.path.join(directory,filename),"w") as f:
+        with open(os.path.join(directory,filename),"w",encoding="utf-8") as f:
             f.write(static.read_resource(filename))
     # copy gitignore
-    with open(os.path.join(directory,".gitignore"),"w") as f:
+    with open(os.path.join(directory,".gitignore"),"w",encoding="utf-8") as f:
         f.write(static.read_resource("gitignore.txt"))
     # generate requirements.txt
     #
@@ -59,7 +59,7 @@ def new(directory):
         "https://github.com/jslyemath/checkit/releases/download/"
         f"v{VERSION}/{wheel}"
     )
-    with open(os.path.join(directory,"requirements.txt"),"w") as f:
+    with open(os.path.join(directory,"requirements.txt"),"w",encoding="utf-8") as f:
         f.write(
             "# The CheckIt platform, from the jslyemath fork.\n"
             "#\n"
@@ -140,17 +140,21 @@ def new(directory):
          "them once browsers drop XSLT (Chrome 158, 2026-11-17).",
 )
 def generate(amount,regenerate,images,image_seeds,outcome,remote,thaw,no_precompute):
-    if amount < PUBLIC_SEEDS:
+    if amount <= PUBLIC_SEEDS:
         # The viewer's version picker always offers PUBLIC_SEEDS versions, and
         # the assessment builder draws from seeds at or above it -- with fewer
         # than that generated, the picker offers versions that do not exist and
         # `Math.random() * (exercises.length - PUBLIC_SEEDS)` goes negative.
-        # Neither fails loudly in the browser, so refuse here instead.
+        # With *exactly* that many it is zero, and every assessment asks for
+        # seed PUBLIC_SEEDS, which does not exist: the guard said `<` where it
+        # meant `<=` (RV-14, 2026-11-16). Neither fails loudly in the browser,
+        # so refuse here instead.
         raise click.BadParameter(
-            f"--amount must be at least PUBLIC_SEEDS ({PUBLIC_SEEDS}), not {amount}. "
-            f"The viewer exposes {PUBLIC_SEEDS} versions of every exercise, so a "
-            "smaller bank leaves the version picker pointing at seeds that were "
-            "never generated. Use 1000 for a real build.",
+            f"--amount must be more than PUBLIC_SEEDS ({PUBLIC_SEEDS}), not {amount}. "
+            f"The viewer exposes {PUBLIC_SEEDS} versions of every exercise and "
+            "assessments draw from the ones after them, so a bank this small "
+            "leaves one or the other pointing at seeds that were never "
+            "generated. Use 1000 for a real build.",
             param_hint="--amount",
         )
     b = bank.Bank()
@@ -243,6 +247,8 @@ def check(generators, built):
         for slug, tb in smoke.run_generators("."):
             if tb is None:
                 click.echo(f"  ok   {slug}")
+            elif tb == smoke.NOT_RUN:
+                click.echo(f"  skip {slug} ({tb})")
             else:
                 click.echo(f"  FAIL {slug}")
                 broken.append((slug, tb))

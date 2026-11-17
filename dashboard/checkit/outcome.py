@@ -3,6 +3,7 @@ import os, json, random
 from html import escape as escape_html
 from . import (PUBLIC_SEEDS, BUNDLE_UNTIL, INLINE_FORMATS, BUNDLE_FORMATS,
                BUNDLE_FILENAME)
+from .utils import atomic_write
 from .wrapper import run_generator
 from .wrapper.tikz import compile_tikz_for_outcome
 
@@ -37,7 +38,11 @@ class Outcome():
         )
     
     def template(self):
-        with open(self.template_filepath()) as f:
+        # UTF-8, never the locale's. Read in cp1252 here, so the text the
+        # viewer renders a student's page from was published garbled --
+        # an em dash as three characters -- while the precomputed HTML,
+        # which pystache reads as UTF-8, was right (RV-6, 2026-11-16).
+        with open(self.template_filepath(), encoding="utf-8") as f:
             return f.read()
 
     # Preference order when an outcome directory holds more than one. The
@@ -118,8 +123,7 @@ class Outcome():
             },
         }
         path = os.path.join(self.build_path(), BUNDLE_FILENAME)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(payload, f)
+        atomic_write(path, json.dumps(payload))      # RV-10
         return path
 
     def preview_exercises(self):
@@ -129,7 +133,7 @@ class Outcome():
         # amount_s), so cap compilation to match -- otherwise a preview taken
         # after a full build would recompile every seed in the outcome.
         compile_tikz_for_outcome(self,image_seeds=PUBLIC_SEEDS)
-        with open(os.path.join(preview_json)) as f:
+        with open(preview_json, encoding="utf-8") as f:
             data = json.load(f)['seeds']
         return [Exercise(d["data"],d["seed"],self) for d in data]
 
@@ -177,7 +181,22 @@ class Outcome():
     def seeds_json_path(self):
         return os.path.join(self.build_path(),"seeds.json")
 
-    def generate_exercises(self,regenerate=False,images=False,amount=1_000,image_seeds=None):
+    def generate_exercises(self,regenerate=False,images=False,amount=1_000,image_seeds=None,
+                           thawed=False):
+        # <frozen/> is enforced here, on the outcome, so that every way in
+        # respects it. It lived only in Bank.generate_exercises, and two
+        # other paths regenerated a frozen outcome without a word: the
+        # deprecated Jupyter panel, which calls this directly, and
+        # write_json(regenerate=True), through to_dict (RV-14, 2026-11-16).
+        # `thawed` is how `--thaw SLUG` gets past it -- naming the outcome
+        # is deliberately the only way.
+        if regenerate and getattr(self, "frozen", False) and not thawed:
+            print(
+                f"SKIPPING {self.slug}: marked <frozen/> in bank.xml. "
+                f"Its existing seeds are kept. To regenerate it anyway: "
+                f"--thaw {self.slug}"
+            )
+            regenerate = False
         if not regenerate:
             try:
                 self.load_exercises()
@@ -211,7 +230,7 @@ class Outcome():
             except AttributeError:
                 pass # load is necessary
         try:
-            with open(self.seeds_json_path()) as f:
+            with open(self.seeds_json_path(), encoding="utf-8") as f:
                 data = json.load(f)
             seed_list = data['seeds']
             self._exercises = [Exercise(d["data"],d["seed"],self) for d in seed_list]

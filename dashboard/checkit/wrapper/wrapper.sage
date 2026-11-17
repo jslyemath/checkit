@@ -273,6 +273,7 @@ if len(sys.argv) >= 4:
 
     # preview/build to specified JSON file
     seeds = []
+    figures = {}
     for i in range(amount):
         if i > 0 and (i % 50) == 0:
             print(f"Generating seed {i}")
@@ -291,12 +292,11 @@ if len(sys.argv) >= 4:
         # *every* seed, so this is written unconditionally -- neither --images
         # nor --image-seeds gates it. (Rasterizing that source is what's
         # expensive; see the gated block below.)
+        #
+        # Held, and written only once every seed has succeeded -- see
+        # write_figures in wrapper.py, which this mirrors (RV-11).
         tikz = generator.tikz_graphics()
-        if tikz is not None:
-            os.makedirs(seed_path, exist_ok=True)
-            for name, source in tikz.items():
-                with open(os.path.join(seed_path, f"{name}.tikz"), "w") as f:
-                    f.write(source)
+        figures[seed_path] = dict(tikz) if tikz is not None else {}
         # Sage plots rasterize straight to PNG and are only consumed by the
         # HTML/viewer surfaces, so they stay behind --images and --image-seeds.
         if gen_images and i < image_amount:
@@ -310,8 +310,37 @@ if len(sys.argv) >= 4:
         "seeds": seeds,
         "generated_on": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
+    # The same as wrapper.py's write_figures and atomic_write, inline,
+    # because Sage runs its own Python, which need not have checkit
+    # installed. UTF-8 throughout (RV-6); an unchanged figure is not
+    # rewritten; a figure the seed no longer draws goes, with its PNG;
+    # seeds.json is replaced whole (RV-10). NOT RUN on the machine this
+    # was written on, which has no Sage -- keep it in step with wrapper.py
+    # by reading the two side by side.
+    for fig_dir, sources in figures.items():
+        if os.path.isdir(fig_dir):
+            for old in os.listdir(fig_dir):
+                if old.endswith(".tikz") and old[:-5] not in sources:
+                    os.remove(os.path.join(fig_dir, old))
+                    if os.path.exists(os.path.join(fig_dir, old[:-5] + ".png")):
+                        os.remove(os.path.join(fig_dir, old[:-5] + ".png"))
+        if not sources:
+            continue
+        os.makedirs(fig_dir, exist_ok=True)
+        for name, source in sources.items():
+            fig_path = os.path.join(fig_dir, f"{name}.tikz")
+            try:
+                with open(fig_path, encoding="utf-8", newline="") as f:
+                    if f.read() == source.replace("\n", os.linesep):
+                        continue
+            except (OSError, UnicodeDecodeError):
+                pass
+            with open(fig_path, "w", encoding="utf-8") as f:
+                f.write(source)
     os.makedirs(os.path.dirname(seeds_path), exist_ok=True)
-    with open(os.path.join(seeds_path), 'w') as f:
+    temp_path = seeds_path + ".tmp"
+    with open(temp_path, 'w', encoding="utf-8") as f:
         json.dump(data, f)
+    os.replace(temp_path, seeds_path)
 else:
     raise RuntimeError("Three positional arguments are required")

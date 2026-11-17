@@ -19372,3 +19372,992 @@ than before -- 300 cells compared rather than 1,220 -- and that is
 not a weaker check. The import can only change what is in the file,
 so the cells compared are now exactly the cells at risk, and all of
 them.
+
+---
+
+## The whole codebase, read by a different model (2026-11-16)
+
+He asked for this in one sentence: a different, more capable model
+should read both repositories from top to bottom, change no code, and
+leave the next session a detailed list of what is wrong and what
+smells. This section is that list. **No code was changed.** Only the
+documents were.
+
+Every finding has an id (`RV-1` ...) so the to-do list in
+`PRINT_TOOL_DESIGN.md` section 15 and the two `CLAUDE.md` files can
+point here without repeating it.
+
+### How to read this, and how much to trust it
+
+Three levels of confidence, and each finding says which it is:
+
+* **Confirmed** -- I ran something and watched it happen. Nine of
+  these. Each has a recipe short enough to rebuild in a few minutes,
+  because the scripts I used lived in a scratch folder that will not
+  survive.
+* **Certain from reading** -- not run, but the code cannot do anything
+  else (for example: a file is opened for writing before the thing to
+  be written has been computed).
+* **From reading** -- I believe it, and it should be watched failing
+  before it is fixed. This repository's own rule.
+
+And how deep the reading went, because "top to bottom" would be an
+overstatement for the two largest files:
+
+| read line by line | read for its code, comments skipped | searched for patterns only |
+|---|---|---|
+| all of `dashboard/checkit/*.py`, `wrapper.py`, `tikz.py`, `html.xsl`, `latex.xsl`, the viewer's `utils/index.ts`, routes, stores and SpaTeXt components | every module in `checkit_printit/` except the two below; `Code.gs` entry point | `gui/static/app.js` (7,325 lines), `seating/seating.js` (6,504), `room.py`, `printit.sty`, `pretext.xsl`, most of `__main__.py` and `gui/__init__.py` beyond the server core and the build path, and the tests |
+
+`gradebook.py` below line 620 was not re-read: it was written and
+mutation-tested in the same session (see the four sections above this
+one), which is a reason to distrust my eye on it, not to trust it.
+Somebody else should read the export path cold.
+
+Both test suites were run at the end and pass -- 152 on the platform,
+1,606 in printit -- **with all nine confirmed bugs present.** So none
+of the nine has a test that could have caught it.
+
+### The nine that were confirmed
+
+In the order I would fix them.
+
+#### RV-1. Building a run a second time deletes its grades
+
+*Confirmed on a throwaway database. The most serious thing found.*
+
+`record.write_run` records a run by deleting the `run` row and
+inserting a new one:
+
+    DELETE FROM run WHERE run_id = ?
+    INSERT INTO run (...)
+
+The comment beside it says the printed papers "go with it" because
+`printed.run_id` cascades, and that is intended. But `attempt.run_id`
+is declared `ON DELETE CASCADE` as well, and `attempt` is the table
+every grade lives in. So recording a run that has already been graded
+deletes every grade read from it, and puts `graded` and `delisted`
+back to 0, because the fresh row does not carry them.
+
+Recipe: `write_run` a run; insert one row into `attempt` for it and
+`set_flags(graded=True)`; call `write_run` again with the same
+`run_id`. Attempts go from 1 to 0 and `graded` from 1 to 0.
+
+Why nothing stops it. `discard_run` and `set_flags` both refuse a
+graded run, in so many words. The build path does not:
+`runner.run` -> `_record` -> `write_run`, and `grep graded runner.py`
+finds nothing. The "this folder already holds a different run" check
+(`FolderInUse`) does not help either -- it compares who holds which
+paper, and a rebuild of the same job holds the same papers, so it
+passes. The web app's Build button goes straight down this path
+(`gui._build`), with no `replace` and no `rebuilt` flag involved. So:
+open the Print tab while the title and date still name a checkpoint
+that has been scanned, press Build, and that checkpoint's grades are
+gone. `scan_page` rows survive (they have no foreign key), so
+re-reading the stored scans brings the machine's readings back; any
+decision made by hand does not come back, and nothing says anything
+was lost.
+
+The fix has two halves and wants both. Never delete the `run` row:
+use `INSERT ... ON CONFLICT(run_id) DO UPDATE`, keep `graded` and
+`delisted`, and replace only the `printed` rows. And refuse in
+`runner.run` when the folder's run has attempts, unless told to go
+ahead on purpose. Separately, `attempt`'s cascade can only ever fire
+by accident -- the one sanctioned delete refuses when attempts exist
+-- so it should be `RESTRICT`, which would have turned this into an
+error instead of a silence.
+
+`tests/test_record.py` has
+`test_rebuilding_the_same_folder_replaces_rather_than_duplicates`,
+which passes today and asserts the behaviour that causes this.
+
+#### RV-2. Importing a class list can fold a new student into an existing one
+
+*Confirmed with invented people.*
+
+`classlist.merge` matches an incoming student to the roster by id,
+then by email, then by name -- and then by **surname plus first
+initial**, whenever exactly one existing student has that
+combination. It never asks whether the two carry different ids.
+
+Recipe: a roster holding Jamie Smith, id ending 01. Import a file
+listing Jamie Smith (01) and Jordan Smith (02). The result is one
+student, and the report says "0 added, 1 updated". Which one survives
+depends on the order of the rows. Listed Jamie-first: the survivor has
+Jordan's id and first name, Jamie's stored `name`, Jamie's address as
+primary and Jordan's as a second address. Listed Jordan-first: Jamie
+keeps the id and gains Jordan's address.
+
+What it damages. `printed` and `attempt` are keyed by student id, so
+one student's history is orphaned or handed to the other. Form
+responses are matched through every address a student holds
+(`all_emails`), so one student's choices are filed under the other.
+Siblings are the obvious trigger; any common surname is enough.
+
+Fix: a name or initial match is allowed only when the two students do
+not both carry an id that differs; and one roster student may be
+matched by at most one incoming row. The `seen` set that would enforce
+the second already exists in the function and is not consulted when
+matching.
+
+#### RV-3. A masked file can still carry preferred names
+
+*Confirmed with invented data. A privacy defect in the privacy tool.*
+
+`mask.classify` decides what to do with a column whose header it does
+not recognise. One of its rules keeps the column as it is when it
+holds at most 12 distinct values of at most 24 characters -- the idea
+being that such a column is a category, like a section or a grade.
+
+A "Preferred Name" column is exactly that shape when only some
+students have one. Recipe: 30 rows, seven of them with a nickname in a
+column headed `Preferred Name`. The plan says
+`keep -- 7 distinct short values`, the masked file is written with all
+seven in it, and the leak check passes, because the vault was never
+told those strings and so has nothing to look for.
+
+`checkit/CLAUDE.md` said "a column the tool does not recognise is
+blanked rather than passed through". That is not true of a sparse
+column, and not true of any text column in a file of twelve students
+or fewer. The sentence has been corrected.
+
+Fix, both parts: add synonyms so preferred / nickname / goes-by
+columns are masked as first names (registrar exports commonly head it
+"Preferred First Name"); and change the rule so that a kept column must have values
+that **repeat** -- categories do, names do not. Something like "keep
+only when filled cells are at least twice the distinct values".
+
+#### RV-4. A masked copy of the record database still holds real values
+
+*Confirmed with invented data. Also privacy.*
+
+`maskcourse.mask_database` copies `record.db` and then updates the
+text cells of the copy in place. SQLite does not scrub the bytes an
+update leaves behind. Recipe: three invented students, one run
+recorded, `learn` the vault from their roster, `mask_database`. It
+reports 18 substitutions; afterwards the logical dump holds no real
+value and `vault.leaks` reports zero -- and one student's surname and
+student id are still sitting in the file's raw bytes.
+
+`_verify` reads `iterdump()`, the logical content, so it cannot see
+what anybody running `strings` on the file would. The masked course
+folder is precisely the thing made to be given to somebody else.
+
+Fix: do not edit a copy. Make a new, empty database and replay a
+masked dump into it. (`PRAGMA secure_delete = ON` before the updates
+and `VACUUM` after is the smaller change.) Then run the leak check
+over the file's bytes as well as its dump.
+
+#### RV-5. A failed compile can hand back the previous run's PDF
+
+*Confirmed in a temp folder.*
+
+`compile.compile_pdf` runs pdflatex twice and then asks one question:
+does `main.pdf` exist? It never looks at pdflatex's exit code and
+never removes an earlier `main.pdf`. When a folder is built a second
+time and the error is in the **preamble**, pdflatex stops before it
+opens the output file, the first build's PDF is still there, and
+`compile_pdf` returns it. `runner` then reports `compiled = True`.
+
+Recipe: write a good `main.tex`, compile; replace it with one that
+loads a package that does not exist, compile again. The second call
+returns the first build's PDF, byte for byte. (An error after the
+first page has shipped does raise -- pdflatex removes its partial
+output.)
+
+A preamble error is what a stale `printit.sty` in the bank, a broken
+`bank_helpers.sty` or an unescaped `&` in the course name produces.
+
+This is the platform's own lesson -- "a PDF existing is not a clean
+compile" is in `CLAUDE.md`, and `wrapper/tikz.py` was fixed for it --
+not carried to the second copy of the same code. Fix: delete
+`main.pdf` before the first pass, check the exit code, and read the
+log for lines beginning `!` the way `tikz._log_errors` does.
+
+#### RV-6. Templates are read in the Windows code page, and the published bank shows it
+
+*Confirmed against mat-106. Harmless today by luck.*
+
+`Outcome.template()` calls `open(path)` with no encoding. On his
+machine that is cp1252 (checked: `utf8_mode` is 0, `PYTHONUTF8`
+unset). The template text is what `bank.json` publishes, and the
+viewer renders the student's page from it.
+
+One mat-106 template, R2's, has a non-ASCII character: an em dash on
+line 37. In both `assets/bank.json` and `docs/assets/bank.json` it is
+published as three wrong characters. **It sits inside an XML comment,
+so nothing a student sees is wrong today** -- only a view of the raw
+template, such as the instructor's "Edit Template" tab, would show it. The first accented letter, dash or curly
+quote typed into visible prose will show on the student page as
+garbage. And the precomputed HTML will be right, because pystache
+reads the same file as UTF-8 -- so the student page and the LMS export
+will disagree, which is the kind of mismatch that takes an afternoon
+to find.
+
+cp1252 also has five byte values with no meaning (81, 8D, 8F, 90,
+9D). A UTF-8 right curly quote contains 9D, so that character in a
+template is not garbage but a crash.
+
+The same bare `open()` is in: `bank.py` (`write_json`,
+`generated_on`), `outcome.py` (`template`, `load_exercises`,
+`preview_exercises`), `wrapper.py` and `wrapper.sage` (every `.tikz`
+and `seeds.json`), `tikz.py` (`_load_preamble`, `figure.tex`) and
+`__main__.py`'s `new`. Fix them together -- "a fix applied to one path
+is not applied to the others". Nothing needs regenerating: the
+template is read when `bank.json` is written, so a plain `generate`
+(no `-r`), `viewer` and a deploy is enough.
+
+#### RV-7. About a third of upside-down sheets are cut in the wrong place
+
+*Confirmed by simulation.*
+
+`scans.placement` works out how a scanned page is turned by averaging
+two angles, one per diagonal of the footer code. Each is first folded
+into the range -180..180 degrees. For a sheet fed upside down the two
+land either side of the fold -- +179.9 and -179.9 -- and their
+average is about zero: "not turned at all".
+
+Recipe: rotate the code's four corners about a point by 180 degrees
+plus a skew of up to 0.3 degrees, add up to 0.4px of noise to each
+corner, and ask where a point elsewhere on the page lands. Upright:
+0 of 400 trials more than 60px out, worst 15px. Upside down: 139 of
+400, worst 3,588px. Nothing in `scans.py` handles rotation at all.
+
+The effect is loud rather than wrong: the crops come from the wrong
+part of the page, so the box is not found (`nobox`), there is no name
+crop and no id read, and the page goes to hand review. It may be worth
+looking at whether the three bad cuts he reported from the 2026-11-12
+stack were upside-down sheets; at the time they were put down to the
+edge threshold.
+
+Fix: average the angles as directions, not as numbers -- sum the
+cosines and the sines of the two turns and take `atan2`.
+
+#### RV-8. Every figure re-reads the whole bank
+
+*Confirmed by timing.*
+
+`tikz._compile_one` calls `_support_files(bank_root)`, which builds a
+fresh `Bank(bank_root)` -- once per figure. Building a `Bank` parses
+`bank.xml` and loads every outcome's `seeds.json`. On mat-106 that is
+1.05 seconds. F2 alone has about 1,800 figures in range, so a full
+rasterise spends about half an hour of pure Python re-parsing JSON,
+inside a thread pool, where it cannot run in parallel.
+
+`compile_tikz_for_outcome` already has `outcome.bank` in its hand.
+Work out the support files once there and pass the list down. The
+`except Exception: return found` in `_support_files` should go at the
+same time: it hides a broken manifest.
+
+#### RV-9. The Apps Script is not inside the package
+
+*Confirmed by listing the tree; not by building a wheel.*
+
+`appsscript/Code.gs` and `appsscript.json` live at the repository
+root. `provision.script_sources()` and `__main__.py` line 323 find
+them by walking three directories up from the module.
+`pyproject.toml`'s package data lists the theme, `gui/static` and
+`data/*.npz` and not these. His install is editable, so it works; from
+a wheel, `form create`, `form attach` and `form setup` cannot find the
+script. This is the same shape as the `gui/static` bug the comment in
+`pyproject.toml` describes at length. Move the folder under
+`src/checkit_printit/` and list it; the only honest test is to build a
+wheel and look inside.
+
+### Certain from reading
+
+#### RV-10. Files are emptied before their new contents exist
+
+The pattern is
+
+    with open(path, "w") as f:
+        f.write(make_the_contents())
+
+Python opens the file -- emptying it -- and only then calls the
+function. If that function raises, the file is left at zero bytes.
+
+* **`availability.set_open` and `set_assessment`**: the function is
+  `set_values`, and it raises on purpose ("no line to change for ...")
+  when a key has no line of its own. So `skills set --due ...` on an
+  `availability.toml` that has no `due` line empties the file. This is
+  the reachable one.
+* **`Bank.write_json`** (platform): the contents are `self.to_dict()`,
+  which runs generators for missing outcomes and every XSLT transform.
+  Anything that raises leaves a zero-byte `bank.json`; the viewer then
+  shows its "Loading" spinner for ever, because `App.svelte` awaits
+  `bankFetch.json()` with no `catch`.
+* **The roster**, three times: `roster.set_dropped`,
+  `responses.pull_for_course` and `roster import` all call `to_toml`
+  inside the `with`.
+
+The rest work their contents out first, so an exception cannot empty
+them -- but they still write in place, so a crash or a full disk part
+way through leaves half a file: `printjob.save_draft`,
+`course.save_identity`, `room.save`, the seating writers,
+`theme.declare` (the bank's `bank.xml`) and `wrapper.py`'s
+`seeds.json`.
+
+23 places in printit open a file with `"w"` in place. Exactly one
+writes to a temporary file and renames it over the original:
+`vault.save`. That is the pattern; it wants to be one helper,
+`atomic_write(path, text)`, used everywhere.
+
+#### RV-11. Figures can disagree with the numbers beside them
+
+Three separate ways, all quiet:
+
+* `wrapper.py` writes each seed's `.tikz` as it goes and `seeds.json`
+  only at the end. A generator that fails at seed 700 leaves new
+  pictures for seeds 0-699 beside the **old** data. Print `\input`s
+  the `.tikz`.
+* `assemble._copy_assets` copies a figure into the run folder only
+  `if not os.path.exists(dst)`. Building the same folder again after a
+  `generate -r` keeps the old picture while the skill's `.tex` is
+  rewritten.
+* `tikz._png_is_current` compares the PNG's time to the `.tikz`'s time
+  and nothing else. Editing `tikz_preamble.tex` or
+  `printitfigures.sty` does not rebuild any PNG, while print picks the
+  new style up at once -- so the website and the handout drift apart,
+  which is the one thing "one picture, two surfaces" exists to
+  prevent. (The reverse waste is real too: `-r` rewrites every `.tikz`
+  and so recompiles every PNG even when the content is identical.) A
+  hash of the figure, the preamble and the support files would fix
+  both directions.
+
+Nothing removes a `.tikz` or `.png` for a seed that no longer has a
+figure, either.
+
+#### RV-12. Nothing escapes text on its way into LaTeX
+
+`main.tex` is built with f-strings: `\setname{...}`, `\setsect{...}`,
+`\acadclass{...}`, `\author{...}`, `\title{...}`, and
+`\setskilldesc{slug}{...}` in `Skill Descriptions.tex` (the viewer
+builds the same line the same way). There is no escaping function
+anywhere in the package -- the only `_escape` is for TOML. A name,
+course title or skill description containing `&`, `%`, `#`, `_`, `$`,
+`{` or `}` is a compile error, or worse, silently eaten text: a `%`
+swallows the closing brace and everything after it on the line. His
+Brightspace course title has an `&` in it. A name outside Latin
+script fails the whole run under pdflatex (loudly, at least).
+
+The same gap exists one level down: `latex.xsl` writes prose text
+nodes as they are. That is why authors escape by hand in generators,
+why the HTML then shows a literal `\%`, and why `checks.raw_tex_in_prose`
+had to be written. Escaping prose inside `latex.xsl` (everything
+outside `<m>`, `<me>` and `<c>`) would retire the whole class.
+
+#### RV-13. A run is refused because of a skill it does not print
+
+`assemble.choose_seeds` loops over `publication_skills(...)`, which
+ignores its `publication` argument and returns every slug in the
+bank. For each it calls `bank.seeds_with_variant`, which raises if the
+outcome has no `seeds.json`, has fewer printable seeds than there are
+version letters, or does not have the variant named in `[variants]`.
+So adding a half-written outcome to `bank.xml` stops all printing
+until it has been generated. Draw only for the skills the roster and
+the extras ask for. (Note this changes what a given run seed draws,
+so it needs a line in the notes when it lands; replays are pinned by
+the manifest and are unaffected.)
+
+#### RV-14. Smaller things that are certain
+
+* **`tikz.py`**: the comment "raising here cancels what has not
+  started" is false. Leaving a `with ThreadPoolExecutor` block waits
+  for every queued job; after the first bad figure the other 1,999
+  still compile before the error appears. Call
+  `pool.shutdown(cancel_futures=True)` on the way out.
+* **`dashboard.py`** (the deprecated Jupyter panel) regenerates with
+  `regenerate=True` directly on the outcome, and `write_json(regenerate=True)`
+  does the same through `Outcome.to_dict`. Both go round `<frozen/>`,
+  which is enforced only in `Bank.generate_exercises`. Delete the
+  panel, or move the check into `Outcome`.
+* **`smoke.py`** looks for `outcomes/*/generator.py`. The demo bank
+  keeps three of its generators one level deeper (`EX/EX1`, `EX/EX2`,
+  `IMG/IMG1`), so `checkit check` has never run them. It also inserts
+  the bank at the front of `sys.path` where `load_generator` appends
+  it, with a long comment about why appending matters, and its
+  docstring says it matches. It calls `data()` and never
+  `tikz_graphics()`. It should walk `Bank().outcomes()`.
+* **`generate -a 50`** passes the guard (`amount < PUBLIC_SEEDS`) and
+  produces a bank whose assessment builder always asks for seed 50,
+  which does not exist. `bank.json` also declares `bundle_until: 400`
+  however few seeds there are.
+* **`printjob.save_draft`** never writes `ids` or `codes`, though
+  `load_draft` reads them and `publication_text` writes them. The
+  comment directly above describes this exact bug for `who`. A
+  hand-edit of `job.toml` to turn either off is undone by the next
+  save from the app.
+* **`gui._build(preview=True)`** calls `write_job` before anything
+  else, so "Draw and report, writing nothing" rewrites the job
+  folder's `publication.toml`.
+* **`theme.declare`** reads `bank.xml` in text mode and writes it back
+  with `newline=""`: a CRLF file comes back LF from top to bottom.
+  `theme.install` says "kept" when `printit.sty` was there but
+  `printitfigures.sty` had to be installed.
+* **`seating.Chart.neighbours`** pairs consecutive *occupied* seats,
+  so two people either side of an empty chair are reported as a
+  collision.
+* **`scans.py`** lines 974-999 define `INK`, `TICKED`, `EMPTY`,
+  `BESIDE` and `EDGE`. Nothing uses any of them, and each still has a
+  comment explaining a threshold the reader no longer applies.
+* **`clasp.PACKAGE = "@google/clasp@latest"`**, run through
+  `npx --yes`. Every setup downloads and runs whatever is newest,
+  while the code depends on clasp's command names, on fragments of its
+  error messages, and on picking a deployment id out of its prose by
+  the prefix `AKfycb`. Pin a version.
+* **The viewer's assessment builder cannot compile an outcome that has
+  a figure.** Its LaTeX says `\input{assets/.../name.tikz}`, the
+  Overleaf export carries `main.tex`, the `.sty` files and the
+  descriptions, and `build_viewer` deliberately leaves `.tikz` out of
+  `docs/` (checked: zero in the published demo). This is item 8 of the
+  section-15 list ("which figure route"); it is recorded here as a
+  defect and not only as a decision, because today the button produces
+  a document that fails.
+* **`utils/index.ts`**: the site's address is worked out from
+  `location.pathname` with trailing slashes removed, in three places.
+  Opened as `.../index.html`, bundles, support files and images are
+  asked for under `index.html/` and 404.
+* **`Export.svelte`** runs its builders inside `setTimeout` with no
+  `try`. `derived()` throws on purpose, and here that leaves the
+  spinner turning for ever with the message only in the console.
+  `Assessment.svelte` re-renders in a reactive statement with no
+  `try`, so typing an unclosed `{{#` into the template box throws.
+
+### From reading -- watch each fail before fixing it
+
+**Platform**
+
+* `CheckIt.vars` (`wrapper.py`). The Sage original passes each
+  variable's display name as `latex_name`. The SymPy port builds the
+  symbol from the scrambled sort name and drops the display name
+  altogether, so it would print as `q_mi_var_123456_0`. No mat-106
+  generator calls it (checked). Implement it or remove it.
+* `plot()` never closes its figure: one open matplotlib figure per
+  seed.
+* `has_images()` looks at the first exercise only, so an image behind
+  a condition skips the `--remote` check.
+* `checks.py`: `bundles()` says it runs "the same checks" on seeds
+  50-399 and re-implements three of the seven by hand. Escaped markup,
+  relative images, punctuation in maths and the inline-maths checks
+  never look at the range where, by its own docstring, "one bug lived
+  334 times". The two SpaTeXt-side checks read only the first 4 and 8
+  public seeds, though generators are given `PUBLIC_SEEDS` and
+  `BUNDLE_UNTIL` precisely so they can branch on them. `_MONEY_PUNCT`
+  is dead.
+* `ensureDerived` forgets a failed fetch only on a bad HTTP status. A
+  network failure or bad JSON leaves the rejected promise cached, and
+  every retry fails until the page is reloaded.
+* `Outcome.svelte`: an unknown slug in the address leaves `outcome`
+  undefined, and the reactive statements read `outcome.slug`. I saw no
+  guard. Not exercised.
+* `--thaw` is case-sensitive where `-o` is not. `Bank.__init__` reads
+  `<file>` and `<category>` elements from anywhere in `bank.xml`, not
+  only under `<latex-support>` and `<color_map>`.
+
+**printit**
+
+* The leak check has two blind spots (`vault.real_values`). Real
+  strings shorter than three characters are never looked for -- Li,
+  Ng, Wu, Vo, Bo, Al. And a real value equal to any pseudonym already
+  issued is skipped; the pseudonym lists contain John, Mary, David,
+  Thomas, George, Paul, Grace, Johnson, Robinson, Hamilton and Rice,
+  and `avoid()` only protects against names in the file being masked
+  now. It is a second line of defence (masking is by column), so the
+  exposure is bounded.
+* `vault.unmask_text` also turns each tag (`p01` ... `p99`) into a
+  real name, anywhere in free text, case-insensitively. `mask_text`
+  does the same for real first names that are ordinary words (Will,
+  Mark, May, Hope).
+* `digits.pick` takes the best-scoring id with a floor and no margin
+  over the runner-up. Two ids differing in one digit are told apart by
+  one handwritten cell. Ids that are not exactly nine digits are
+  silently never candidates.
+* `record.connect()` runs the whole schema, four `ALTER` probes, a
+  scan of every run's folder path and a commit on **every** call, and
+  each of about 25 functions opens its own connection. One page load
+  migrates the database half a dozen times. Migrate once per file per
+  process.
+* `record.progress` and friends order by `run.date`, which is whatever
+  text the publication carried. The app's date field is presumably
+  ISO; the CLI's is free text. A date that is not ISO sorts wrongly
+  and "last", "last sat" and "passed in" are then wrong with no error.
+* `roster.find` falls back to a unique **substring** of a name, and
+  `roster drop` acts on it: `drop ann` drops Joanna when she is the
+  only match.
+* `scans.index_reader` swallows `PageIndexError` -- the exception that
+  carries the instructions for fixing it -- and the page becomes
+  "unknown run" with no reason attached.
+* The id grid's size is written down twice: `ID_CELL` / `ID_TALL` /
+  `ID_RULE` in `scans.py`, and 4.4mm / 5.2mm / 0.4pt in `printit.sty`.
+  They agree today. A bank still holding an older theme prints one
+  grid and reads another; `main.pages` already records where each mark
+  is and could carry the pitch too.
+* The web app does not check the `Host` header. The token is written
+  into `index.html`, which is served to whoever asks. A hostile page
+  that re-points its own name at `127.0.0.1` could fetch the page,
+  read the token and use the API. Exotic, and three lines to close:
+  refuse any `Host` that is not `127.0.0.1:<port>` or
+  `localhost:<port>`. Two path checks use `startswith(root)` without a
+  separator (`_static`, `api_print_reveal`).
+* `runner._record` catches every exception into `record_error`. Both
+  the CLI and the app print it as one quiet line and carry on with
+  exit code 0. The record is "the only record of who held which
+  paper"; losing it should be louder than that.
+* `course.init` formats the course name into `course.toml` unescaped.
+  `gradebook.Profile` accepts `matches = "handle"`, a field the roster
+  does not have. `form.call` retries a timeout but not the same
+  timeout arriving wrapped in a `URLError`.
+
+### Where the design is carrying more than it should
+
+These are not bugs. They are the reasons bugs like the ones above
+keep being possible.
+
+**The same thing written several times.** This repository's own list
+of silent failures has "a fix applied to one path is not applied to
+the others" on it, three times in one day. The copies that exist now:
+
+| what | copies | where |
+|---|---|---|
+| "is a compiled PDF really clean" | 2 | `wrapper/tikz.py` (fixed), `compile.py` (RV-5) |
+| write a string into TOML | 9 | `_quote` in `manifest`, `printjob`, `form`, `seating`; `quote` in `gradebook`, `roster`; `course._escape`; two in `availability._render`. None escapes a newline, so a pasted title with a line break writes a file that cannot be read back |
+| read `course.toml` | 4 | `course.thresholds`, `course.bank_for`, `course.identity`, `publication._course_bank` |
+| the row of 28 percent signs that ends an exercise's LaTeX preamble | 4 | `latex.xsl` writes it; `assemble`, `spatext` and the viewer each search for it |
+| which color a skill's box gets | 2 | `checkit.Bank.color` ("resolved here, once") and `checkit_printit.bank.Bank.color`, which re-parses `bank.xml` |
+| the gradebook export, start to finish | 2 | `__main__.gradebook_export` (200 lines) and `gui.api_gradebook_write`. Every change this week had to be made twice |
+| turning SpaTeXt into something to look at | 4 | `html.xsl`, `latex.xsl`, `pretext.xsl`, and the Svelte components the student page uses |
+| "open the database, or return nothing if there is none" | ~25 | every function in `record.py` |
+| the site's own address | 3 | `utils/index.ts` |
+
+**Four renderers that do not agree.** The student page is drawn by
+Svelte components walking the SpaTeXt; the instructor tabs, the LMS
+export and print come from the three stylesheets. Where they differ:
+
+* a `<knowl>` with both `<content>` and sub-parts: the student page
+  shows the content and drops the parts; all three stylesheets do the
+  opposite
+* several `<outtro>`s: the page and `html.xsl` show them all;
+  `latex.xsl` and `pretext.xsl` take the first
+* an element inside `<m>`: the page shows all the text; the
+  stylesheets take only the first text node (not "the direct text
+  children", as the docstring in `checks.py` has it). This is why that
+  bug never showed on screen
+* `<em>` in a title: shown on the page, dropped by the stylesheets
+
+Every stylesheet begins by matching `*` and emitting nothing -- "kill
+undefined elements". So an element in a place the stylesheet does not
+select simply disappears: a display equation directly under
+`<content>`, an `<em>` in a title, a mistyped tag. That is the
+opposite of failing loudly. A `checkit check` that walks the SpaTeXt
+and reports anything the stylesheet will not select would generalise
+the one check that exists (`nested-in-m`); longer term the student
+page could be drawn from the precomputed HTML, leaving three renderers
+instead of four.
+
+**Files too large to hold in the head.** `gui/__init__.py` is 3,724
+lines and fifty-three endpoints across eight tabs. `app.js` is 7,325 lines
+and `seating.js` 6,504, sharing one global scope: 422 top-level
+functions and 144 top-level variables between them, no modules, and
+no tests of any JavaScript logic at all (the markup tests are, as
+`CLAUDE.md` says, the only ones). They do not collide today -- I
+checked for a name declared in both -- but nothing would say so if
+they did. To be fair to them: no data is ever written with
+`innerHTML`, there is exactly one `fetch`, and no empty `catch`.
+`__main__.py` has command bodies of 200 and 240 lines
+(`gradebook_export`, `gradebook_map`) doing work that belongs in the
+module so the app can call it.
+
+**Thresholds fitted to one stack.** `scans.py` has about twenty-five
+tuned numbers. The notes two sections up record what that costs: a
+gate fitted to one stack threw away six boxes from the next. The test
+fixtures are drawn rectangles. The measurements from the real stacks
+exist (they are quoted in the comments); a small corpus of real,
+masked crops with their expected calls would let a threshold change
+be checked against every stack so far instead of the latest one.
+
+**The command line prints names.** `build`'s report lists unseated,
+dropped and colliding students by name, and `roster import` lists
+every student added, updated or dropped. The standing rule is that
+names never reach a chat, and an assistant running these commands
+reads their output. A switch -- an environment variable would do --
+that prints counts or initials instead would make the rule something
+the tool enforces.
+
+**The map has become a second history.** `checkit-printit/CLAUDE.md`
+is 2,145 lines, loaded into every session. `checkit/CLAUDE.md` opens
+with "keep it short enough that it stays true". Two statements in
+`checkit/CLAUDE.md` turned out not to be true, and were corrected
+today:
+
+* "a column the tool does not recognise is blanked rather than passed
+  through" -- see RV-3
+* "images are rasterized to 400" -- only because `--image-seeds 400`
+  is typed by hand. The default is every seed
+
+A third stale statement lives in code and so was left alone: the
+`--image-seeds` help text and a comment in `Export.svelte` still say
+the LMS export uses seeds 100-999. It stops at 399.
+
+Most of printit's map is narrative that belongs here. Cutting it back
+to what exists, which Python, and the footguns is its own piece of
+work.
+
+**Dead or half-alive code.** `dashboard.py` (deprecated, and RV-14);
+the Python MathML path in `exercise.py` with its `latex2mathml`
+dependency -- `derived()` only ever emits the basic form and the
+viewer does MathML with KaTeX; `CheckIt.vars`; `theme.DECLARED_PATH`;
+`Chart.version_of`; `checks._MONEY_PUNCT`; the five `scans.py`
+constants; `questionType: true` in the Brightspace and Moodle export
+contexts, which is a literal key and not the variable, and inert only
+because those templates have no question-type sections.
+
+**Speed.** Besides RV-8: each exercise compiles its XSLT stylesheet
+afresh for each format, and pystache re-reads the template file each
+time -- roughly 25,000 compilations for a mat-106 build. Compile once
+per process. The platform's tests take 160 seconds for 152 tests.
+
+### What is good, and should not be lost in a tidy-up
+
+* The seed tiers, and `bank.json` declaring what it precomputed so a
+  consumer can ask instead of probing.
+* `<frozen/>` and `--thaw`: naming the outcome is the only way past.
+* The manifest and replay, and the refusal when a generator has
+  changed.
+* The vault: an unknown file version is refused, the save is atomic,
+  and a twin that fails its check is deleted rather than handed over.
+* The web app's token, its bind to `127.0.0.1`, and the complete
+  absence of `innerHTML` on data.
+* The gradebook audit: an independent check against the record, with
+  the download withheld when it finds something.
+* `tools/docs.py`, which tests the documents against the code. It
+  passed before and after today's edits.
+* Comments that say *why*. They are long, and they are the reason this
+  review could be done at all. Where one was wrong (the cancel in
+  `tikz.py`, the cascade in `record.py`) the bug was sitting directly
+  under it.
+
+### One observation about the published site
+
+mat-106's `assets/bank.json` was generated on 2026-10-12 and
+`docs/assets/bank.json` on 2026-09-20, so the site is three weeks
+behind the build. The print-only data (seeds 400 and up) is absent
+from both -- 17,400 entries, none carrying data -- so the exposure
+fixed in 0.2.9.1 did reach the published bank.
+
+### The order I would take it in
+
+1. RV-1, with a guard in `runner` and a test watched failing. It is
+   the only finding that destroys something that cannot be recomputed.
+2. RV-2, before the next class-list import.
+3. RV-3 and RV-4, before the next masked file leaves the machine.
+4. RV-5 and RV-10 together: one `atomic_write`, one "is this compile
+   clean" function.
+5. RV-6: add `encoding="utf-8"` across the platform in one commit.
+6. RV-7: one function, one test with a rotated code.
+7. RV-12: one `tex_escape`, used at every place text meets LaTeX.
+8. Then the duplication table, top to bottom -- each row removed is a
+   class of future bug removed with it.
+
+What I did **not** do: fix anything, commit anything, or touch
+mat-106 or mat-206. The probes wrote only to temporary folders and
+used invented names throughout.
+
+---
+
+## Fixing what the review found (2026-11-17)
+
+He asked for the review's findings to be checked and then fixed,
+asking only where a decision was his. This section is the record, kept
+item by item as the work went; the to-do rows in
+`PRINT_TOOL_DESIGN.md` section 15 are struck through as each lands.
+
+**Every confirmed claim was re-run first and held:** the record probe
+(attempts 1 -> 0), the merge probe, the masking probe, the database
+bytes probe, the stale-PDF probe and the placement simulation all
+reproduced exactly as written. Nothing in the review turned out to be
+wrong.
+
+Method, for every fix: the test is written first and watched failing
+against the unfixed code; then the fix; then each part of the fix is
+put back the old way, one at a time, by a scratch harness
+(`breakit.py`, which converts patterns to the file's own line endings
+and counts a pattern that does not match as a harness failure, never
+as "skipped"), and each must make a test fail. Where a part was not
+caught, either a test was added or the part was found to be redundant
+and removed -- both happened.
+
+### RV-1. A graded run is not rebuilt, and the record keeps its marks
+
+Three changes, any one of which would have stopped the loss:
+
+* `record.write_run` updates the `run` row in place
+  (`INSERT ... ON CONFLICT(run_id) DO UPDATE`) and replaces only the
+  `printed` rows. `graded` and `delisted` are left out of the update:
+  they describe what happened to the run afterwards, which a build
+  cannot know.
+* A trigger, `run_with_marks_is_kept`, refuses any `DELETE FROM run`
+  for a run that has attempts. A trigger rather than changing the
+  foreign key to `RESTRICT`, because SQLite cannot alter a constraint
+  without rebuilding the table, and that file holds the only copy of
+  the grades. It is in `SCHEMA`, so every existing database gains it
+  on its next open.
+* `runner.run` refuses to build into a folder whose run has marks
+  (`record.marks_in`), **before** `assemble` -- the folder's page
+  index is how its scans were placed, and refusing after assemble had
+  rewritten it would refuse too late. `--replace` does not get past
+  it. Two things do, because neither changes what was printed:
+  `--rebuilt` (recovering a lost index; who held what is unchanged)
+  and a replay (the recorded seeds exactly). A preview is not refused.
+
+The docstring of `tests/test_folder_collision.py` said a rebuild of the
+same run "destroys nothing". It was true until the run was graded, and
+it now says so. The runner tests moved to a fixture base class with no
+tests of its own (`_ACourse`): my first version subclassed the existing
+test class and silently ran its five tests a second time.
+
+Watched failing: 10 of 17 new tests on the unfixed code; five
+breakages of the fix, all caught.
+
+### RV-2. A class-list import no longer merges two people
+
+`classlist.merge` still falls back to names when no id matches, but a
+name match is now disqualified when the two students carry different
+ids of the same kind (`_ids_conflict` -- like for like only, so a
+Global id on one side and a Banner id on the other is still exactly
+what the name rule is for), when the roster row was already claimed by
+an earlier row of the same file, or when the name key is shared by two
+rows of the incoming file.
+
+**A bug in my own fix, caught by a test written for something else.**
+The shared-key count counted each row's keys as a list, and a row's
+display name and its first-plus-last are usually the same key -- so
+every row looked shared with itself, and every exact-name match was
+quietly demoted to the weaker surname-plus-initial rule. Everything
+still passed, because the initial rule usually lands on the same
+person. Counting a set per row fixed it, and
+`test_an_exact_name_still_matches_by_name` pins it.
+
+The claimed-once rule was not caught by any test at first: the other
+two rules cover every case I had written. The case only it catches is
+two different spellings in one file reaching one roster row, and that
+test was added.
+
+Real data: merging each real roster with itself, and with an
+id-stripped copy of itself (the name path), gives identical counts
+before and after the change -- MAT 106: 0 added, 0 dropped.
+
+### RV-3. A sparse name column is masked, and categories must repeat
+
+* "Preferred Name", "Preferred First Name", "Nickname", "Goes By",
+  "Known As", "Chosen Name" are recognised, as a new vault kind
+  `preferred`. Its own kind and not `first`, because as `first` it
+  replaced the legal first name in the fields `apply` hands to
+  `Vault.resolve`, and a names-only file then failed to recognise the
+  student. (The first test of that passed either way: the file carried
+  ids and an address, which identify a row before any name is read.
+  The test now uses a names-only file.) I also wrote a guard in
+  `apply` that kept `preferred` out of those fields; no test could
+  tell it from the separate kind, since `resolve` never reads a
+  `preferred` field, so it was removed.
+* `mask.classify`'s "a few distinct short values" rule now keeps a
+  column only if **every value occurs at least twice in the file** --
+  counted across all columns, because a grade value appears once in
+  one column and many times across the row -- and **no value is also
+  a word in a name column**.
+* Exception: a Brightspace `<Selectbox ...>` header is kept outright.
+  Run against all 40 real exports in Downloads, the repeat rule
+  blanked the "Midterm Grade Estimate" column in every one of them,
+  because some letter grade occurs once. A selectbox can only hold the
+  LMS's own scheme, so it is a category by construction. With that,
+  the only real columns whose decision changed are a class list's
+  `Class` and `Pronouns`, now blanked.
+
+`test_the_failure_never_prints_the_values_that_leaked` relied on the
+classifier wrongly keeping a column of one-off surnames in order to
+reach the leak scan; it was given repeated surnames so it still does.
+
+### Two masking defects the review did not know about
+
+Both turned up because a vault picks its seed at random, so the same
+test passed or failed from run to run.
+
+**About one mask in thirty refused itself.** A fake email or username
+is built from the fake name (`b` + `ramanujan` = `braman...`), which
+can spell a real student's first name ("Bram"); the leak scan matched
+it and refused the whole twin. Swept over 300 seeds on a 30-row
+invented class list: 10 refusals. `_stem` now scrambles the letters
+after the first until the stem spells no real name. 0 of 300 after.
+
+**About one mask in twenty did not unmask back.** The vault kept
+pseudonyms distinct *within* a student but not *across* students: a
+nickname masked as a shortening of one student's fake name could equal
+another student's fake, and unmasking then had one string and two real
+values. Swept over 200 seeds: 10 wrong round trips, e.g. a real
+"Quinn" coming back as somebody's nickname. `Vault.mask` now treats
+every other student's pseudonyms as taken, compared without case
+because unmasking matches without case. One-character fakes are exempt
+-- every middle initial is "X" on purpose and `pairs` never
+substitutes so short a string -- and the first version, without that
+exemption, made every class list with two middle initials fail. 0 of
+200 after. Both are pinned by 80-seed sweeps in the suite, which is
+slow (about 13 s each) and the price of a test that cannot pass by a
+lucky seed.
+
+### RV-4, and `vault mask-course` could not mask his real course at all
+
+`maskcourse.mask_database` now builds a new database: the source is
+opened read-only, every table, index and trigger is recreated from its
+own `CREATE` statement, and rows are inserted already masked -- every
+string value, whatever the column is declared as. The check now reads
+the file's bytes as well as its dump.
+
+Then the real-data check: masking the real MAT 106 folder into a
+temporary directory, with an in-memory vault so his real vault file
+was not touched. **It refused, every time -- and it refused with the
+old code too.** So `vault mask-course` had never been able to produce
+a twin of his course. Asked about by shape only (kind, length, whole
+word or not, what the enclosing word is) and tallied over five runs,
+every complaint was one of two false alarms:
+
+* a real 4-letter surname **in the middle of** an ordinary 12-letter
+  word that the original file already held (the course's own wording);
+* a real first name **at the start of** a pseudonym the vault had
+  invented ("Kat" in "Katherine").
+
+The masker replaces whole words; the scan matched letters. Fixes:
+`_pick` no longer chooses a pseudonym that contains a real name, and
+`Vault.leaks` takes the original text and lets off exactly two kinds
+of occurrence -- inside a word of a pseudonym, and **strictly inside**
+a word the original held. A real value at either end of a word still
+counts, original or not, because `jsmith` and `smith42` are how
+usernames leak; without an original (`vault check`) only the
+pseudonym exemption applies.
+
+The byte check needed its own question, and took three tries. Scanning
+raw bytes for real values cried wolf, because a length byte that
+happens to be a letter sits flush against the text and spells a short
+name (one real twin in four refused, at random). Blanking every stored
+value out of the bytes first refused every time, because a long index
+key is split across an overflow page and a fragment survives. What
+works: blank the stored values, scan what is left, and count only a
+real value that is not part of any stored value. An old real name in
+free space is part of nothing stored, so it is still caught --
+`test_the_check_reads_the_bytes_too` plants one in a properly masked
+twin and is refused.
+
+Real data after: the MAT 106 folder masks cleanly eight times out of
+eight; `record.db` unchanged by hash each time.
+
+### RV-5 to RV-14, in brief (the session ran out before full write-ups)
+
+Each was test-first and break-checked unless stated.
+
+* **RV-5** `compile_pdf` removes an old `main.pdf` first and stops on a
+  non-zero exit. The exit check is only caught alone by an error that
+  appears on pass two (pass one's PDF is still there); a test does that.
+  Two real 434-page runs compile cleanly under it.
+* **RV-6** every text `open()` in `dashboard/checkit` is UTF-8.
+  `test_encoding.py` forces cp1252; the curly quote crashed before. A
+  temp copy of mat-106 rebuilt `bank.json` identical to the real one
+  except `generated_on` and R2's template, which now has its em dash.
+* **RV-7** `scans.placement` averages turns as unit vectors. Simulation:
+  0 of 400 upside-down sheets misplaced (was 139). None of the 107 pages
+  in the 2026-11-12 stacks were upside down, so this did not cause the
+  three bad cuts reported then.
+* **RV-8 / RV-11c** `tikz.py`: support files worked out once per outcome
+  from the Bank in hand; a PNG is current when its hash in
+  `figure-keys.json` (not published) matches figure + preamble + support
+  files; a failure cancels the queue. **The first `-i` after this
+  recompiles every figure once**, because no keys exist yet.
+* **RV-9** `appsscript/` moved into the package (`git mv`), listed in
+  package data, one lookup. Not verified by building a wheel: no local
+  Python has setuptools, and fetching it needs a download.
+* **RV-10** `checkit_printit.fileio.atomic_write` and
+  `checkit.utils.atomic_write` (two copies on purpose: printit installs
+  against released platform wheels). Used for all course state,
+  `bank.xml`, `bank.json`, `derived.json`, `seeds.json`.
+  `theme.declare` now keeps a CRLF bank.xml CRLF.
+* **RV-11a/b** the wrapper writes figures only after every seed
+  succeeds, skips unchanged ones, removes figures a seed no longer
+  draws. `wrapper.sage` mirrors it inline -- **not run; no Sage here.**
+* **RV-12** `assemble.tex_escape` on name, section, course, semester,
+  instructor, title, descriptions; the id deliberately not. Viewer's
+  `texEscape` mirrors it. `latex.xsl` prose escaping is **not done** --
+  a decision for him (below).
+* **RV-13** unprinted skills that cannot be drawn are skipped without
+  consuming the RNG; a real preview drew identically under old and new.
+* **RV-14** done: `<frozen/>` enforced on the Outcome; `smoke.py` walks
+  the Bank and runs `tikz_graphics`/`json_ready` (all 29 mat-106 and 11
+  demo generators pass); `-a 50` refused; `save_draft` writes
+  `ids`/`codes` (the app's two boxes never reached a build); a preview
+  writes nothing; dead `scans.py` constants gone; clasp pinned to 3.4.1;
+  `course init` escapes. Viewer: unknown-skill page, export errors
+  shown, template-box errors caught, bundle fetch retries,
+  `/index.html` address bug, `questionType` key. **The viewer was built
+  but not checked in a browser, and `viewer.zip` was not rebuilt.**
+
+Also found: a flaky vault test (fixed seed), and a pre-existing
+svelte-check error (`Jumbotron.svelte` imports a missing component).
+
+**His real `record.db` gained the `run_with_marks_is_kept` trigger** the
+first time new code opened it (`connect` applies the schema on every
+open). Integrity ok; 394 attempts, 4 graded runs, unchanged.
+
+**mat-106 W7 shows students `9{,}456`**: a LaTeX thousands separator in
+plain prose. A bank content bug, not fixed.
+
+Open decisions for him: escape prose in `latex.xsl`; fix W7 (needs `-r`
+on a live skill); republish mat-106 (site three weeks behind, and R2);
+figure route for viewer assessments; commit and push this work.
+
+### His answers, and what was done with them (2026-11-17, later)
+
+**W7 -- "should be displayed in math mode; not if it changes the seeds."**
+The generator puts quotient, the word and the remainder into one
+`answer` string, so the template cannot wrap just the number. It can
+wrap the whole thing: `<m>\text{ {{answer}} }</m>`. Inside `\text{}` the
+braces of `9{,}456` are grouping, so KaTeX shows "9,456 remainder 734"
+-- checked in KaTeX directly and then on the rebuilt page. The spaces
+inside `\text{ ... }` are deliberate: four braces in a row is a Mustache
+triple-brace, the trap the CLAUDE.md already records. Template only,
+so no seed moved; print uses W7's `textemplate.tex`, untouched.
+
+So that it cannot happen again unnoticed, `checks.raw_tex_in_prose` (and
+its copy in the bundle check, now one helper, `_prose_leaks`) reports a
+bare `{` or `}` in visible text. On mat-106's build before the fix it
+reported exactly W7 -- 39 public and 294 instructor versions -- and
+nothing in the other 28 skills. A leaked command's own argument braces
+are not counted again (`\text{MDCXLVIII}` is one finding, not three).
+
+**Figures in the viewer's assessments -- "use the .tikz we already use
+with printit if it was made with .tikz; does upstream have this for
+ordinary images?"** Upstream does: its Overleaf button sends the LaTeX
+text alone (`name="snip"`), so any `\includegraphics{assets/...}` points
+at a file the project does not have. Checked in `upstream/main`. The
+TikZ half was the fork's own: `<tikz-image>` exists only here, and
+`build_viewer` deliberately left every `.tikz` out of the site.
+
+* `build_viewer` publishes `.tikz` for seed folders below
+  BUNDLE_UNTIL (mat-106: 2,418 files, 1.4 MB), never above.
+* `ensureFigures` fetches what the chosen versions reference; `\input`
+  of a `.tikz` is replaced by its source in place. **An
+  `\includegraphics` of a PNG with a `.tikz` beside it is replaced by
+  the TikZ too** -- mat-106's F2 and F2-E show students
+  `<image source="...png">`, while their print templates `\input` the
+  `.tikz`; the first browser run sent five PNGs, which is what found
+  this. A PNG with no source beside it (F3, R1) goes to Overleaf as a
+  file of the project under a flat name, and the single copied file
+  says which files it would need.
+
+Verified end to end: a temporary copy of mat-106 built with the new
+code, served locally, an assessment of F2 and W7 generated in the
+browser, its Overleaf files posted to a local receiver and compiled
+with pdflatex -- clean, two pages, five TikZ figures drawn in the
+printit style, no `\input` or `\includegraphics` left. The page opened
+as `/index.html` (the address bug), the unknown-skill page, W7's answer
+on screen, and no console errors were checked the same way.
+
+**Republish mat-106 -- yes; commit and push -- yes.** Done after this
+section was written; see the commits.
+
+**Prose escaping** was not done: he asked what it means. Explained in
+chat; it waits for his decision.

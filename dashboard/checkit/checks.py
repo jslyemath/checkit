@@ -41,6 +41,24 @@ _WORD_CMD = re.compile(re.escape(BS) + r"[a-zA-Z]{2,}")
 # this check required two or more letters and reported a confident clean while
 # an outcome showed students "27.6\%" and "\$770.13" in 300 places.
 _CHAR_ESC = re.compile(re.escape(BS) + r"[%$&_#{}]")
+# A bare brace, with no backslash for either pattern above to see. mat-106's
+# W7 showed students "9{,}456 remainder 734" for weeks: a LaTeX thousands
+# separator typed into plain text, literal on the web and swallowed as
+# grouping in print (2026-11-17). An escaped brace is _CHAR_ESC's, so it is
+# not counted twice.
+_BRACE = re.compile(r"(?<!" + re.escape(BS) + r")[{}]")
+# A leaked command with its argument, so the argument's braces are not
+# reported a second time: `\text{MDCXLVIII}` is one leak, not three.
+_CMD_WITH_ARG = re.compile(re.escape(BS) + r"[a-zA-Z]+(\{[^{}]*\})?")
+
+
+def _prose_leaks(text):
+    """Every leaked TeX token in visible text. One list, used by both the
+    bank.json check and the bundle check: they kept separate copies, and
+    a pattern added to one would have been missing from the other."""
+    found = [m.group() for p in (_WORD_CMD, _CHAR_ESC) for m in p.finditer(text)]
+    found += [m.group() for m in _BRACE.finditer(_CMD_WITH_ARG.sub(" ", text))]
+    return found
 
 
 def _visible_text(html):
@@ -61,10 +79,8 @@ def raw_tex_in_prose(bank_json):
             html = exercise.get("html")
             if not html:
                 continue
-            text = _visible_text(html)
-            for pattern in (_WORD_CMD, _CHAR_ESC):
-                for match in pattern.finditer(text):
-                    hits[(outcome["slug"], match.group())] += 1
+            for token in _prose_leaks(_visible_text(html)):
+                hits[(outcome["slug"], token)] += 1
     for (slug, token), count in sorted(hits.items()):
         out.append(Finding("raw-tex", slug, "%r renders literally" % token, count))
     return out
@@ -392,10 +408,8 @@ def bundles(bank_path):
                 for match in _CONTROL_RE.finditer(value):
                     hits[(slug, "control %s" % _CONTROL[match.group()])] += 1
                 if fmt == "html":
-                    text = _visible_text(value)
-                    for p in (_WORD_CMD, _CHAR_ESC):
-                        for match in p.finditer(text):
-                            hits[(slug, "raw %r" % match.group())] += 1
+                    for token in _prose_leaks(_visible_text(value)):
+                        hits[(slug, "raw %r" % token)] += 1
                 if fmt == "latex" and brace_balance(value) != 0:
                     hits[(slug, "unbalanced braces")] += 1
     for (slug, what), count in sorted(hits.items()):

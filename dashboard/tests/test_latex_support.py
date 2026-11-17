@@ -132,7 +132,7 @@ class LatexSupportTestCase(unittest.TestCase):
         self.write(self.theme_path(), text)
 
     def build(self):
-        result = CliRunner().invoke(main, ["generate", "-a", "50"])
+        result = CliRunner().invoke(main, ["generate", "-a", "60"])
         self.assertEqual(result.exit_code, 0, result.output)
 
     def bank_json(self):

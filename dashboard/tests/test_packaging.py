@@ -125,6 +125,20 @@ class GenerateAmountGuard(unittest.TestCase):
         self.assertIn("--amount", result.output)
         self.assertIn(str(PUBLIC_SEEDS), result.output)
 
+    def test_exactly_public_seeds_is_refused_too(self):
+        """RV-14 of the 2026-11-16 review. The assessment builder draws from
+        PUBLIC_SEEDS up, so a bank of exactly that many leaves it nothing
+        to draw: `floor(r * 0) + 50` is always seed 50, which does not
+        exist. The guard said `<` where it meant `<=`."""
+        from click.testing import CliRunner
+
+        from checkit import PUBLIC_SEEDS
+        from checkit.__main__ import generate
+
+        result = CliRunner().invoke(generate, ["--amount", str(PUBLIC_SEEDS)])
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("--amount", result.output)
+
 
 class PackagedFiles(unittest.TestCase):
     def test_static_resources_the_runtime_reads_are_declared(self):
