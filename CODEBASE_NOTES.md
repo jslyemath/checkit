@@ -20787,6 +20787,95 @@ a session opened in printit or mat-106. Claude Code may ask, the first
 time, to approve an import from outside the project; the maps still say
 where the rules are if it does not load.
 
+## Real students in the public history, and the guard (2026-11-17)
+
+**What was wrong.** Before pushing the documents' reorganisation, a probe
+compared everything about to be committed with the real rosters and found
+students in printit's `DESIGN.md` (moved from this repo's
+`PRINT_TOOL_DESIGN.md`): a surname, a nickname, an address and a student
+id, written as a worked example. They were replaced before that push. A
+look at what was *already* public then found more, in all three repos:
+docstrings and comments in `classlist.py`, `roster.py`, `vault.py`,
+`app.js`, `pageindex.py`; fixtures in `test_classlist.py`, `test_gui.py`,
+`test_pageindex.py`; this file; printit's old map; and four of printit's
+commit messages. Real data copied into an example while working on a real
+file, for two months. The house rules said "never commit them"; nothing
+enforced it.
+
+**What was ruled out, by him.** The first count read every roster under
+the home, Demo's too -- and Demo's are invented, so a fixture made from
+them looked real. Others were ordinary words a student shares (a month in
+this file's dates, an algorithm's name, nicknames) and the word problems'
+list of common first names in both banks. He cleared those case by case;
+they are the allowlist, `~/CheckItPrintIt/name-guard.toml`, which stays
+out of every repo because which words they are is itself about students.
+
+**The rewrite.** git-filter-repo is not installed, so `git filter-branch`
+with an index filter: every file version in his commits was rewritten
+once, in advance (357 of them), and each commit's index pointed at the
+new versions; a message filter did the commit messages. Each real value
+became the vault's pseudonym where it has one (so `vault unmask` still
+reads the old text) and otherwise an invented name that is in no roster
+and nowhere in either history; a nickname and the name it shortens got a
+pair that shortens the same way. Three spellings the guard does not see
+were written in too: a first name as a lower-case variable, a surname
+inside a fixture's address, and the full names two nicknames stand for.
+In `checkit` only commits not on `upstream` were rewritten -- upstream's
+history had no hits and is not his -- so every upstream branch and tag
+kept its id; `main`, `v0.2.9.1` and an old agent worktree's branch
+changed. In printit, `main` and `v0.2.0`. Both bundled first, then
+force-pushed with a lease.
+
+**Verified rather than assumed:** a fresh mirror clone of each repo from
+GitHub, every ref including `refs/pull/*`, read by the guard file version
+by file version: 0 hits in all three. No scrubbed value left in any case
+or before an `@`. Both suites pass at the rewritten heads (printit 1750,
+checkit 220). The old commits are gone from the local repos (refs,
+reflogs, `gc --prune=now`); the bundles in the session's scratch folder
+are the only copy.
+
+**Not done, because only the owner can:** GitHub still serves the old
+commits by id, and `checkit` shares storage with its upstream's fork
+network. GitHub Support removes them and their cached views (ROADMAP 14).
+The ids are in `~/CheckItPrintIt/history-rewrite-2026-11-17.txt`, not
+here: a public list of them would be a map to the names.
+
+**The guard** (DESIGN 20, `nameguard.py`, `githooks/`): pre-commit,
+commit-msg, pre-merge-commit (a merge does not run pre-commit) and
+pre-push, which reads every commit being pushed. Real is every roster,
+seating chart and vault under the home except invented courses; matched
+as whole words, names as written or in capitals, ids and addresses
+always. It fails closed. The agent's shell hook now also refuses
+`--no-verify`, `commit -n` and any mention of `core.hooksPath`, on Bash
+and PowerShell.
+
+Found while building it, each by running it on the real home:
+
+* **A seat is a `Seat`**, not a string; the first version read no
+  seating chart at all, and a chart's typed names need not be on the
+  roster.
+* **`Vault.real_values()` includes address domains** -- right for
+  checking a masked twin, wrong here: `edu` became a name, 154 hits. The
+  guard reads a vault person by person.
+* **`git log -p` does not show what a merge brings in**, so the audit
+  (`--all`) reads every file version, not every diff.
+* **A mirror clone's folder ends in `.git`**, which no allowlist pattern
+  matched: 33,796 false hits until `repo_name` dropped it.
+* Run from `Projects/`, `python -m` imports the `checkit` *folder* as a
+  package. The hooks run with `-I`.
+
+Tests: 24 in `test_nameguard.py`, every person invented, the last one a
+real `git commit` refused by the real hook. Sixteen deliberate breaks,
+each noticed. The shell hook: 18 commands as Bash and as PowerShell, all
+as expected.
+
+**What went wrong in the doing.** Four times a probe printed real names
+into the session: each blanked the value it was reporting and printed
+the line around it, where other real names sat; once, a list of candidate
+pseudonyms said which candidate was "in a roster". None reached a file or
+a commit. The rule is now in `WORKING_RULES.md`: blank every real value
+on the line, in any case, inside words too, before anything is printed.
+
 ## printit's map, as it stood before 2026-11-17
 
 `checkit-printit/CLAUDE.md` was 2,171 lines and loaded into every printit

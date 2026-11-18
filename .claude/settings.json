@@ -5,12 +5,12 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/no_heredoc.py\"",
-            "statusMessage": "Checking for heredocs"
+            "statusMessage": "Checking for heredocs and skipped git hooks"
           }
         ]
       }

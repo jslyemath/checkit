@@ -42,7 +42,22 @@ vault stops the command and names no one. Design: `privacy.py`.
 Where real names live: every course under `~/CheckItPrintIt/`,
 `mat-106-checkit/TeX Outputs/` and `PDF Outputs/` (gitignored), and
 `../FundCheck` (not a repo). **Never commit them, never paste one into chat.**
-Test fixtures are invented on purpose; keep them that way.
+Test fixtures and worked examples are invented; keep them that way.
+
+**Commits are guarded.** Real students reached all three public repos
+over two months -- in docstrings, fixtures, the notes, commit messages
+-- and the history was rewritten on 2026-11-17. Since then git hooks
+refuse any commit or push that adds a real name word, id or address
+(checkit-printit `DESIGN.md` section 20). When one refuses, replace the
+value with an invented one. When it is wrong -- an ordinary word that
+a student happens to share -- ask him to add the word to `fine_words` in
+`~/CheckItPrintIt/name-guard.toml`. Never `--no-verify`, never touch
+`core.hooksPath`; the shell hook refuses both.
+
+**A probe's output must blank every real value on the line, not only
+the one it is about** -- in any case, and inside longer words. Three
+probes on 2026-11-17 blanked the value they were reporting and printed
+the names beside it.
 
 ## What this project believes
 

@@ -21,6 +21,7 @@ References: `DESIGN n.n` is a section of `checkit-printit/DESIGN.md`;
 | 6 | **Make the four renderers agree.** The student page (Svelte) and `html.xsl` / `latex.xsl` / `pretext.xsl` differ on: a knowl with both content and parts; several outtros (print keeps the first); an element inside `<m>` (the stylesheets keep the first text only); `<em>` in a title. Proposed ruling: show everything, everywhere. Touches upstream code and what students see, and the student page has no JS tests, so it is checked in a browser. `checkit check` now reports every case (`dropped`, `nested-in-m`); mat-106 hits none | platform | notes, "The renderer check" | **his ruling on each case** |
 | 7 | **A corpus of real, masked crops** for the scan thresholds, so a change to one is checked against every stack so far rather than the latest | printit | notes, "The whole codebase, read by a different model" | masked crops from a second stack |
 | 8 | **The re-scan glyph.** The chip reuses the `record` glyph; a circular arrow of its own needs the measured harness (r >= 5.8 was solved at 21px; a chip draws at 18) | printit | -- | his eye |
+| 14 | **Ask GitHub Support to purge the rewritten commits.** The force-push of 2026-11-17 replaced 206 commits in `checkit` and 231 in `checkit-printit`, but GitHub still serves the old ones by id, and `checkit` shares storage with its upstream's fork network. Only Support can remove them and their cached views. The ids are in `~/CheckItPrintIt/history-rewrite-2026-11-17.txt` -- never in a repo, since each leads straight to an old commit | all | notes, "Real students in the public history" | **him** -- it is a request from the owner |
 | 9 | **Tests must not reach the real home.** A module-scoped fixture in `test_scans.py` wrote a vault into `~/CheckItPrintIt` on 2026-11-17. A session-wide `CHECKIT_PRINTIT_HOME` in `conftest.py` would stop every such fixture at once; check which tests rely on the default first | printit | notes, "Pseudonyms in everything the command line prints" | nothing |
 
 ## Decisions that are his
@@ -102,6 +103,10 @@ Each is his call, and each was parked for a reason (DESIGN 13.8).
 
 Newest first. Older work is in the notes; search them by date.
 
+- **2026-11-17** -- real students scrubbed from the history of `checkit`
+  and `checkit-printit` and force-pushed; git hooks in all three repos
+  refuse a commit or push that adds one. Notes, "Real students in the
+  public history".
 - **2026-11-17** -- the documents reorganised: house rules in one shared
   file, this roadmap, printit's map cut from 2,191 lines to a map, the
   design document moved into the repo it describes. Notes, "The documents,
