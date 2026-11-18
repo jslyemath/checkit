@@ -1,11 +1,30 @@
 from .exercise import Exercise
 import os, json, random
 from html import escape as escape_html
+import pystache
 from . import (PUBLIC_SEEDS, BUNDLE_UNTIL, INLINE_FORMATS, BUNDLE_FORMATS,
                BUNDLE_FILENAME)
 from .utils import atomic_write
 from .wrapper import run_generator
 from .wrapper.tikz import compile_tikz_for_outcome
+import re
+
+#: An <image> or <tikz-image> in template or data text, before rendering.
+_IMAGE_TAG = re.compile(r"<\s*(image|tikz-image)\b")
+_XML_COMMENT = re.compile(r"<!--.*?-->", re.S)
+
+
+def _strings_in(value):
+    """Every string in a generator's data, however deeply nested."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for v in value.values():
+            yield from _strings_in(v)
+    elif isinstance(value, (list, tuple)):
+        for v in value:
+            yield from _strings_in(v)
+
 
 class Outcome():
     def __init__(self, title=None, slug=None, path=None, description=None, bank=None, ai_prompt=None, frozen=False):
@@ -44,6 +63,21 @@ class Outcome():
         # which pystache reads as UTF-8, was right (RV-6, 2026-11-16).
         with open(self.template_filepath(), encoding="utf-8") as f:
             return f.read()
+
+    def parsed_template(self):
+        """`template.xml`, read and parsed by pystache once per edit.
+
+        Every exercise used to read and parse the file again -- a thousand
+        times per outcome per format. Keyed by the file's modification time
+        and size, so editing the template between two renders in one
+        process is still seen.
+        """
+        stat = os.stat(self.template_filepath())
+        key = (stat.st_mtime_ns, stat.st_size)
+        cached = getattr(self, "_parsed_template", None)
+        if cached is None or cached[0] != key:
+            cached = self._parsed_template = (key, pystache.parse(self.template()))
+        return cached[1]
 
     # Preference order when an outcome directory holds more than one. The
     # extension is what selects the runtime -- see wrapper/__init__.py RUNTIMES.
@@ -98,8 +132,22 @@ class Outcome():
         exs = self.exercises()
         if not exs:
             return False
-        from .exercise import _has_images
-        return _has_images(exs[0].spatext_ele())
+        # Every version, not the first. Rendering seed 0 alone missed a figure
+        # that only some versions draw, so the build went ahead without
+        # --remote and those versions published dead links (2026-11-17).
+        #
+        # Read from the template and the data, without rendering: this runs
+        # as a preflight, before minutes of rendering, and rendering every
+        # seed here would be most of those minutes. A figure can only come
+        # from one of the two -- written in the template, or pasted in by a
+        # {{{triple brace}}}. A tag inside an XML comment is not counted (the
+        # comment is stripped before rendering), but one inside a section no
+        # version enables is: such a template asks for --remote, which costs
+        # a flag and is the safe side to be wrong on.
+        if _IMAGE_TAG.search(_XML_COMMENT.sub("", self.template())):
+            return True
+        return any(_IMAGE_TAG.search(text)
+                   for e in exs for text in _strings_in(e.data))
 
     def write_derived_bundle(self,remote=None):
         """The non-public seeds, pre-rendered, as one file per outcome.

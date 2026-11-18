@@ -20,7 +20,15 @@ import json
 import os
 import re
 
+from . import BUNDLE_UNTIL, PUBLIC_SEEDS
 from .xml import CHECKIT_NS  # noqa: F401  (kept for symmetry with bank.py)
+
+# The two SpaTeXt-side checks below read every version a site publishes
+# (seeds below BUNDLE_UNTIL), and the data check every version there is.
+# They read the first 8 and 4: generators are handed PUBLIC_SEEDS and
+# BUNDLE_UNTIL precisely so they can branch on them, and a fault in the
+# instructor range was invisible (review, 2026-11-16). Affordable since
+# stylesheets and templates are compiled once (2026-11-17).
 
 BS = chr(92)
 
@@ -157,7 +165,43 @@ def relative_image_src(bank_json):
 # SpaTeXt-side check: the one the HTML cannot show
 # ---------------------------------------------------------------------------
 
-def nested_elements_in_math(bank, seeds=8):
+def _nested_in_math(root):
+    """The tags inside each <m> of `root` that has any, as "a,b" strings."""
+    return [",".join(c.tag.split("}")[-1] for c in math)
+            for math in root.iter(M) if len(math)]
+
+
+def spatext_checks(bank, seeds=None):
+    """Both SpaTeXt-side checks, from one rendering of each version.
+
+    Rendering is the cost -- Mustache, then an XML parse -- and the two
+    checks each rendered every version separately: about 25 of
+    `checkit check`'s seconds on mat-106 for the same 29,000 trees twice.
+    Every version, print-only ones included, since print is where
+    something dropped is least likely to be noticed.
+    """
+    out = []
+    nested, dropped = collections.Counter(), collections.Counter()
+    for outcome in bank.outcomes():
+        for exercise in outcome.exercises()[:seeds]:
+            try:
+                root = exercise.spatext_ele()
+            except Exception as exc:                      # pragma: no cover
+                out.append(Finding("spatext-error", outcome.slug, str(exc), 1))
+                break
+            for names in _nested_in_math(root):
+                nested[(outcome.slug, names)] += 1
+            for what in _dropped(root):
+                dropped[(outcome.slug, what)] += 1
+    for (slug, names), count in sorted(nested.items()):
+        out.append(Finding("nested-in-m", slug,
+                           "<m> contains <%s>; its content is dropped" % names, count))
+    for (slug, what), count in sorted(dropped.items()):
+        out.append(Finding("dropped", slug, what + "; not drawn", count))
+    return out
+
+
+def nested_elements_in_math(bank, seeds=None):
     """<m> elements containing other elements.
 
     html.xsl and latex.xsl both render <m> with normalize-space(text()), which
@@ -169,24 +213,103 @@ def nested_elements_in_math(bank, seeds=8):
     HTML the evidence has been deleted. It is the check that would have caught
     an outcome rendering "is a multiple of" with both numbers gone.
     """
-    out = []
-    hits = collections.Counter()
-    for outcome in bank.outcomes():
-        for exercise in outcome.exercises()[:seeds]:
-            try:
-                root = exercise.spatext_ele()
-            except Exception as exc:                      # pragma: no cover
-                out.append(Finding("spatext-error", outcome.slug, str(exc), 1))
-                break
-            for math in root.iter(M):
-                children = list(math)
-                if children:
-                    names = ",".join(c.tag.split("}")[-1] for c in children)
-                    hits[(outcome.slug, names)] += 1
-    for (slug, names), count in sorted(hits.items()):
-        out.append(Finding("nested-in-m", slug,
-                           "<m> contains <%s>; its content is dropped" % names, count))
-    return out
+    return [f for f in spatext_checks(bank, seeds) if f.check != "dropped"]
+
+
+# What each element may hold, as html.xsl, latex.xsl and pretext.xsl select
+# it -- the three agree on all of this. Every stylesheet begins by matching
+# `*` and writing nothing ("kill undefined elements"), so an element anywhere
+# else is silently dropped: no error, no warning, nothing on the page.
+#
+# Keep this in step with the stylesheets. A tag added to a stylesheet and not
+# here is reported as dropped, which is the safe way round: loud, and fixed by
+# adding it here.
+_INLINE = {"m", "me", "q", "c", "em", "url", "image", "tikz-image",
+           "glyphs", "nobreak"}
+_HOLDS = {
+    "knowl": {"title", "intro", "content", "outtro", "knowl"},
+    "title": {"m", "q", "c"},
+    "intro": {"p", "list"},
+    "content": {"p", "list"},   # and <knowl>, outside any knowl; see below
+    "outtro": {"p", "list"},
+    "list": {"item"},
+    "item": {"p", "list"},
+    "p": _INLINE, "em": _INLINE, "q": _INLINE, "nobreak": _INLINE,
+    "url": _INLINE,
+    # Leaves. Their own text is read; anything inside is not. <m> and <me>
+    # are left to nested_elements_in_math, which says more about them.
+    "c": set(), "glyphs": set(), "image": set(), "tikz-image": set(),
+}
+# Where text written straight into the element, outside a <p>, is dropped.
+_BLOCK = {"knowl", "intro", "content", "outtro", "list", "item"}
+
+
+def _local(el):
+    return el.tag.split("}")[-1] if isinstance(el.tag, str) else None
+
+
+def _dropped(root):
+    """Every piece of `root` no stylesheet will draw, as short descriptions."""
+    found = []
+
+    def walk(el, inside_knowl):
+        name = _local(el)
+        if name in ("m", "me"):
+            return
+        if name in _BLOCK:
+            stray = [el.text] + [c.tail for c in el]
+            if any(t and t.strip() for t in stray):
+                found.append(f"text directly in <{name}>, outside a <p>")
+        if name == "knowl":
+            kids = [c for c in el if _local(c)]
+            names = [_local(c) for c in kids]
+            for one in ("title", "intro", "content"):
+                if names.count(one) > 1:
+                    found.append(f"a second <{one}> in a <knowl>")
+            if "knowl" in names and "content" in names:
+                found.append("a <knowl> with both <content> and parts; "
+                             "the <content> is dropped")
+            shown = [c for c in kids if _local(c) == "outtro"
+                     and c.get("distractor") != "true"]
+            if len(shown) > 1:
+                found.append("a second <outtro>: drawn on the web, dropped in "
+                             "print and PreTeXt")
+        if name == "url" and el.get("href") is None:
+            found.append("<url> without href")
+        allowed = set(_HOLDS.get(name, set()))
+        if name == "content" and not inside_knowl:
+            allowed.add("knowl")
+        for child in el:
+            kid = _local(child)
+            if kid is None:
+                continue                      # a comment
+            if kid not in allowed:
+                found.append(f"<{kid}> inside <{name}>")
+                continue
+            walk(child, inside_knowl or name == "knowl")
+
+    walk(root, False)
+    return found
+
+
+def dropped_by_stylesheets(bank, seeds=None):
+    """SpaTeXt the stylesheets will silently not draw.
+
+    Four renderers turn an exercise into something to look at: the student
+    page (Svelte, walking the SpaTeXt itself) and html.xsl, latex.xsl and
+    pretext.xsl. They disagree in places -- a knowl with both content and
+    parts, several outtros, an element in a title -- and because every
+    stylesheet turns an element it does not expect into nothing, a
+    disagreement is invisible: the web page looks right and print has lost
+    a paragraph (review, 2026-11-16). This reports every such element, so
+    that a disagreement is at least loud. Making the renderers agree is
+    on the roadmap; this is what says whether it matters to a bank.
+
+    Read from the SpaTeXt, not the output: by the time it is HTML or LaTeX
+    the evidence is gone. Every version; see `spatext_checks`, which
+    `run_all` calls so that each version is rendered once for both.
+    """
+    return [f for f in spatext_checks(bank, seeds) if f.check != "nested-in-m"]
 
 
 _MUSTACHE = re.compile(r"\{\{\{?\s*([#^/&]?)\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}?\}\}")
@@ -257,7 +380,7 @@ def _visible_contexts(data, sections):
     return contexts
 
 
-def template_fields_without_data(bank, seeds=4):
+def template_fields_without_data(bank, seeds=None):
     """Template fields the generator never supplies.
 
     Mustache renders an absent key as the empty string, so the sentence around
@@ -357,9 +480,6 @@ def latex_structure(bank_json):
     return out
 
 
-_MONEY_PUNCT = re.compile(r'data-latex="[^"]*[.,]"')
-
-
 def punctuation_in_inline_math(bank_json):
     """Sentence punctuation pulled inside inline maths.
 
@@ -387,34 +507,48 @@ def punctuation_in_inline_math(bank_json):
 # Bundles: what print and the LMS export actually read
 # ---------------------------------------------------------------------------
 
+#: Every check that reads rendered output. bank.json and the bundles are
+#: both run through exactly these, so a check added here covers both.
+OUTPUT_CHECKS = (
+    escaped_markup,
+    raw_tex_in_prose,
+    control_characters,
+    relative_image_src,
+    punctuation_in_inline_math,
+    latex_structure,
+)
+
+
+def _bundles_as_bank_json(bank_path):
+    """Every derived.json, shaped like bank.json, so OUTPUT_CHECKS can read it."""
+    outcomes = []
+    pattern = os.path.join(bank_path, "assets", "*", "generated", "derived.json")
+    for path in sorted(glob.glob(pattern)):
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        outcomes.append({
+            "slug": data.get("slug"),
+            "exercises": [formats for _, formats in
+                          sorted(data.get("seeds", {}).items(), key=lambda kv: int(kv[0]))],
+        })
+    return {"outcomes": outcomes}
+
+
 def bundles(bank_path):
     """The same checks over derived.json.
 
     bank.json inlines only the public seeds, so a clean bank.json says nothing
     about the versions an assessment draws from. One bug lived 334 times in
     here and 48 times in bank.json.
+
+    "The same checks" used to be three of the seven, re-implemented by hand:
+    escaped markup, relative images, punctuation in maths and the
+    inline-maths checks never looked at these versions (review, 2026-11-16).
+    Now it is OUTPUT_CHECKS itself, each finding marked as coming from here.
     """
-    out = []
-    hits = collections.Counter()
-    pattern = os.path.join(bank_path, "assets", "*", "generated", "derived.json")
-    for path in glob.glob(pattern):
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-        slug = data.get("slug")
-        for _, formats in data.get("seeds", {}).items():
-            for fmt, value in formats.items():
-                if not isinstance(value, str):
-                    continue
-                for match in _CONTROL_RE.finditer(value):
-                    hits[(slug, "control %s" % _CONTROL[match.group()])] += 1
-                if fmt == "html":
-                    for token in _prose_leaks(_visible_text(value)):
-                        hits[(slug, "raw %r" % token)] += 1
-                if fmt == "latex" and brace_balance(value) != 0:
-                    hits[(slug, "unbalanced braces")] += 1
-    for (slug, what), count in sorted(hits.items()):
-        out.append(Finding("bundle", slug, what, count))
-    return out
+    doc = _bundles_as_bank_json(bank_path)
+    return [f._replace(detail=f"{f.detail}, in versions {PUBLIC_SEEDS}-{BUNDLE_UNTIL - 1}")
+            for check in OUTPUT_CHECKS for f in check(doc)]
 
 
 # ---------------------------------------------------------------------------
@@ -426,13 +560,9 @@ def run_all(bank):
         doc = json.load(f)
 
     findings = []
-    findings += escaped_markup(doc)
-    findings += raw_tex_in_prose(doc)
-    findings += control_characters(doc)
-    findings += relative_image_src(doc)
-    findings += punctuation_in_inline_math(doc)
-    findings += latex_structure(doc)
-    findings += nested_elements_in_math(bank)
+    for check in OUTPUT_CHECKS:
+        findings += check(doc)
+    findings += spatext_checks(bank)
     findings += template_fields_without_data(bank)
     findings += bundles(bank.abspath())
     return findings

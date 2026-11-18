@@ -37,9 +37,13 @@ class Bank():
         # An optional <color_map> of <category prefix="W" color="Violet"/>.
         # The platform does not draw anything with these; it resolves them so
         # every consumer agrees on which color a slug gets.
+        #
+        # Only <category> under <color_map>, and only <file> under
+        # <latex-support>, below: iter() searched the whole document, so an
+        # element of that name anywhere else in bank.xml was read as one.
         self._color_map = {
             category.get("prefix"): category.get("color")
-            for category in xml.iter(f"{CHECKIT_NS}category")
+            for category in xml.iterfind(f"{CHECKIT_NS}color_map/{CHECKIT_NS}category")
             if category.get("prefix") and category.get("color")
         }
         # Optional <latex-support> of <file path="..." role="..."/>. Written by
@@ -48,7 +52,7 @@ class Bank():
         # tool CheckIt does not ship from needing a mention in CheckIt's code.
         self._declared_support = [
             (ele.get("path"), ele.get("role") or "support")
-            for ele in xml.iter(f"{CHECKIT_NS}file")
+            for ele in xml.iterfind(f"{CHECKIT_NS}latex-support/{CHECKIT_NS}file")
             if ele.get("path")
         ]
         for o in self._outcomes:

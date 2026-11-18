@@ -1,240 +1,129 @@
-# Working in this project
+# CheckIt, and the tools built around it
 
-Loaded automatically every session. Keep it short enough that it stays true.
+@WORKING_RULES.md
 
-This is the **map**, not the record. The long-form history is
-`CODEBASE_NOTES.md` (5,600+ lines, not auto-loaded — find a section with
-`grep -n "^## " CODEBASE_NOTES.md`), and it has to be kept up: see "Three
-documents" below.
+The line above loads the house rules, which apply in all three repos and
+begin with a duty: **check that student names are masked before doing
+anything else.**
 
-## The repos
+This file is the map of the whole project and of the platform. printit has
+its own map (`../checkit-printit/CLAUDE.md`); the bank has a short one.
 
-| path | what it is |
-|---|---|
-| `Projects/checkit` | the platform, a fork of StevenClontz/checkit. `dashboard/` is the Python package, `viewer/` the Svelte app, `docs/demo/` the demo site |
-| `Projects/mat-106-checkit` | the live bank. 29 outcomes, publishes to `docs/` |
-| `Projects/checkit-printit` | the print tool. Separate repo, separate install |
-| `Projects/mat-206-checkit` | **frozen. Do not modify or push.** Being rebuilt from scratch later |
-| `Projects/FundCheck` | not a git repo. The pre-port FCP script and ~120 `.tex` files **with real student names** |
+## Three repos, three jobs
+
+| repo | what it is | its map |
+|---|---|---|
+| `Projects/checkit` | **the platform**, a fork of StevenClontz/checkit. `dashboard/` is the Python package (`checkit generate`, `viewer`, `check`); `viewer/` is the Svelte site students and instructors browse; `docs/demo/` is the demo site | this file |
+| `Projects/checkit-printit` | **the print tool and the course around it**: print runs, rosters, seating, the Google Form, scanning marked papers back in, Progress, the gradebook round-trip, the vault -- and the local web app (`gui -c <course>`), which is part of printit, not of the platform | `../checkit-printit/CLAUDE.md` |
+| `Projects/mat-106-checkit` | **the live bank**: 29 outcomes, publishes to `docs/` | its own `CLAUDE.md` |
+| `Projects/mat-206-checkit` | **frozen. Do not modify or push.** To be rebuilt from scratch later | -- |
+| `Projects/FundCheck` | not a repo. The pre-port FCP script and ~120 `.tex` files **with real student names** | -- |
+
+**The boundary:** the platform knows nothing about printit. `grep -rn
+printit dashboard/checkit/` returns nothing and should stay that way.
+printit owns `printit.sty` and `printitfigures.sty`, installs them into a
+bank's `printit/` folder, and declares them in `bank.xml` under
+`<latex-support>`; the platform publishes whatever a bank declares.
+
+This repo also holds the documents that span all three: `WORKING_RULES.md`,
+`ROADMAP.md` and `CODEBASE_NOTES.md`.
 
 ## Which Python
 
-There is no single environment. Use the right one:
+There is no single environment.
 
 ```bash
-# checkit's tests, and anything importing checkit
+# checkit's tests, and anything importing checkit (printit's venv has both, editable)
 "C:/Users/slye/Projects/checkit-printit/.venv/Scripts/python.exe" -m pytest dashboard/tests -q
 
-# mat-106 bank operations
+# mat-106 bank operations (checkit editable, pointing here)
 cd "C:/Users/slye/Projects/mat-106-checkit" && ./venv/Scripts/python.exe -m checkit generate ...
-
-# printit
-"C:/Users/slye/Projects/checkit-printit/.venv/Scripts/python.exe" -m checkit_printit ...
 ```
 
-mat-106's venv has checkit installed **editable**, pointing at `Projects/checkit/dashboard`. Edits to the platform take effect there with no reinstall.
+An edit to `dashboard/` takes effect in both with no reinstall. printit
+installs against a **released wheel** of the platform (0.2.9.1), so a
+helper printit needs from here has to be in a release first -- which is
+why `atomic_write` exists in both repos on purpose.
 
-## The CLI surface
+## The CLI
 
 `checkit`: `new`, `generate`, `viewer`, `check`, `tui`.
 
-`generate` flags that matter:
-- **`-r` / `--regenerate`** — without it, existing seeds are reused. A generator fix reaches nothing until you pass this. It re-rolls every version, so never mid-term on a live skill.
-- `-o` / `--outcome` — repeatable
-- `-i` / `--images` + `--image-seeds N` — rasterize `.tikz` to PNG
-- `--remote URL` — required when the bank has images
-- `--thaw SLUG` — regenerate an outcome marked `<frozen/>`
+`generate`:
+- **`-r` / `--regenerate`** -- without it, existing seeds are reused, so a
+  generator fix reaches nothing. It re-rolls every version: never mid-term
+  on a live skill, and **republish the same day**.
+- `-o` / `--outcome`, repeatable; `--thaw SLUG` for an outcome marked
+  `<frozen/>`. Both ignore case.
+- `-i` / `--images` with `--image-seeds N` rasterizes `.tikz` to PNG.
+  Images go to 400 **only because `--image-seeds 400` is passed by hand**;
+  nothing past 400 uses a PNG (print `\input`s the `.tikz`).
+- `--remote URL` is required when the bank has images; any version's
+  template or data naming `<image>`/`<tikz-image>` counts.
 
-`checkit-printit` has grown a lot: `build`, `init`, `install`, `import`, plus
-`course`, `form`, `gradebook`, `gui`, `record`, `roster`, `skills` and
-`vault` groups. It also has a
-local web app (`gui -c <course>`) with eight views — Roster, Update form,
-Print job, Runs, Scans, Progress, Seating, Settings. All eight are built; the
-"not built yet" placeholder is still in the page for the next one. Its own
-`CLAUDE.md` lists everything and says what is open — read that before
-touching it.
-
-A printed page now carries machine-readable marks (a QR in the footer and a
-`main.pages` index beside the PDF) so marked papers can be scanned back in.
-That is printit's business, not the platform's, but two things reach here:
-`printit.sty` is what the bank publishes, so the marks ship with it; and
-printit's venv — which is also where checkit's tests run — now needs
-`pypdfium2` and `zxing-cpp`, and also `numpy` and `pillow`, which reading a
-scan has always used and which were never declared: they were only present
-because matplotlib drags numpy in.
-
-`vault` is the newest group, and the one to reach for before sharing any
-file that carries a name, a student id or an email address. It writes a
-masked twin — one invented person per real person, with the same rows,
-columns and shape of value — and `vault unmask` turns whatever comes
-back into the real thing. The pseudonym table lives in
-`~/CheckItPrintIt/vaults/<course>.json`, a **sibling** of `courses/` so
-that masking a course folder cannot reach it, and it is the only way
-back: there is no recovery key, deliberately. A column the tool does not
-recognise is blanked when it reads as free text, and every twin is read
-back and searched for real values before it is handed over. **Neither
-is a guarantee yet:** an unrecognised column holding twelve or fewer
-distinct short values is kept only if each value repeats in the file
-and none is somebody's name (RV-3, fixed 2026-11-17), and the
-read-back still cannot find a value the vault was never told -- which
-is why the header synonyms matter. See `PRINT_TOOL_DESIGN.md` 18.
-
-`gradebook` is the LMS round-trip. `gradebook map` works out which
-column of an exported gradebook holds which skill, which strings mean
-a pass and a non-pass, and whether a blank cell counts -- saving the
-answers as `gradebook.toml` beside the course's other state. None of
-that is student data, so the mapping can be worked out against a masked
-twin. `gradebook export` then takes the file the instructor exported,
-fills in the cells there is a recorded result for, and changes nothing
-else: same columns, same rows, same line endings. It writes nothing
-without `-o`, and it will not replace an existing pass unless told to.
-
-On a run printed without names, the student writes their id into a grid in the
-header and printit reads it, matching the nine digits against the roster
-rather than reading a number in the abstract. The recogniser is 372KB of
-trained numbers in `src/checkit_printit/data/digits.npz`, regenerated by
-`tools/train_digits.py`; inference is numpy arithmetic, so nothing new is
-installed.
+`check` runs every generator, then structural checks over **every
+version**: `bank.json` and each bundle get the same `OUTPUT_CHECKS`, and
+the SpaTeXt is read once per version for maths that drops content
+(`nested-in-m`) and anything no stylesheet draws (`dropped`). About 45s on
+mat-106.
 
 ## Seed tiers
 
-- `0 .. 49` (`PUBLIC_SEEDS`) — students; inlined in `bank.json`
-- `50 .. 399` (`BUNDLE_UNTIL`) — instructors; per-outcome `derived.json`
-- `400+` — print only. Data lives in `seeds.json`, which is **not** published;
-  as of 0.2.9.1 `bank.json` drops the `data` for these too. It used to carry
-  it, so 17,400 print-only exercises were served publicly with their answers,
-  and the viewer would render one from a hand-typed URL. Both are fixed; the
-  fix only reaches a bank on its next `generate` and deploy.
+- `0 .. 49` (`PUBLIC_SEEDS`) -- students; inlined in `bank.json`.
+- `50 .. 399` (`BUNDLE_UNTIL`) -- instructors; per-outcome `derived.json`,
+  and the `.tikz` of each figure, which the viewer's assessment builder
+  pastes into its LaTeX.
+- `400+` -- print only. Data in `seeds.json`, which is **not** published.
+  `bank.json` drops their `data` too (0.2.9.1); it used to serve 17,400
+  print-only exercises with their answers.
 
-Images are rasterized to 400 **only because `--image-seeds 400` is passed by hand** -- the default is every seed. 400 is the right number because nothing past that can consume one: the viewer shows 50, bundles stop at 400, LMS export runs 100–399, and **print uses no PNGs at all** — it `\input`s the `.tikz`, written for all 1000 seeds.
+## How an exercise becomes something to look at
 
-## One picture, two surfaces
-
-A generator's `tikz_graphics()` returns TikZ source. CheckIt writes a `.tikz` per seed, rasterizes it to PNG for the web, and print `\input`s the same file. SpaTeXt's `<tikz-image source="X">` becomes `<img src="X.png">` in HTML and `\input{X.tikz}` in LaTeX.
-
-Both surfaces style it with `printitfigures.sty`, loaded by the bank's `tikz_preamble.tex` and by `printit.sty`. That is what keeps a web figure and a printed one identical.
-
-## Who owns the theme
-
-checkit-printit owns `printit.sty` and `printitfigures.sty`, installs them to `<bank>/printit/`, and writes a `<latex-support>` declaration into `bank.xml`. **CheckIt holds no constant naming printit** — it publishes what the bank declares. `grep -rn printit dashboard/checkit/` returns nothing, and should stay that way.
-
-`printit.sty` cannot load in a standalone figure (it wants page geometry, `\acadclass`, `\title`). That is why the picture half is a separate package.
+- **SpaTeXt** is the source. Four renderers turn it into output: the
+  student page (Svelte, walking the SpaTeXt itself) and `html.xsl`,
+  `latex.xsl`, `pretext.xsl` (instructor tabs, LMS export, print). They do
+  not fully agree -- ROADMAP item 6 -- and every stylesheet turns an
+  element it does not expect into nothing, which `checkit check` reports.
+- **`latex.xsl` escapes prose**: text outside `<m>`, `<me>` and `@latex`
+  prints as written. Raw LaTeX belongs inside `<m>`.
+- **Stylesheets compile once per thread** (`exercise.stylesheet`) **and a
+  template is parsed once per edit** (`Outcome.parsed_template`); anything
+  standing in for an Outcome needs that method. mat-106's precompute: 40s
+  to 6.
+- **One picture, two surfaces.** A generator's `tikz_graphics()` returns
+  TikZ; a `.tikz` is written per seed, rasterized for the web, and
+  `\input` by print. `<tikz-image source="X">` is `<img src="X.png">` in
+  HTML and `\input{X.tikz}` in LaTeX. Both are styled by
+  `printitfigures.sty`, so web and print figures match. **A PNG is current
+  when its hash matches** (`figure-keys.json`), so editing the preamble or
+  the `.sty` redoes every figure.
 
 ## Three templating systems, deliberately
 
-- **XSLT** — `dashboard/checkit/static/{html,latex,pretext}.xsl` turn SpaTeXt into each format
-- **Mustache** `{{x}}` / `{{{x}}}` / `{{#section}}` — bank `template.xml`, the viewer's assessment template, LMS exports
-- **Jinja** `\VAR{}` `\BLOCK{}` `\#{}` — per-outcome `textemplate.tex`, print only. Those delimiters come from the `latex` PyPI package, not from us.
+- **XSLT** -- the stylesheets above.
+- **Mustache** `{{x}}` / `{{{x}}}` / `{{#s}}` -- a bank's `template.xml`,
+  the viewer's assessment template, LMS exports.
+- **Jinja** `\VAR{}` `\BLOCK{}` `\#{}` -- a skill's `textemplate.tex`,
+  print only (delimiters from the `latex` package).
 
-A template that documents its own syntax will have that documentation parsed as syntax. Both the Mustache and Jinja templates broke this way. Name fields in prose.
+A template that documents its own syntax has that documentation parsed as
+syntax; both Mustache and Jinja templates broke that way. Name fields in
+prose.
 
-## Standing constraints
+## Platform footguns
 
-- **mat-206: do not modify, do not push.**
-- Real student names live in `mat-106-checkit/TeX Outputs/` (gitignored), `../FundCheck`, and every print run under `~/CheckItPrintIt`. Never commit them, never paste them into chat unless asked.
-- Print output goes to `~/CheckItPrintIt/<course>/<title>/`, and course state
-  to `~/CheckItPrintIt/courses/<name>/` — both deliberately outside every
-  repo, because they hold names, student ids and email addresses.
-- Never paste a student name into chat. Mask output that might contain one.
+- **Every file is UTF-8 and written whole** (`checkit.utils.atomic_write`).
+  Never `open()` without `encoding=`, never `open(path, "w")` for state.
+- **`<frozen/>` is enforced on the Outcome**, so every path respects it.
+- **`-a` must be more than 50**: the viewer offers 50 versions and
+  assessments draw from the ones after.
+- **A stub Outcome in a test needs `parsed_template()`** -- nineteen tests
+  failed for want of it.
+- `dashboard.py` (the deprecated Jupyter UI) and the Python MathML path
+  are upstream's and kept on purpose.
+- The viewer's `PUBLIC_SEEDS` is a second copy of the Python one;
+  `test_subset.py` asserts they match.
 
-## After the 2026-11-16 review
+## Still to do
 
-A different model read both repos; RV-1 to RV-14 were fixed on
-2026-11-17. The review is "The whole codebase, read by a different model
-(2026-11-16)" in `CODEBASE_NOTES.md`, the fixes "Fixing what the review
-found (2026-11-17)" straight after it. What changed that you will meet:
-
-- **Every file is UTF-8 and written whole.** `checkit.utils.atomic_write`
-  here, `checkit_printit.fileio.atomic_write` there -- two copies on
-  purpose. Never `open(path, "w")` for state; never `open()` without
-  `encoding=`.
-- **A PNG is current when its hash matches**, recorded per outcome in
-  `assets/<slug>/generated/figure-keys.json`, not by file time. Editing
-  `tikz_preamble.tex` or `printitfigures.sty` now redoes every figure.
-- **The site publishes `.tikz` for seeds below 400**, and the viewer's
-  assessment builder pastes figures into its LaTeX -- including a PNG
-  drawn from TikZ (F2), which it swaps for its `.tikz`.
-- **A run with marks cannot be deleted or rebuilt.** A trigger in every
-  `record.db` refuses the delete; `build` refuses the rebuild.
-- `checkit check` now runs every generator the Bank declares, through
-  `tikz_graphics`, and flags a bare `{` or `}` in visible prose.
-
-Still open: prose inside `latex.xsl` is not escaped; `wrapper.sage`
-was changed but never run (no Sage here); the review's "from reading"
-list and its duplication table.
-
-## Three documents, and which one you are supposed to write to
-
-| | job | read it |
-|---|---|---|
-| `CLAUDE.md` (one per repo) | the **map**: what exists, which Python, the footguns | automatically, every session |
-| `PRINT_TOOL_DESIGN.md` | the **plan** for printit: decisions, rationale, what is next. **Section 15 is the to-do list** -- the whole of it, not one tab's worth | on request, and before asking "what is left" |
-| `CODEBASE_NOTES.md` | the **history**: what changed and why, dated | `grep -n "^## " CODEBASE_NOTES.md` |
-
-**A change with reasoning behind it gets a dated `##` section in
-`CODEBASE_NOTES.md`. The commit message is not the record.** Put the reasoning
-that would not survive being summarised: what was actually wrong, how it was
-found, what was ruled out, and what was verified rather than assumed.
-
-This rule already existed, in the first paragraph of `CODEBASE_NOTES.md`, and
-was followed for weeks and then silently dropped the day `CLAUDE.md` was
-added -- twenty-six commits, including a live data exposure whose only record
-was a commit message. `CLAUDE.md` did not replace it; they do different jobs.
-See "The fortnight the notes were not kept".
-
-## Checks that have failed silently here
-
-Each of these shipped something wrong while reporting success. They are not
-hypothetical and several have recurred after being written down.
-
-**Write patch scripts with the Write tool, never a heredoc.** A heredoc
-mangles backslashes, so `\n` in a Python string becomes a real newline and the
-find-and-replace matches nothing. This has cost time five times in a single
-session. `sed` is worse: `\u` is an escape, which breaks every `\usepackage`.
-Put `assert old in text` in the script so a missed match writes nothing.
-
-**`command | tail` reports tail's exit code.** Redirect to a file, check `$?`
-alone, then read the file. Done again this week despite being listed here.
-
-**A test that passes proves nothing until you have watched it fail.** Break
-the code deliberately and confirm the test notices. Doing that found four
-vacuous tests in one session — and three of them were the test for the thing
-most recently fixed, written while thinking about the fix rather than about
-what could still be wrong.
-
-**Run it on real data.** Three bugs this week lived in code whose tests all
-passed and appeared only against the instructor's actual files.
-
-**Verify the artifact, not the dry run.** `build --preview` and `build` draw
-independently without a shared `--seed`, so checking the preview proved
-nothing about what shipped.
-
-**Do not declare something impossible without checking.** "A CLI cannot sign
-in to Google" was asserted twice, wrong both times, and sent a design down a
-worse path.
-
-**A merge is not done when tests pass.** Diff the commit against what you
-meant to merge — the 0.2.9 merge kept ancestry and lost nine files' content,
-and every check looked at the working tree, where it was genuinely present.
-
-**A PDF existing is not a clean compile.** pdflatex recovers from errors and
-writes one anyway. Fixed in `wrapper/tikz.py`; the habit generalises.
-
-**Counting seeds is not counting figures.** "400 seeds imaged" was true while
-nine figures were missing.
-
-**A fix applied to one path is not applied to the others.** Three times in
-one day: a rename that caught `"-w"` but not ` -w ` or `` `-w` ``, a
-`form attach` carrying its own copy of a helper that had just been fixed, and
-a hand-deployment path that missed every improvement the automated one got.
-When a change to shared behaviour does not show up, ask "is there a second
-copy", not "did it deploy".
-
-**Writing to `CLAUDE.md` is not writing to `CODEBASE_NOTES.md`.** Twenty-six
-commits went unrecorded because the notes felt superseded by the map. They are
-not; see the table above.
-
-**`gh` defaults to a fork's parent.** Both clones now have
-`gh repo set-default` pointing at `jslyemath/...`, but before that a release
-command aimed itself at `StevenClontz/checkit`. Check `--repo` on anything
-that writes.
+`ROADMAP.md`. Nothing open is listed here.

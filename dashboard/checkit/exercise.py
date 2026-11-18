@@ -1,3 +1,5 @@
+import threading
+
 from lxml import etree
 from latex2mathml.converter import convert
 import pystache
@@ -15,6 +17,26 @@ MATHML_CONSUMERS = ("canvas", "brightspace")
 def tex_to_mathml(tex, display="inline"):
     """One LaTeX string as a MathML element, ready to splice into a tree."""
     return etree.fromstring(convert(tex, display=display))
+
+
+_compiled = threading.local()
+
+
+def stylesheet(name):
+    """One of the static stylesheets, compiled once per thread.
+
+    Each exercise used to compile its stylesheet afresh for every format --
+    about 35,000 compilations for one mat-106 build, which was most of the
+    time precompute took (the review's "Speed" note, 2026-11-16). Per
+    thread, not per process, because an lxml XSLT object is not safe to
+    share between threads.
+    """
+    cache = getattr(_compiled, "sheets", None)
+    if cache is None:
+        cache = _compiled.sheets = {}
+    if name not in cache:
+        cache[name] = etree.XSLT(etree.fromstring(read_resource(name)))
+    return cache[name]
 
 
 def _has_images(spatext_ele):
@@ -78,7 +100,7 @@ class Exercise:
         root-relative <img src> values.
         """
         renderer = pystache.Renderer()
-        xml_string = renderer.render_path(self.outcome.template_filepath(),self.data)
+        xml_string = renderer.render(self.outcome.parsed_template(), self.data)
         try:
             ele = etree.fromstring(bytes(xml_string, encoding='utf-8'))
         except etree.XMLSyntaxError as e:
@@ -137,7 +159,7 @@ class Exercise:
                 "lives). Pass remote='' to keep the old "
                 "root-relative behaviour."
             )
-        transform = etree.XSLT(etree.fromstring(read_resource("html.xsl")))
+        transform = stylesheet("html.xsl")
         ele = transform(
             src,
             subset=f"'{subset}'",
@@ -169,7 +191,7 @@ class Exercise:
             raise NotImplementedError(
                 f"pretext output does not support consumer={consumer!r}, only 'basic'."
             )
-        transform = etree.XSLT(etree.fromstring(read_resource("pretext.xsl")))
+        transform = stylesheet("pretext.xsl")
         ele = transform(self.spatext_ele()).getroot()
         return ele
 
@@ -180,7 +202,7 @@ class Exercise:
             ),pretty_print=True), 'utf-8')
 
     def latex(self):
-        transform = etree.XSLT(etree.fromstring(read_resource("latex.xsl")))
+        transform = stylesheet("latex.xsl")
         return str(transform(self.spatext_ele()))
 
     def derived(self, remote=None, formats=INLINE_FORMATS):

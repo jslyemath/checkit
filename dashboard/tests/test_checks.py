@@ -15,6 +15,7 @@ all, because by then the dropped content is gone.
 
 import json
 import os
+import re
 import sys
 import unittest
 
@@ -276,6 +277,212 @@ class TemplateFieldsWithoutData(unittest.TestCase):
             {"line": {"slope": 3}})
         self.assertEqual(len(found), 1)
         self.assertIn("gone", found[0].detail)
+
+
+class _ManyExercises(_StubOutcome):
+    """`count` versions, all clean except the one at `bad`."""
+
+    def __init__(self, slug, template, good, bad_data, count, bad):
+        super().__init__(slug, template, good)
+        self._exercises = [_StubExercise(bad_data if i == bad else good)
+                           for i in range(count)]
+
+
+class TheSpatextChecksReadPastTheFirstFewVersions(unittest.TestCase):
+    """They read the first 4 and 8 seeds. Generators branch on PUBLIC_SEEDS
+    and BUNDLE_UNTIL, so a fault in the instructor range was invisible."""
+
+    def test_a_field_missing_only_in_a_late_version(self):
+        outcome = _ManyExercises("X", "<p>{{a}}</p>", {"a": 1}, {}, 300, bad=250)
+        found = checks.template_fields_without_data(_StubBank([outcome]))
+        self.assertEqual([(f.check, f.count) for f in found], [("missing-data", 1)])
+
+    def test_nested_markup_in_maths_in_a_late_version(self):
+        from lxml import etree
+
+        ns = 'xmlns="https://spatext.clontz.org"'
+        clean = f'<knowl {ns}><content><p><m>x</m></p></content></knowl>'
+        nested = f'<knowl {ns}><content><p><m>x<m>y</m></m></p></content></knowl>'
+
+        class Ex:
+            def __init__(self, xml):
+                self.xml = xml
+
+            def spatext_ele(self):
+                return etree.fromstring(self.xml)
+
+        outcome = _StubOutcome("X", "", {})
+        outcome._exercises = [Ex(nested if i == 300 else clean) for i in range(400)]
+        found = checks.nested_elements_in_math(_StubBank([outcome]))
+        self.assertEqual([(f.check, f.count) for f in found], [("nested-in-m", 1)])
+
+
+class TheBundlesGetEveryCheck(unittest.TestCase):
+    """bundles() said it ran "the same checks" and re-implemented three of
+    the seven. Each of these four was never looked for past seed 49."""
+
+    def findings(self, formats):
+        import tempfile
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        folder = os.path.join(tmp.name, "assets", "X", "generated")
+        os.makedirs(folder)
+        with open(os.path.join(folder, "derived.json"), "w", encoding="utf-8") as f:
+            json.dump({"slug": "X", "seeds": {"60": formats}}, f)
+        return checks.bundles(tmp.name)
+
+    def test_each(self):
+        cases = {
+            "escaped-markup": {"html": "<p>&lt;m&gt;x&lt;/m&gt;</p>"},
+            "relative-img": {"html": '<img src="assets/X/60/p.png">'},
+            "math-punctuation": {"html": '<span class="math inline-math" data-latex="x.">x</span>'},
+            "latex-maths": {"latex": BS + "(a $ b" + BS + ")"},
+        }
+        for check, formats in cases.items():
+            with self.subTest(check):
+                found = self.findings(formats)
+                self.assertEqual([f.check for f in found], [check])
+                self.assertIn("in versions 50-399", found[0].detail)
+
+    def test_a_clean_bundle_is_clean(self):
+        self.assertEqual(self.findings({"html": "<p>fine</p>", "latex": "fine"}), [])
+
+
+class WhatTheStylesheetsDropSilently(unittest.TestCase):
+    """Every stylesheet turns an element it does not expect into nothing.
+    Each case here is one the 2026-11-16 review found the renderers
+    disagreeing on, or one that simply vanishes everywhere."""
+
+    NS = 'xmlns="https://spatext.clontz.org"'
+
+    def dropped(self, body):
+        from lxml import etree
+        root = etree.fromstring(f'<knowl {self.NS}>{body}</knowl>')
+        return checks._dropped(root)
+
+    def test_a_clean_exercise(self):
+        self.assertEqual(self.dropped(
+            "<title>T <m>x</m> <c>c</c> <q>q</q></title>"
+            "<intro><p>Find <em>it</em>.</p></intro>"
+            "<content><list><item><p><m>a</m></p></item></list></content>"
+            "<outtro><p><q>b</q> <url href='h'>u</url></p></outtro>"), [])
+
+    def test_content_beside_parts(self):
+        found = self.dropped("<content><p>a</p></content>"
+                             "<knowl><content><p>b</p></content></knowl>")
+        self.assertEqual(len(found), 1)
+        self.assertIn("both <content> and parts", found[0])
+
+    def test_a_second_outtro(self):
+        found = self.dropped("<content><p>a</p></content>"
+                             "<outtro><p>1</p></outtro><outtro><p>2</p></outtro>")
+        self.assertEqual(len(found), 1)
+        self.assertIn("dropped in print", found[0])
+
+    def test_distractors_are_not_a_second_outtro(self):
+        """A multiple-choice question: print shows the correct one only,
+        on purpose."""
+        self.assertEqual(self.dropped(
+            "<content><p>a</p></content><outtro><p>1</p></outtro>"
+            "<outtro distractor='true'><p>2</p></outtro>"), [])
+
+    def test_emphasis_in_a_title(self):
+        self.assertEqual(self.dropped("<title><em>T</em></title>"),
+                         ["<em> inside <title>"])
+
+    def test_an_html_tag(self):
+        """The demo's EX3 has a <ul> in an <intro>; all three drop it."""
+        self.assertEqual(self.dropped("<intro><ul><li>a</li></ul></intro>"),
+                         ["<ul> inside <intro>"])
+
+    def test_text_outside_a_paragraph(self):
+        self.assertEqual(self.dropped("<content>Solve it.</content>"),
+                         ["text directly in <content>, outside a <p>"])
+
+    def test_a_url_without_href(self):
+        self.assertEqual(self.dropped("<content><p><url>x</url></p></content>"),
+                         ["<url> without href"])
+
+    def test_maths_is_left_to_its_own_check(self):
+        self.assertEqual(self.dropped(
+            "<content><p><m>x<m>y</m></m></p></content>"), [])
+
+    def test_the_bank_level_check_counts_versions(self):
+        from lxml import etree
+        ns = self.NS
+
+        class Ex:
+            def __init__(self, xml):
+                self.xml = xml
+
+            def spatext_ele(self):
+                return etree.fromstring(self.xml)
+
+        outcome = _StubOutcome("X", "", {})
+        outcome._exercises = [
+            Ex(f'<knowl {ns}><title><em>t</em></title></knowl>' if i in (3, 700)
+               else f'<knowl {ns}><title>t</title></knowl>')
+            for i in range(1000)]
+        found = checks.dropped_by_stylesheets(_StubBank([outcome]))
+        self.assertEqual([(f.check, f.count) for f in found], [("dropped", 2)])
+
+
+class RunAllRunsEveryCheck(unittest.TestCase):
+    """A check written and not wired in reports a clean bank forever."""
+
+    def test_the_spatext_checks_are_in_it(self):
+        import tempfile
+        from lxml import etree
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        with open(os.path.join(tmp.name, "bank.json"), "w", encoding="utf-8") as f:
+            json.dump({"outcomes": []}, f)
+
+        class Bank(_StubBank):
+            def build_path(self):
+                return tmp.name
+
+            def abspath(self):
+                return tmp.name
+
+        ns = 'xmlns="https://spatext.clontz.org"'
+
+        class Ex:
+            data = {}
+
+            def __init__(self, bad):
+                self.bad = bad
+
+            def spatext_ele(self):
+                if not self.bad:
+                    return etree.fromstring(f"<knowl {ns}><title>t</title></knowl>")
+                return etree.fromstring(
+                    f"<knowl {ns}><title><em>t</em></title><content><p>"
+                    f"<m>x<m>y</m></m></p></content></knowl>")
+
+        # The bad one is a print-only version: run_all must read them.
+        outcome = _StubOutcome("X", "", {})
+        outcome._exercises = [Ex(i == 700) for i in range(1000)]
+        kinds = {f.check for f in checks.run_all(Bank([outcome]))}
+        self.assertTrue({"dropped", "nested-in-m"} <= kinds, kinds)
+
+
+class TheTableKeepsUpWithTheStylesheets(unittest.TestCase):
+    """`_HOLDS` is a second statement of what the stylesheets select. If a
+    stylesheet learns a tag and the table does not, every use of it would
+    be reported as dropped -- loud, but wrong. This fails first."""
+
+    def test(self):
+        from checkit.static import read_resource
+        for sheet in ("html.xsl", "latex.xsl", "pretext.xsl"):
+            text = read_resource(sheet)
+            selected = set(re.findall(r"stx:([a-z-]+)", text))
+            known = set(checks._HOLDS) | {"m", "me"}
+            for holds in checks._HOLDS.values():
+                known |= holds
+            with self.subTest(sheet):
+                self.assertEqual(selected - known, set())
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 import click
 from trogon import tui
 import os
-from . import static, VERSION, bank, PUBLIC_SEEDS
+from . import static, VERSION, bank, PUBLIC_SEEDS, BUNDLE_UNTIL
 
 @tui()
 @click.group(
@@ -103,9 +103,10 @@ def new(directory):
     help="Rasterize images for only the first N seeds (default: all). "
          "Applies to PNGs only -- TikZ .tikz source is written for every seed, "
          "so LaTeX/print output is unaffected by this cap. "
-         f"The HTML viewer shows {PUBLIC_SEEDS} seeds and LMS export uses seeds "
-         "100-999, "
-         "so a low value produces broken images for those endusers.",
+         f"The HTML viewer shows {PUBLIC_SEEDS} seeds, and assessments and LMS "
+         f"export use seeds up to {BUNDLE_UNTIL - 1}, so a value below "
+         f"{BUNDLE_UNTIL} produces broken images for those users; nothing "
+         "past it uses a PNG.",
 )
 @click.option(
     "-o",
@@ -158,6 +159,7 @@ def generate(amount,regenerate,images,image_seeds,outcome,remote,thaw,no_precomp
             param_hint="--amount",
         )
     b = bank.Bank()
+    by_lower = {o.slug.lower(): o.slug for o in b.outcomes()}
     only = None
     wanted = {name for name in outcome if name.upper() != "ALL"}
     if wanted and len(wanted) < len(outcome):
@@ -171,7 +173,6 @@ def generate(amount,regenerate,images,image_seeds,outcome,remote,thaw,no_precomp
         # narrowing the Bank. write_json() serialises every outcome the Bank
         # holds, so a narrowed Bank writes a bank.json missing the others --
         # and skips the missing-`remote` preflight for them too.
-        by_lower = {o.slug.lower(): o.slug for o in b.outcomes()}
         only = {by_lower[name.lower()] for name in wanted if name.lower() in by_lower}
         missing = sorted(n for n in wanted if n.lower() not in by_lower)
         if missing:
@@ -186,6 +187,9 @@ def generate(amount,regenerate,images,image_seeds,outcome,remote,thaw,no_precomp
                 param_hint="--outcome",
             )
     frozen = {o.slug for o in b.outcomes() if o.frozen}
+    # Matched without regard to case, as -o is. `--thaw w1` used to be
+    # refused as "no outcome" while `-o w1` found W1 a moment earlier.
+    thaw = [by_lower.get(name.lower(), name) for name in thaw]
     unknown = set(thaw) - {o.slug for o in b.outcomes()}
     if unknown:
         raise click.BadParameter(

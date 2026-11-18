@@ -1,0 +1,19 @@
+{
+  "env": {
+    "CHECKIT_PRINTIT_MASK_NAMES": "1"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/no_heredoc.py\"",
+            "statusMessage": "Checking for heredocs"
+          }
+        ]
+      }
+    ]
+  }
+}

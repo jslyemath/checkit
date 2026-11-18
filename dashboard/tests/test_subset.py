@@ -295,6 +295,13 @@ class _StubOutcome:
     def template_filepath(self):
         return self._path
 
+    def parsed_template(self):
+        # What spatext_ele() asks an Outcome for since templates are
+        # parsed once (2026-11-17).
+        import pystache
+        with open(self._path, encoding="utf-8") as f:
+            return pystache.parse(f.read())
+
 
 class ExerciseApi(unittest.TestCase):
     """Covers the plumbing in exercise.py, not the stylesheet.

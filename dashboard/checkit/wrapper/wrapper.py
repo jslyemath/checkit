@@ -307,6 +307,24 @@ def _random_full_column_rank(rows, cols, upper_bound=6):
 # Library of helpful functions (mirrors wrapper.sage's CheckIt)
 # ---------------------------------------------------------------------------
 
+class _ShownAs(Symbol):
+    """A symbol that sorts by its name and prints as `shown`.
+
+    What Sage's var(name, latex_name=shown) is: SymPy orders the terms of a
+    sum by symbol name, so a scrambled name gives a random order while the
+    reader still sees x and y. Only LaTeX is overridden; str() keeps the
+    real name, which is what SymPy uses to tell symbols apart.
+    """
+
+    def __new__(cls, name, shown):
+        obj = super().__new__(cls, name)
+        obj._shown = shown
+        return obj
+
+    def _latex(self, printer):
+        return self._shown
+
+
 class CheckIt:
     @staticmethod
     def vars(*latex_names, random_order=True):
@@ -323,8 +341,11 @@ class CheckIt:
             random.shuffle(indices)
         import string
         random_letter = random.choice(list(string.ascii_lowercase))
+        # Sage's original passes each display name as latex_name. This port
+        # used to drop it, so the symbols printed as `q_mi_var_123456_0`
+        # (2026-11-17; no bank called it, which is why nobody saw).
         return (
-            Symbol(f"{random_letter}_mi_var_{stamp}_{indices[i]}")
+            _ShownAs(f"{random_letter}_mi_var_{stamp}_{indices[i]}", name)
             for i, name in enumerate(latex_names)
         )
 

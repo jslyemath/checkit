@@ -210,6 +210,13 @@ class ThawingIsDeliberate(FrozenTestCase):
         result = self.run_cli("-r", "--thaw", "FROZEN", "--thaw", "FROZEN")
         self.assertEqual(result.exit_code, 0, result.output)
 
+    def test_thaw_ignores_case_as_outcome_does(self):
+        """`-o frozen` found FROZEN and `--thaw frozen` called it unknown."""
+        self.edit_generators()
+        result = self.run_cli("-r", "--thaw", "frozen")
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertTrue(all(str(v).startswith("EDITED") for v in self.values("FROZEN")))
+
 
 class EveryPathRespectsIt(FrozenTestCase):
     """RV-14 of the 2026-11-16 review: the check lived only in

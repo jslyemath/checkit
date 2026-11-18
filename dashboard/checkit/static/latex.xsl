@@ -9,8 +9,68 @@
     <!-- kill undefined elements -->
     <xsl:template match="*"/>
 
-    <!-- Normalize text() whitespace but don't completely trim beginning or end: https://stackoverflow.com/a/5044657/1607849 -->
-    <xsl:template match="text()"><xsl:value-of select="translate(normalize-space(concat('&#x7F;',.,'&#x7F;')),'&#x7F;','')"/></xsl:template>
+    <!-- Normalize text() whitespace but don't completely trim beginning or end: https://stackoverflow.com/a/5044657/1607849
+
+         Then escaped. Text outside <m>, <me> and an @latex attribute is
+         prose, and the web shows it exactly as written, so print has to as
+         well. Copied verbatim, a "50% off" printed as "50" (the % began a
+         comment), an & was a compile error, and a brace silently vanished. -->
+    <xsl:template match="text()">
+        <xsl:call-template name="tex-escape">
+            <xsl:with-param name="text" select="translate(normalize-space(concat('&#x7F;',.,'&#x7F;')),'&#x7F;','')"/>
+        </xsl:call-template>
+    </xsl:template>
+
+    <!-- The ten characters LaTeX reads as instructions, and what prints each
+         one literally. The same table as checkit-printit's tex_escape, which
+         does this for the names and titles printit types into main.tex.
+
+         XSLT 1.0 has no replace(). translate() turns every special character
+         into a backslash, so the text before the first backslash in that copy
+         is the run of ordinary characters; it is written as is, the special
+         character after it is written escaped, and the rest goes round
+         again.
+
+         That is one call per special character, and libxslt stops at a depth
+         of 3000, so text with thousands of them would fail to render at all.
+         Long text is therefore halved first (escaping is per character, so
+         any split point is safe), which keeps the depth near log2(length)
+         plus 200 however the text is made. -->
+    <xsl:variable name="tex-specials" select="'\{}$&amp;#^_%~'"/>
+    <xsl:variable name="tex-marks" select="'\\\\\\\\\\'"/>
+
+    <xsl:template name="tex-escape">
+        <xsl:param name="text"/>
+        <xsl:variable name="marked" select="translate($text, $tex-specials, $tex-marks)"/>
+        <xsl:choose>
+            <xsl:when test="string-length($text) &gt; 200 and contains($marked, '\')">
+                <xsl:variable name="half" select="floor(string-length($text) div 2)"/>
+                <xsl:call-template name="tex-escape">
+                    <xsl:with-param name="text" select="substring($text, 1, $half)"/>
+                </xsl:call-template>
+                <xsl:call-template name="tex-escape">
+                    <xsl:with-param name="text" select="substring($text, $half + 1)"/>
+                </xsl:call-template>
+            </xsl:when>
+            <xsl:when test="contains($marked, '\')">
+                <xsl:variable name="plain" select="string-length(substring-before($marked, '\'))"/>
+                <xsl:value-of select="substring($text, 1, $plain)"/>
+                <xsl:variable name="ch" select="substring($text, $plain + 1, 1)"/>
+                <xsl:choose>
+                    <xsl:when test="$ch = '\'">\textbackslash{}</xsl:when>
+                    <xsl:when test="$ch = '~'">\textasciitilde{}</xsl:when>
+                    <xsl:when test="$ch = '^'">\textasciicircum{}</xsl:when>
+                    <xsl:otherwise><xsl:value-of select="concat('\', $ch)"/></xsl:otherwise>
+                </xsl:choose>
+                <xsl:call-template name="tex-escape">
+                    <xsl:with-param name="text" select="substring($text, $plain + 2)"/>
+                </xsl:call-template>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:value-of select="$text"/>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
 
     <xsl:template match="/">
         <xsl:text>%%%%% SpaTeXt Commands %%%%%</xsl:text>
@@ -144,7 +204,9 @@
 
     <xsl:template match="stx:c">
         <xsl:text>\texttt{</xsl:text>
-        <xsl:value-of select="normalize-space(text())"/>
+        <xsl:call-template name="tex-escape">
+            <xsl:with-param name="text" select="normalize-space(text())"/>
+        </xsl:call-template>
         <xsl:text>}</xsl:text>
     </xsl:template>
 
@@ -197,7 +259,9 @@
                 <xsl:text>}}</xsl:text>
             </xsl:when>
             <xsl:otherwise>
-                <xsl:value-of select="text()"/>
+                <xsl:call-template name="tex-escape">
+                    <xsl:with-param name="text" select="text()"/>
+                </xsl:call-template>
             </xsl:otherwise>
         </xsl:choose>
     </xsl:template>
