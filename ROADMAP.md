@@ -16,7 +16,6 @@ References: `DESIGN n.n` is a section of `checkit-printit/DESIGN.md`;
 | 1 | **One real gradebook round-trip.** The export is built, rewritten against his own `apply_to_brightspace.py`, audited against the record, and byte-identical to the old CLI path on his 11-13 exports. What it has never had is an upload and a re-download to compare | printit | DESIGN 14.6, 18 | him, at the next grading |
 | 2 | **A second, independent plan** for the export, as his script has. `verify_export` and the audit catch a stray or unbacked write, not a wrong plan written faithfully | printit | DESIGN 18 | nothing; only worth it if the export ever runs unattended |
 | 3 | **Read marks in, one way**, to seed a record from an existing gradebook | printit | DESIGN 18 | a decision: what a mark with no printed paper behind it looks like on Progress |
-| 4 | **Review and publish `F5-E`.** Built 2026-11-18 from a colleague's version: nine contexts, fourteen kinds of student work, an answer key per kind; generated, checked and previewed in print, not published, **not committed**. Paused 2026-11-19; the notes section ends with what is on disk, his three open questions, how to re-check it and how to publish | mat-106 | notes, "F5-E: analysing a student's proportional reasoning", last subsection | **his review** |
 | 15 | **Email students their results and pages** from Prior assessments. Built and checked 2026-11-19 against a local imitation of the script, not committed. Left: the first live send on `Demo`, through a borrowed form that is removed afterwards (DESIGN 21, "Testing without emailing anyone") -- which is also the first time anything here meets Google; his eye on the mail glyph. Settings' sign-in storm was found and fixed along the way, uncommitted | printit | DESIGN 21; notes, "Emailing students their papers", last subsection | **him** |
 | 16 | **Preferred first and last names; First and Last on the Roster.** Built and checked 2026-11-20, uncommitted. MAT 106's First and Last were filled by a one-time split at his request, with no printed name changed. Left: his look at the Roster, including the one compound surname, which went whole into Last | printit | DESIGN 22; notes, "Preferred names, and the registrar's in two columns" | **his eye** |
 | 5 | **The Settings tab's boilerplate editor.** A form can be created or attached from the app; editing its fixed text cannot | printit | DESIGN 12.6 (stage 8h) | nothing |
@@ -108,6 +107,12 @@ Each is his call, and each was parked for a reason (DESIGN 13.8).
 ## Done
 
 Newest first. Older work is in the notes; search them by date.
+
+- **2026-11-20** -- F5-E published: the 29th skill, a missing-value
+  problem with a fictional student's work to analyse, online and ready
+  to print. His three questions from 11-18 (the skill statement, the mix
+  of kinds, the mixed-number answer) were left as they were. Notes,
+  "F5-E: analysing a student's proportional reasoning", last subsection.
 
 - **2026-11-17** -- real students scrubbed from the history of `checkit`
   and `checkit-printit` and force-pushed; git hooks in all three repos

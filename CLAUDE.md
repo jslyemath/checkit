@@ -15,7 +15,7 @@ its own map (`../checkit-printit/CLAUDE.md`); the bank has a short one.
 |---|---|---|
 | `Projects/checkit` | **the platform**, a fork of StevenClontz/checkit. `dashboard/` is the Python package (`checkit generate`, `viewer`, `check`); `viewer/` is the Svelte site students and instructors browse; `docs/demo/` is the demo site | this file |
 | `Projects/checkit-printit` | **the print tool and the course around it**: print runs, rosters, seating, the Google Form, scanning marked papers back in, Progress, the gradebook round-trip, the vault -- and the local web app (`gui -c <course>`), which is part of printit, not of the platform | `../checkit-printit/CLAUDE.md` |
-| `Projects/mat-106-checkit` | **the live bank**: 29 outcomes, publishes to `docs/` | its own `CLAUDE.md` |
+| `Projects/mat-106-checkit` | **the live bank**: 29 skills plus the Fundamentals Checkpoint (30 outcomes in `bank.xml`), publishes to `docs/` | its own `CLAUDE.md` |
 | `Projects/mat-206-checkit` | **frozen. Do not modify or push.** To be rebuilt from scratch later | -- |
 | `Projects/FundCheck` | not a repo. The pre-port FCP script and ~120 `.tex` files **with real student names** | -- |
 

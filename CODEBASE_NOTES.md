@@ -21045,6 +21045,50 @@ is temporary, so the recipe is here:
 `outcomes/F5-E/` and `docs/` and push -- the name guard runs on both.
 Then move ROADMAP item 4 to Done.
 
+### Published (2026-11-20)
+
+Picked up after the emailing and names work.
+
+**The preview.** `checkit viewer` was run in a scratch copy of the bank,
+holding `bank.xml`, `assets/`, `outcomes/` and the helpers. `TeX
+Outputs` and `PDF Outputs` hold real names and were never copied. The
+copy was served on 8774 and he browsed it. Of the 50 public versions, 25
+are correct and 22 have figures, and all 14 kinds appear. His three
+questions from 11-18 were not taken up; he asked to publish as it
+stands.
+
+**Alt text, which he could not check himself.** All 22 figure versions
+among the 50 carry `alt`, from the generator's `figure_desc`. Each says
+what is drawn, number by number, errors included: v3's skip-count slip
+reads "0, 7, 14, 20, 27, 34". Nothing is corrected or flagged, so the
+alt does not give away the answer that sighted students must find.
+
+**The count.** He expected 29. `bank.xml` lists the Fundamentals
+Checkpoint (FCP) as an outcome too. That made 29 outcomes before F5-E
+(FCP and 28 skills) and 30 after (FCP and 29 skills); the "30 outcomes"
+in the maps read as 30 skills. Both maps now say "29 skills plus the
+Fundamentals Checkpoint".
+
+**Checks before publishing.**
+- Every generated file is newer than the last source edit.
+- `checkit check` reports no findings over the whole bank.
+- After `checkit viewer` into the real `docs/`, the only changed paths
+  were `docs/assets/bank.json` and `docs/assets/F5-E/`.
+- Inside `bank.json`, compared outcome by outcome against HEAD: F5-E
+  added, none changed, only `generated_on` differing.
+- F5-E's print-only seeds carry no data; the highest seed with data is
+  399.
+
+**Published.** mat-106 commit da3cc58 holds `bank.xml`, `CLAUDE.md`,
+`outcomes/F5-E/` and `docs/`; the name guard checked the staged lines,
+the message and the push.
+
+**Print.** Print reads `assets/F5-E/generated/seeds.json`, which is
+local and gitignored like every outcome's, generated on 11-18 with
+`--image-seeds 400`; the print check of 11-18 (24 pages, no LaTeX
+errors) still stands. Students can choose it on the form only once it
+is opened in his course, which is his step.
+
 ## Emailing students their papers (2026-11-19)
 
 His request: a button in Prior assessments, on a graded run, that
