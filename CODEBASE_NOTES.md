@@ -20876,6 +20876,566 @@ pseudonyms said which candidate was "in a roster". None reached a file or
 a commit. The rule is now in `WORKING_RULES.md`: blank every real value
 on the line, in any case, inside words too, before anything is printed.
 
+## F5-E: analysing a student's proportional reasoning (2026-11-18)
+
+His request: develop F5-E into randomised versions, from a colleague's
+hand-made one -- a missing-value problem (two cars at constant speeds,
+"when red has gone 20 miles, silver has gone 30; how far has red gone
+when silver has gone 45?") followed by a fictional student's work and two
+questions: describe the first step, the model and the numbers placed
+first; then judge whether the model was used accurately and the answer
+right. Her extra samples of student work were a ratio between the two
+cars, a scale factor within one car, two double number lines and a tape
+diagram. Not all speed problems, a real variety, and names and pronouns
+from `bank_helpers.random_person`.
+
+### What makes a problem hard enough
+
+The literature on missing-value problems (Hart; Lamon; Lesh, Post and
+Behr) agrees on what pushes a student off multiplication and onto
+additive or guessing strategies: **non-integer ratios, both within a
+quantity and between the two**. If silver's 30 becomes 60, "double it"
+solves the problem without proportional reasoning; if red is half of
+silver, "halve it" does. So every version is built from
+
+* a **unit pair** p : q, coprime, both 2..9 -- the smallest matching
+  amounts, so q/p and p/q are both non-integers;
+* a **given multiplier** m and an **asked multiplier** k, 2..8, neither
+  dividing the other, so the scale factor k/m is a non-integer;
+* given a = m*p with b = m*q; asked c = k*q; answer x = k*p, a whole
+  number. Her version is p:q = 2:3, m = 10, k = 15 -- outside these
+  ranges, and the reason the diagrams stay drawable is that m and k are
+  at most 8.
+
+Every context has a plausible range, and all five numbers in the problem
+(a, b, c, x and the distractor) are distinct.
+
+### Contexts, each with an irrelevant number
+
+Her Exit 24 is the most valuable thing in her version: it is what her
+student divided by. Every context therefore carries one.
+
+| context | A (asked) | B (given twice) | irrelevant number |
+|---|---|---|---|
+| two cars, constant speeds | miles of car 1 | miles of car 2 | the exit they passed together |
+| party punch | cups of juice | cups of ginger ale | number of guests |
+| mixing paint | ounces of blue | ounces of yellow | length of the mural |
+| map scale | centimetres on the map | kilometres on the ground | width of the map |
+| price | pounds of apples | dollars | number of stalls at the market |
+| shadows | height of the tree | length of its shadow | distance between pole and tree |
+| reading rate | pages read | minutes | chapters in the book |
+| club ratio | fifth graders | fourth graders | classrooms in the school |
+| recipe | eggs | servings | minutes in the oven |
+
+### The student's work: fourteen kinds
+
+Correct (six):
+
+1. **Ratio between the quantities** -- a/b = p/q, then p/q * c. When p/q
+   is more than 1 it is written as a mixed number and multiplied by
+   parts, as in her sample ("1 1/4 * 36 = 36 + 9 = 45").
+2. **Scale factor within a quantity** -- c/b = k/m, then k/m * a.
+3. **Building up a unit chunk** -- a / m = p and b / m = q, then c / q = k
+   groups, k * p = x.
+4. **A proportion, cross-multiplied** -- a/b = x/c, b*x = a*c, x = ac/b.
+5. **Double number line** -- both lines from 0, skip-counting by p and
+   q, the answer circled.
+6. **Tape diagram** -- m boxes of p over m boxes of q, then k of each.
+
+Incorrect (eight), each a documented misconception:
+
+7. **Additive reasoning** -- the difference b - a, applied to c. The
+   classic error, and the one worth most attention.
+8. **The irrelevant number** -- her version: a divided by the
+   distractor, times c.
+9. **The ratio inverted** -- b/a times c. Its answer is on the wrong side
+   of c, which a reasonableness check catches.
+10. **The proportion set up mismatched** -- a/b = c/x.
+11. **An additive double number line** -- the given pair, then the same
+    jump added to both lines, no zero. The additive error inside a model.
+12. **A skip-counting slip on a correct double number line** -- the
+    model right, one label wrong and carried forward.
+13. **A mixed-number slip** -- the right ratio, as a mixed number, with
+    only the whole part multiplied (1 1/4 * 36 = 36 1/4). The model
+    accurate and the arithmetic not -- what part 2 of her question exists
+    to separate.
+14. **A rounded unit rate** -- a / b as a two-place decimal when it
+    repeats, so the answer is close but not exact.
+
+Some need conditions -- 11 needs c > b; 13 an improper ratio; 14 a
+repeating decimal -- and a version picks among the kinds its numbers
+allow, correct and incorrect weighted about evenly. The same problem can
+therefore come with any of several pieces of work.
+
+### The questions, and what the answer key says
+
+Her two, generalised only where a piece of work is not a picture:
+"Describe the first step that NAME took to solve the problem. What model
+or strategy did NAME use? Which numbers from the problem did NAME work
+with first?" and "Analyze NAME's work. Was the model or strategy used
+accurately? Did NAME get the correct answer? Explain how you made your
+decision about the accuracy." The key, per kind of work, describes the
+first step and the model, says whether it was used accurately, gives the
+correct answer, and for an error names the misconception in a sentence
+an elementary teacher could say to a child.
+
+### Pictures
+
+Double number lines and tape diagrams are drawn as TikZ by the
+generator's `tikz_graphics`, so the website's PNG and the printed page
+are one picture (`<tikz-image>`; print `\input`s the `.tikz`). Plain TikZ
+only: `printitfigures.sty` does not load `decorations.pathreplacing`, so
+her braces become totals written beside each tape.
+
+### Where it stopped, and how to pick it up (pinned 2026-11-19)
+
+Paused by him on 2026-11-19 for the emailing work, before his review.
+Nothing is published and nothing is committed.
+
+**On disk, uncommitted in `mat-106-checkit`:** `bank.xml` (the F5-E
+`<associate>` removed; a real `<outcome>` "Explaining Proportional
+Reasoning" after F5, with the old associate's description kept word for
+word), `outcomes/F5-E/generator.py`, `template.xml`, `textemplate.tex`,
+and `CLAUDE.md` (29 -> 30 outcomes). **In `checkit`:** this section,
+`ROADMAP.md` item 4 and its small item on `{{#list}}`, and `CLAUDE.md`
+(30 outcomes). `assets/F5-E/generated/` is gitignored, like every
+outcome's, and regenerates.
+
+**What has been run:** `generate -o F5-E -r -i --image-seeds 400
+--remote https://jslyemath.github.io/mat-106-checkit` (111 figures; F5-E
+only, so no live skill was re-rolled), then `checkit check` clean over
+the whole bank. F5-E has never been live, so the republish rule has
+nothing to protect yet; publishing it is the step that makes it live.
+
+**His three open questions**, from the report of 2026-11-18:
+
+1. The skill statement in `bank.xml` is still the associate's ("I can
+   explain my reasoning for each step of work..."), though the task is
+   analysing a student's work. His course outcome, so left for him.
+2. The mix: correct work about 51% of versions, pictures about 30%. Each
+   is a weight in `_kinds()` (the figure kinds are 1.75 and 1.5).
+3. The irrelevant-number kind's answer is printed as a mixed number
+   (28 8/19); a child would more likely write a decimal.
+
+**To check it again after any change** -- the scratchpad that held these
+is temporary, so the recipe is here:
+
+* *The sweep.* Load the generator without the platform (exec its source
+  with `BaseGenerator = object` and `provide_data = staticmethod`), seed
+  `random` with 0..2999, call `generate()`, and assert: the student's
+  answer equals the true answer exactly when the kind is in `CORRECT`;
+  `problem_tex` holds four distinct numbers and not the answer; a figure
+  version has one `tikzpicture` and no `work` lines, any other has one
+  display `<m>` per line of work; no unconverted `$` in `problem`, `q1`,
+  `q2`, `a1`, `a2`. Then count contexts, kinds, the correct share and the
+  figure share, and list any kind a context never gets (none, at 3000).
+* *Print.* A job in a scratch folder with an invented roster of eight,
+  `seating.toml` giving versions A-H, `[seeds.F5-E]` pinning A=400
+  (number line), B=405 (tape), C=408 (additive number line), D=420
+  (skip-count slip), E=421 (additive), F=406 (irrelevant number), G=492
+  (mixed-number slip), H=425 (scale factor), `simply_print = ["F5-E"]`,
+  keys on; built with `CHECKIT_PRINTIT_HOME` set to a scratch home and
+  `--no-record`, so the real record is never written. 24 pages, no LaTeX
+  errors, no overfull boxes, on 2026-11-18.
+* *Web.* `checkit viewer` into a scratch copy and read seeds 50 and 51's
+  precomputed HTML, or open the PNGs under `assets/F5-E/generated/`.
+
+**To publish, when he has reviewed it:** in `mat-106-checkit`,
+`./venv/Scripts/python.exe -m checkit viewer`, then commit `bank.xml`,
+`outcomes/F5-E/` and `docs/` and push -- the name guard runs on both.
+Then move ROADMAP item 4 to Done.
+
+## Emailing students their papers (2026-11-19)
+
+His request: a button in Prior assessments, on a graded run, that
+emails each student who sat it their result per skill and their own
+scanned pages, from the Google account in the app; a template edited
+on Settings and editable again for each send. The design and his four
+answers are DESIGN 21; this is what building it found.
+
+**The only Google identity printit has is the form's script**, which
+runs as the form's owner. So mail goes through a new `mail` op there
+(`MailApp`, which asks only to send; `GmailApp` asks to read and delete
+everything), one request per student. Adding it is a new permission,
+and Google then refuses *every* call -- push and pull too -- until he
+grants it, so "Update the script" on Settings ends in the existing
+authorize panel. It updates the deployment rather than creating one,
+because a new deployment is a new URL and `secrets/` would go on
+naming the old one.
+
+**A found bug, not in the request.** Scans saved a page against a
+student only through the decision on that page, and decisions sit on
+the page with the box. A skill that runs to a second sheet has no box
+there, so every second sheet ever saved has nobody on it in
+`scan_page`. Nothing read those rows until now; an email would have
+attached half a paper. `_note_pages` now finds a later sheet's first
+page through the run's own index (`Index.first_page_of`: step back
+while the sheet number falls, same kind, student and skill, else None)
+and gives it to whoever that first page was decided to be -- the
+decision, not the printed name, so a re-matched paper keeps both
+sheets together. `scan_page` gained `run_page`, so pages go into the
+PDF in printed order; `ADDED` became per table to carry it. Stacks
+saved before today are not repaired; the email page says "W2 has 1 of
+2 pages" where a paper comes up short, and re-saving that stack on
+Scans fixes it.
+
+**pystache was the first template reader and was dropped.** In strict
+mode it still rendered an unclosed `{{#results}}` as plain text -- the
+quiet hole the strictness was for. `mailing.render` reads Mustache's
+field tags only and refuses everything else by name. Same syntax as
+the bank's templates, so not a fourth system.
+
+**A timeout on `mail` is its own type** (`form.FormTimeout`). `form.call`
+retries a timeout, which for a form push is harmless and for an email
+is a second email. `mail` is called with `retries=0`; a timeout stops
+the send, records nothing, and says to look in Sent first.
+
+**Verified rather than assumed.** 47 tests in `test_mailing.py`, eleven
+rules broken on purpose and each caught. `tools/check.py` all clear.
+In the browser, on an invented seven-student course in a scratch home
+(never a real course): the row button opens the page; the "?" toggle
+moves a skill and its page in and out of the email; a misspelt field is
+refused by name and disables Send; the Settings card saves through the
+one save bar, keeping comments, with quotes and `&` intact. Then the
+whole send, against a local imitation of the script that recorded
+instead of sending: three went with the right pages each (a two-sheet
+paper's both sheets, a "?" skill's page left out, a missing page
+absent), one bad address was refused and named, and the button came
+back as "Send to 1". Clicks were by element reference; the pane's
+screenshots were drawn at 800px over a 1273px viewport and a click by
+coordinate missed twice.
+
+**Not verified: anything at Google.** `update-deployment`, MailApp's
+permission prompt, the quota call, and how large a POST the web app
+accepts with a class's worth of pages have never run. The first live
+send is his, on `Scratch`, to his own addresses.
+
+### "Failed to fetch" on Settings, and no Scratch course (2026-11-19, later)
+
+He reported two things: no "Update the script" on Scratch, and "Failed
+to fetch" after pressing "Sign in to Google". He asked whether the
+second was because he was already signed in on MAT 106.
+
+**What he was looking at was Demo** (port 8768, `#setup`), not Scratch.
+The only servers running were MAT 106 (8767) and Demo (8768).
+**There is no Scratch course on this machine**: `~/CheckItPrintIt/courses`
+holds `Demo` and `MAT 106` only, and no folder anywhere under the home is
+named like it. printit's `CLAUDE.md` still says `Scratch` exists, with two
+students and a real form. That line is out of date, or the course lives
+somewhere else; not yet asked.
+
+**No "Update the script" on Demo is right.** The button sits in the
+connected-form card (`setup-have`), and Demo has no form. A live send
+needs a course with a form. MAT 106 has one, but updating its script
+means re-authorizing the live form mid-term. I proposed a new
+two-student Scratch with a fresh form. **He said no (2026-11-20).**
+`Scratch` was retired on purpose so that `Demo` is the one test course,
+and a course made for a test is deleted afterwards, not written into
+the notes. So Demo borrows a form for the test and gives it back;
+DESIGN 21, "Testing without emailing anyone", has the steps. printit's
+`CLAUDE.md` now names Demo, not Scratch.
+
+Demo as found on 2026-11-20 (counts only):
+- eight students, all at `example.invalid`;
+- two runs, seven graded attempts (six passed, one queried);
+- **no scanned pages** (`scan_page` is empty), so a send from Demo
+  today would attach nothing.
+
+The `mailed` table was already there, meaning the Demo server had
+opened the record with the new code.
+
+**"Failed to fetch" was a request storm, and it is older than the email
+work.** The Demo tab's console held more than 46,000
+`ERR_INSUFFICIENT_RESOURCES` errors. `renderSetup` ran
+`setTimeout(() => loadSetup(), 4000)` while `signingIn` was true. There
+were two faults, both from 29047ad (2026-10-20):
+
+- `loadSetup` renders three times, and two of those renders saw
+  `signingIn`. So each round scheduled two more rounds, which doubles
+  every 4s.
+- `loadSetup` asked through `fetchGoogle()`, which returns the promise it
+  already holds. So the page never heard that the sign-in ended, and the
+  loop never stopped.
+
+The email work made it a little worse by adding one more request per
+round, the template load. Being signed in on MAT 106 was not the cause.
+clasp's sign-in is one per machine, and the server answered
+`loggedIn: true, lastAttempt: "done"` once the tab was reloaded off
+Settings.
+
+**The fix** (`app.js`, `pollSignIn`): at most one timer. It clears this
+page's cached answer (`googleRequest = null`) and asks again, without
+`force`, because the server reports `signingIn` live and checks clasp
+afresh once the sign-in ends.
+
+**How it was checked.** Watched it fail first: with `api` stubbed to
+answer `signingIn: true`, the old code sent 5,699 `/api/setup` requests
+and one `/api/google` request in 17s. The fixed code, stubbed to say
+"waiting" three times and then "done", made one `/api/setup` request and
+four `/api/google` requests in 22s, and ended on "Signed in". After that:
+`node --check` on `app.js` passed, and `tools/check.py` was all clear
+(1821, audit 0, docs 0, 220). Not committed.
+
+**Where it stopped** (paused at his request):
+
+- A screenshot of the real Demo Settings page was not taken yet. It was
+  reloaded at `?cb=3#setup`.
+- He has not been told the findings above.
+- Still open with him:
+  - committing (he said "we'll wait to push").
+
+On 2026-11-20 he reported that Demo's Settings says he is signed in:
+the fix, seen on the real page.
+
+### The first live send (2026-11-20)
+
+Done on Demo, through the app's own controls, following DESIGN 21,
+"Testing without emailing anyone".
+
+1. **Backup.** Demo's files went to
+   `~/CheckItPrintIt/demo-backup-2026-11-20/`, in the home and not the
+   scratchpad. `record.db` was copied with SQLite's backup; the copy's
+   integrity check says ok.
+2. **A run to scan.** Demo's old runs have no PDF, so the test printed a
+   new one on the Print tab: two students (`d01`, `d02`), N3 and R1,
+   six pages including the keys. Printing first needed three things
+   Demo had never had:
+   - a seating chart, made on Seating with Seat all;
+   - a saved job;
+   - a variant for each skill (N3 `any_method`, R1 `whole_numbers`).
+
+   My typing landed mid-field, so the run is named "Skill CheEmail
+   testckpoint".
+3. **Scans.** The run's own `main.pdf` was handed to `#scan-files`.
+   The page fetched it from a one-file server on port 8773, now stopped
+   and removed from `launch.json`. All 6 pages matched. Marks: `d01` N3
+   passed, R1 queried; `d02` N3 passed, R1 failed. Saved.
+4. **A borrowed form.** On Settings, Create made "DELETE ME - printit
+   email test". He granted the permission.
+5. **Addresses.** On the Roster, `d01` was set to his work address and
+   `d02` to his gmail, both at his instruction.
+6. **The send.** The quota check answered "1500 more emails today".
+   The plan was 1 page for `d01` (the queried R1 left out) and 2 for
+   `d02`. The page said "Sent 2." and both rows offered "send again".
+7. **Update the script**, pressed afterwards on Demo. It answered
+   "updated: <the same URL>" and "the script reports version 2", so
+   `clasp update-deployment` keeps the address.
+
+**Verified at Google:**
+- the mail permission;
+- `MailApp` sending with attachments;
+- the quota call;
+- `update-deployment`.
+
+**Not yet confirmed:** that both emails arrived and look right. That
+is his inbox.
+
+**Seen along the way, not fixed:**
+- The "Save first -- the build reads the file" toast sits over the
+  Save button it names, so the first click on Save hit the toast.
+- A course with no `seating.toml` fails to build with a raw
+  `[Errno 2]`, not a sentence.
+- The results read "1" and "0", which is correct: Demo's
+  `gradebook.toml` maps the marks that way.
+
+**He confirmed both emails arrived (2026-11-20).**
+
+**Cleaned up the same day** by a script that checked the backup first:
+- removed from Demo: `job.toml`, `room.json`, `seating.toml`,
+  `form.toml`, `scans/` and `secrets/`;
+- restored `course.toml`, `gradebook.toml`, `record.db` and
+  `roster.toml`, each compared byte for byte with the backup;
+- deleted the run's two folders and the backup.
+
+Demo holds its four original files again. The vaults were untouched
+(last written 11-17). **Left for him:** trash "DELETE ME - printit email
+test" in Drive.
+
+**His questions about size, answered with his own scans.**
+- Each email carries one PDF, so Google's 250-attachments cap never
+  applies. The limit that matters is 25 MB per message (Apps Script
+  quotas page, read 2026-11-20).
+- His 19 stacks run 109-158 KB per page. Twenty pages of the bulkiest
+  come to 3.2 MB, and forty to 6.2 MB.
+- `MAX_ATTACHMENT` is 18 MB, which allows for base64.
+- Google publishes no limit on a request's size into a web app. Today's
+  were well under 1 MB; the largest ever sent is unknown.
+
+## Preferred names, and the registrar's in two columns (2026-11-20)
+
+DESIGN 22 has the decisions; this is how it went.
+
+**What started it.** The live email test showed the email's `{{first}}`
+was a guess. On MAT 106 each of the 45 students had only `name`, and
+`first`, `last` and `preferred` were empty for all of them. `preferred`
+was one whole printed name. His Sheets proof of concept kept a nickname
+apart from the surname. He asked for `pref_first` and `pref_last`, each
+falling back to the registrar's; for First and Last as their own Roster
+columns; for the order switch to turn both pairs; and for masking to be
+"ensured and re-ensured".
+
+**Why the registrar's name was one string.** The importer does read
+separate Last/First columns, or splits "Last, First". His class lists
+carry them: two with separate columns, two with full names. A
+re-import fills them on students already there (`merge`, the field
+loop). MAT 106 has simply not been re-imported since those fields
+existed.
+
+**What a re-import would do**, measured in memory with counts only:
+- all 45 get First and Last;
+- **eight printed names would change**, every one in the given name
+  only. The roster name is "X Surname", with X the name the student goes
+  by.
+
+DESIGN 22 sets out his choice. The one recommended keeps today's
+printed name by setting `pref_first`.
+
+**Consequences found while building**, each now in DESIGN 22:
+- **`name` cannot go.** `seating.toml` matches a seat by sid, else by
+  `name` or the printed name; `find`, `keys_of` and the import fall back
+  to it. It follows First and Last when the Roster edits them, as it
+  followed the Name box before.
+- **The vault had one fake surname per person.** A preferred surname
+  that differs would have stopped masking with a VaultError, so a second
+  surname now draws its own fake. This is lazy, so existing vaults are
+  unchanged.
+- **Every privacy path kept its own tuple of name fields.** That was
+  four copies: `maskcourse`'s avoid list, its masking loop, `nameguard`,
+  and `privacy.saw` through `maskcourse`. There is now one list,
+  `Student.name_fields()`. The masking loop also masks `display` and
+  both filed forms.
+- **Seating cards cut at the first space.** That is wrong for "Mary Ann",
+  so they use the parts once stored.
+- **The email preferred the registrar's first name** over the preferred
+  one. Now `name_values` puts preferred first.
+
+**Found by operating it.**
+- The first real click on the order switch sorted the Last column
+  instead. `elementFromPoint` at the switch's centre was the sort
+  button: the heading was 88px, measured as its bare label, with the
+  arrow and rank laid over the floated switch. The old Name column's
+  150px floor had hidden this for months.
+- The column carrying the switch is now measured with arrow, rank and
+  switch. Clicked again, the switch flipped both pairs; First took the
+  pin; a column sorted up, down, then up again.
+
+**Verified.**
+- 1851 tests and `tools/check.py` all clear; 30 of the tests are new.
+- 13 break-checks, each caught (`breakcheck_names.py`):
+  - each privacy path forgetting a field;
+  - the vault without the second surname;
+  - `display` ignoring the preferred parts, or composing half a name;
+  - the old key loading silently;
+  - the email greeting by the registrar's name;
+  - half a name saved;
+  - `name` not following;
+  - the card cut;
+  - Progress splitting.
+- In the browser on Demo, through the real boxes and Save:
+  - a three-part edit saved, and printed "Norrie Alder";
+  - a preferred name on a whole-name row was refused with its sentence,
+    and nothing was written.
+- Demo's roster was backed up first and restored after, matching its
+  hash.
+- MAT 106 loads, and 0 printed names change today.
+- The name guard is clean against 312 real values.
+
+**Not done.** Nothing of his is converted or imported: the re-import
+and the eight are his.
+
+### The one-time split, and the frozen pair (2026-11-20, later)
+
+**He asked why a re-import was needed.** It was not needed. Without
+First and Last, everything prints and mails as before. Only two things
+are missing:
+- a preferred name cannot be set, because it is refused, with nothing to
+  stand in for;
+- the surname sort is a guess.
+
+He chose a one-time split, and said he would fix the compound surname
+himself.
+
+**The split** (`split_mat106.py`, counts only):
+- Counted first: 44 names of two words, 1 of three, none with odd
+  spacing, none with First or Last already set.
+- First is the first word and Last is the rest, so First + " " + Last
+  is the stored name exactly. `classlist.split_full_name` was not used:
+  it makes a three-word name's middle word a middle name, which First +
+  Last would drop from the paper.
+- The script refuses, writing nothing, unless every name rebuilds and
+  no printed name changes.
+- Backup: `MAT 106/.backup-2026-11-20/roster.toml`. Written through
+  `fileio.atomic_write` and `roster.to_toml`.
+- Read back: 45 of 45 filled; printed and roster names unchanged for
+  all; skills, sections, ids, addresses, drops and `chose_for`
+  identical. The compound surname went whole into Last.
+
+**The frozen columns.** Only the first name column had been pinned, so
+the other half of the name scrolled away. He asked for both frozen,
+with the switch at the far right of the right-hand one, and more room
+between it and the heading text.
+- Both registrar columns now pin: `pinleft` at 0, and `pinleft2` at
+  `--pin2`, the first's width from `sizeColumns`. The hairline is on the
+  pair's outer edge only.
+- The switch has `margin-left: var(--s3)`, and its column reserves 38px
+  for it.
+- Checked in the browser (emulated 1100x750, because the pane was hidden
+  and reported a 0x0 viewport): scrolled 200px sideways, both name
+  columns held their places and Pref first slid under them. The switch
+  sat 17px clear of "LAST ↑ 2" and took the click, in both orders.
+  Progress's Name heading still fits with the wider gap.
+
+**He found three problems in that** (2026-11-20):
+- a see-through strip between the frozen columns;
+- "LAST ↓ 1" losing its end to "..." beside the switch;
+- no way to widen a frozen column, so long names were cut off.
+
+The check above had passed because it measured, at one window width,
+things the bug did not show there.
+
+- **One cause behind the first two: the table was `width: auto`.**
+  `table-layout: fixed` applies only to a table with a width. With
+  `auto`, the browser laid the columns out by content. `sizeColumns`
+  measured headings as the bare label in normal weight, which
+  under-counts the bold primary sort, the letter-spacing, the arrow, the
+  rank and the padding. Section was planned at 74px against the 96 it
+  needs, and the browser took the difference from the other columns:
+  each `<col>` said 110 and drew at 107.7. The second frozen column
+  stuck at the planned 110, which left 2.3px of strip. A floated switch
+  is not content, so the Last heading never got room for it.
+- **The fixes:**
+  - The table gets an explicit width, so the `<col>`s are what is drawn.
+  - Every heading is measured as drawn at its widest: bold,
+    letter-spacing from the computed style, "↓ 2", the th's padding,
+    and the switch plus its `--s3` gap.
+  - `--pin2` is read off the drawn first column, not the plan.
+- **Width that is his:**
+  - A handle on each frozen heading's right edge (`addColumnGrip`).
+    Drag to resize; double-click to fit again. The widths are kept per
+    browser, in `localStorage` `rosterWidths`.
+  - A dragged width is exempt from growing and shrinking. It is never
+    narrower than its heading.
+  - The frozen pair is never shrunk to fit a narrow window either: the
+    other columns scroll instead.
+- **A bug in the handle, found by operating it.** A press that never
+  moved saved the current width and redrew the heading row. That pinned
+  a column he had only clicked, and replaced the handle between the two
+  clicks of a double-click, so "fit it again" never fired. A press now
+  does nothing unless it moved 2px.
+- **Checked** at 760x700 (emulated, the pane hidden):
+  - planned and drawn widths equal for every column;
+  - no heading clipped, "FIRST ↓ 1" beside the switch included, with
+    a 15px gap;
+  - scrolled sideways, a seam of 0 on every row and the heading, before
+    and after dragging either frozen column;
+  - real drags: First 110 to 191, Last 110 to 149, and the second's
+    sticking point followed;
+  - a double-click put First back to 110.
+- **A harness note.** The pane's screenshot frame is not the page scaled
+  evenly. One drag landed at page (227, 63) when (270, 86) was meant.
+  The mapping came from where the events actually arrived, logged by a
+  capture listener, not from the screenshot.
+
 ## printit's map, as it stood before 2026-11-17
 
 `checkit-printit/CLAUDE.md` was 2,171 lines and loaded into every printit

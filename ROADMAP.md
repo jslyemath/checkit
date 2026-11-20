@@ -16,7 +16,9 @@ References: `DESIGN n.n` is a section of `checkit-printit/DESIGN.md`;
 | 1 | **One real gradebook round-trip.** The export is built, rewritten against his own `apply_to_brightspace.py`, audited against the record, and byte-identical to the old CLI path on his 11-13 exports. What it has never had is an upload and a re-download to compare | printit | DESIGN 14.6, 18 | him, at the next grading |
 | 2 | **A second, independent plan** for the export, as his script has. `verify_export` and the audit catch a stray or unbacked write, not a wrong plan written faithfully | printit | DESIGN 18 | nothing; only worth it if the export ever runs unattended |
 | 3 | **Read marks in, one way**, to seed a record from an existing gradebook | printit | DESIGN 18 | a decision: what a mark with no printed paper behind it looks like on Progress |
-| 4 | **Publish `F5-E`** as a real `<outcome>` in mat-106's `bank.xml`. The slug appears only inside `<associates>`, which nothing reads, so it generates and publishes nothing | mat-106 | DESIGN 14.8 | nothing |
+| 4 | **Review and publish `F5-E`.** Built 2026-11-18 from a colleague's version: nine contexts, fourteen kinds of student work, an answer key per kind; generated, checked and previewed in print, not published, **not committed**. Paused 2026-11-19; the notes section ends with what is on disk, his three open questions, how to re-check it and how to publish | mat-106 | notes, "F5-E: analysing a student's proportional reasoning", last subsection | **his review** |
+| 15 | **Email students their results and pages** from Prior assessments. Built and checked 2026-11-19 against a local imitation of the script, not committed. Left: the first live send on `Demo`, through a borrowed form that is removed afterwards (DESIGN 21, "Testing without emailing anyone") -- which is also the first time anything here meets Google; his eye on the mail glyph. Settings' sign-in storm was found and fixed along the way, uncommitted | printit | DESIGN 21; notes, "Emailing students their papers", last subsection | **him** |
+| 16 | **Preferred first and last names; First and Last on the Roster.** Built and checked 2026-11-20, uncommitted. MAT 106's First and Last were filled by a one-time split at his request, with no printed name changed. Left: his look at the Roster, including the one compound surname, which went whole into Last | printit | DESIGN 22; notes, "Preferred names, and the registrar's in two columns" | **his eye** |
 | 5 | **The Settings tab's boilerplate editor.** A form can be created or attached from the app; editing its fixed text cannot | printit | DESIGN 12.6 (stage 8h) | nothing |
 | 6 | **Make the four renderers agree.** The student page (Svelte) and `html.xsl` / `latex.xsl` / `pretext.xsl` differ on: a knowl with both content and parts; several outtros (print keeps the first); an element inside `<m>` (the stylesheets keep the first text only); `<em>` in a title. Proposed ruling: show everything, everywhere. Touches upstream code and what students see, and the student page has no JS tests, so it is checked in a browser. `checkit check` now reports every case (`dropped`, `nested-in-m`); mat-106 hits none | platform | notes, "The renderer check" | **his ruling on each case** |
 | 7 | **A corpus of real, masked crops** for the scan thresholds, so a change to one is checked against every stack so far rather than the latest | printit | notes, "The whole codebase, read by a different model" | masked crops from a second stack |
@@ -51,6 +53,10 @@ References: `DESIGN n.n` is a section of `checkit-printit/DESIGN.md`;
   the file should get an empty view.
 - **`drop_columns` pads a line above the header** with empty cells when a
   file with a preamble is trimmed for import. Nothing reads that line.
+- **`checkit check` reads a field inside a `{{#list}}` section as a
+  top-level one**, so a template looping over a list of objects fails
+  `missing-data` for every version whose list is empty. F5-E avoids the
+  loop; the check should follow sections the way Mustache does.
 - **The demo bank's EX3 puts an HTML `<ul>` in an intro**, which all three
   stylesheets drop. Upstream's example; `checkit check` reports it.
 
